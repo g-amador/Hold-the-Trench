@@ -1,27 +1,30 @@
 """
-states/main_menu.py
+states/game_over_state.py
 
-Main menu for Hold the Trench.
+Defeat screen for Hold the Trench.
 """
 
 import pygame
 
-from config import (
+from src.config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     BLACK,
     WHITE
 )
 
-from states.prep_phase import PrepPhase
+from src.states.prep_phase import PrepPhase
 
 
-class MainMenu:
+class GameOverState:
     """
-    Main menu state.
+    Displayed when the player loses.
     """
 
-    def __init__(self, game):
+    def __init__(
+        self,
+        game
+    ):
 
         self.game = game
 
@@ -29,7 +32,9 @@ class MainMenu:
 
         self.options = [
 
-            "Start Campaign",
+            "Retry Scenario",
+
+            "Generate New Scenario",
 
             "Exit Game"
 
@@ -37,7 +42,7 @@ class MainMenu:
 
         self.title_font = pygame.font.SysFont(
             "Arial",
-            56
+            48
         )
 
         self.font = pygame.font.SysFont(
@@ -45,11 +50,17 @@ class MainMenu:
             36
         )
 
-    def handle_event(self, event):
+    def handle_event(
+        self,
+        event
+    ):
 
         if event.type != pygame.KEYDOWN:
             return
 
+        #
+        # Navigate
+        #
         if event.key == pygame.K_UP:
 
             self.selected_index -= 1
@@ -70,17 +81,30 @@ class MainMenu:
 
                 self.selected_index = 0
 
+        #
+        # Confirm
+        #
         elif event.key == pygame.K_RETURN:
 
-            self.activate_selection()
+            self.activate_option()
 
-    def activate_selection(self):
+    def activate_option(
+        self
+    ):
+        """
+        Execute selected action.
+        """
 
-        option = self.options[
+        choice = self.options[
             self.selected_index
         ]
 
-        if option == "Start Campaign":
+        #
+        # Retry
+        #
+        if choice == (
+            "Retry Scenario"
+        ):
 
             self.game.change_state(
 
@@ -90,7 +114,27 @@ class MainMenu:
 
             )
 
-        elif option == "Exit Game":
+        #
+        # New scenario
+        #
+        elif choice == (
+            "Generate New Scenario"
+        ):
+
+            self.game.change_state(
+
+                PrepPhase(
+                    self.game
+                )
+
+            )
+
+        #
+        # Exit
+        #
+        elif choice == (
+            "Exit Game"
+        ):
 
             self.game.running = False
 
@@ -105,13 +149,15 @@ class MainMenu:
         screen
     ):
 
-        screen.fill(BLACK)
+        screen.fill(
+            BLACK
+        )
 
         #
         # Title
         #
         title = self.title_font.render(
-            "HOLD THE TRENCH",
+            "DEFEAT",
             True,
             WHITE
         )
@@ -129,7 +175,7 @@ class MainMenu:
         # Subtitle
         #
         subtitle = self.font.render(
-            "WWI Procedural Defense Game",
+            "The trench line has fallen.",
             True,
             WHITE
         )
@@ -144,7 +190,7 @@ class MainMenu:
         )
 
         #
-        # Menu
+        # Options
         #
         for index, option in enumerate(
             self.options
@@ -172,6 +218,9 @@ class MainMenu:
                 )
             )
 
+        #
+        # Controls
+        #
         controls = self.font.render(
             "UP/DOWN = Select | ENTER = Confirm",
             True,

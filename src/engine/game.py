@@ -6,15 +6,15 @@ Main game controller for Hold the Trench.
 
 import pygame
 
-from config import (
+from src.config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     GAME_TITLE,
     FPS
 )
 
-from engine.asset_manager import AssetManager
-from states.main_menu import MainMenu
+from src.engine.asset_manager import AssetManager
+from src.states.main_menu import MainMenu
 
 
 class Game:

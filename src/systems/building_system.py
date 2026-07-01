@@ -6,17 +6,17 @@ Handles player structure placement.
 
 import pygame
 
-from config import (
+from src.config import (
     TRENCH_COST,
     MG_NEST_COST,
     BUNKER_COST,
     ARTILLERY_COST
 )
 
-from entities.trench import Trench
-from entities.mg_nest import MGNest
-from entities.bunker import Bunker
-from entities.artillery import Artillery
+from src.entities.trench import Trench
+from src.entities.mg_nest import MGNest
+from src.entities.bunker import Bunker
+from src.entities.artillery import Artillery
 
 
 class BuildingSystem:

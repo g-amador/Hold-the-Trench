@@ -6,7 +6,7 @@ WWI defensive bunker for Hold the Trench.
 
 import pygame
 
-from config import (
+from src.config import (
     TILE_SIZE
 )
 

@@ -4,7 +4,7 @@ systems/economy_system.py
 Handles player supplies and resource spending.
 """
 
-from config import (
+from src.config import (
     STARTING_SUPPLIES,
     SUPPLIES_PER_WAVE
 )

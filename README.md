@@ -4,7 +4,7 @@
 
 Build trench networks, establish machine-gun nests, and hold the line against increasingly desperate enemy assaults.
 
-Survive enough waves to secure victory, then decide:
+Defeat all enemy assault waves to secure victory, then decide:
 
 **Will you continue to the next battlefield, or leave the front?**
 
@@ -44,7 +44,7 @@ Preparation Phase
 (Build Defenses)
         ↓
 Enemy Assaults
-(Survive the Waves)
+(Defeat All Waves)
         ↓
 Victory or Defeat
         ↓
@@ -61,11 +61,11 @@ Choose:
 
 | Structure                  | Purpose                            |
 | -------------------------- | ---------------------------------- |
-| 🕳️ Trench                 | Provides cover for troops          |
-| 🔫 MG Nest                 | Suppresses and eliminates infantry |
-| 💥 Artillery Position      | Delivers devastating area damage   |
-| 🧱 Bunker                  | Durable defensive structure        |
-| 📦 Supply Tent *(planned)* | Improves resource generation       |
+| 🕳️ Trench                  | Basic defensive position           |
+| 🔫 MG Nest                 | Anti-infantry fire support         |
+| 🧱 Bunker                  | Durable defensive strongpoint      |
+| 💥 Artillery Position      | Long-range bombardment             |
+| 📦 Supply Tent *(planned)* | Resource generation                |
 
 ---
 
@@ -116,10 +116,10 @@ Victory grants you a choice:
 
 | Key | Structure    |
 | --- | ------------ |
-| `1` | 🕳️ Trench   |
+| `1` | 🕳️ Trench    |
 | `2` | 🔫 MG Nest   |
-| `3` | 💥 Artillery |
-| `4` | 🧱 Bunker    |
+| `3` | 🧱 Bunker    |
+| `4` | 💥 Artillery |
 
 ---
 
@@ -203,31 +203,170 @@ python main.py
 
 ---
 
+## 🪖 How to Play
+
+### Step 1: Generate a Battlefield
+
+Starting a new game creates a procedurally generated WWI battlefield with randomized terrain, weather conditions, enemy strength, and assault duration.
+
+No two battles are exactly alike.
+
+### Step 2: Prepare Your Defenses
+
+During the preparation phase, use your available supplies to construct defensive positions:
+
+* 🕳️ Trench networks
+* 🔫 Machine-gun nests
+* 🧱 Bunkers
+* 💥 Artillery positions
+
+Careful planning is essential, as supplies are limited.
+
+### Step 3: Begin the Assault
+
+Once your defenses are ready, the enemy assault begins.
+
+Enemy forces attack in multiple waves while your defensive structures automatically engage hostile units.
+
+### Step 4: Hold the Line
+
+Defeat all enemy assault waves to achieve victory.
+
+If your defenses collapse and the battlefield is overrun, the battle is lost.
+
+### Step 5: Decide Your Fate
+
+After each successful defense, you may choose to:
+
+* ▶️ Continue fighting
+* 🔄 Generate a new battlefield
+* 🏠 Return to the main menu
+* ❌ Exit the game
+
+Every new battlefield is procedurally generated, creating a unique campaign experience each time.
+
+---
+
+## 🔒 Running Hold the Trench in an Isolated Environment
+
+Because Hold the Trench is a fully offline single-player game, it can easily be executed in isolated environments.
+
+### Option 1: Python Virtual Environment (Recommended)
+
+Create an isolated Python environment:
+
+```bash
+python -m venv venv
+```
+
+Activate the environment:
+
+**Windows**
+
+```bash
+venv\Scripts\activate
+```
+
+**Linux/macOS**
+
+```bash
+source venv/bin/activate
+```
+
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Run the game:
+
+```bash
+python main.py
+```
+
+---
+
+### Option 2: Docker Container
+
+Create a Docker image:
+
+```bash
+docker build -t hold-the-trench .
+```
+
+Run the game:
+
+```bash
+docker run hold-the-trench
+```
+
+This keeps all dependencies isolated from the host operating system.
+
+> Note:
+> Running pygame applications inside Docker requires graphical display
+> forwarding (X11, Wayland, WSLg, or similar technologies).
+> For most players, a Python virtual environment or virtual machine is
+> the simpler option.
+
+---
+
+### Option 3: Virtual Machine
+
+For complete operating-system isolation, run Hold the Trench inside a virtual machine using:
+
+* VirtualBox
+* VMware
+* Hyper-V
+* KVM/QEMU
+
+Install Python and the game normally inside the guest operating system.
+
+---
+
+### Option 4: Air-Gapped Systems
+
+Hold the Trench requires no internet connection and can be played on:
+
+* Disconnected computers
+* Isolated networks
+* Sandboxed environments
+* Offline development workstations
+
+---
+
 ## 🧭 Development Roadmap
 
-### ✅ Prototype
+### ✅ Vertical Slice V1
 
 * [x] Procedural scenarios
 * [x] Wave-based assaults
 * [x] Trench construction
 * [x] Machine-gun nests
+* [x] Bunkers
+* [x] Artillery positions
+* [x] Weather system
+* [x] Campaign progression
+* [x] Save/load support
 * [x] Pause and resume
-* [x] Post-battle choices
+* [x] Post-battle decisions
+* [x] Victory and defeat states
 
-### 🚧 In Development
+### 🚧 Planned Improvements
 
-* [ ] Artillery mechanics
-* [ ] Dynamic weather effects
-* [ ] Improved battlefield generation
 * [ ] Additional enemy types
-* [ ] Better visual effects
-* [ ] Enhanced audio design
+* [ ] Improved battlefield generation
+* [ ] Better pathfinding
+* [ ] Visual effects
+* [ ] Sound effects
+* [ ] Music
+* [ ] Gameplay balancing
 
-### 📌 Future Ideas
+### 📌 Future Features
 
 * [ ] Tanks
 * [ ] Mortar teams
-* [ ] New defensive structures
+* [ ] Supply tents
 * [ ] Difficulty modifiers
 * [ ] Steam achievements
 
@@ -251,4 +390,4 @@ A license will be selected prior to public release.
 
 ---
 
-### 🎖️ *"Hold the line. Survive the assault. Decide when your war ends."*
+### 🎖️ *"Hold the line. Defeat the assault. Decide when your war ends."*

@@ -6,13 +6,13 @@ Controls enemy wave generation and victory conditions.
 
 import random
 
-from config import (
+from src.config import (
     MIN_WAVES,
     MAX_WAVES,
     MAP_WIDTH
 )
 
-from entities.enemy import Enemy
+from src.entities.enemy import Enemy
 
 
 class WaveDirector:

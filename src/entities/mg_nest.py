@@ -7,7 +7,7 @@ Primary defensive weapon.
 
 import pygame
 
-from config import (
+from src.config import (
     TILE_SIZE
 )
 
