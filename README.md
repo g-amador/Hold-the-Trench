@@ -130,6 +130,8 @@ Victory grants you a choice:
 * 🏠 Return to the main menu
 * ❌ Exit the game
 
+[Back to Table of Contents](#toc)
+
 ---
 
 ## 🎮 <a name="controls">Controls
@@ -393,4 +395,4 @@ Good luck, Commander, and hold the line.
 
 ---
 
-> Built with ❤️, Python, Pygame, a sprinkle of Copilot magic... and a determination to survive one more assault.
+> Built with ❤️, Python, Pygame, a sprinkle of ChatGPT magic... and a determination to survive one more assault.
