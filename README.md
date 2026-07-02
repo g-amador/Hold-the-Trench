@@ -10,15 +10,36 @@ Defeat all enemy assault waves to secure victory, then decide:
 
 ---
 
-## 📸 Overview
+## 📑 <a name="toc">Table of Contents
+
+1. [📸 Overview](#overview)
+2. [✨ Features](#features)
+3. [🎮 Gameplay Loop](#gameplay-loop)
+4. [🛡️ Buildable Defenses](#buildable-defenses)
+5. [⚔️ Enemy Types](#enemy-types)
+6. [🎯 Objectives](#objectives)
+7. [🎮 Controls](#controls)
+8. [🗂️ Project Structure](#project-structure)
+9. [🚀 Installation](#installation)
+10. [🪖 How to Play](#how-to-play)
+11. [🔒 Running in an Isolated Environment](#isolated-environment)
+12. [🧭 Development Roadmap](#development-roadmap)
+13. [🎨 Inspiration](#inspiration)
+14. [📬 License, Usage & Contact](#contact)
+
+---
+
+## 📸 <a name="overview">Overview
 
 **Hold the Trench** is a session-based tactical defense game inspired by wave survival and procedural strategy games.
 
 Each battle takes place on a **newly generated WWI battlefield**, forcing players to adapt their defenses, manage supplies, and make difficult tactical decisions.
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## ✨ Features
+## ✨ <a name="features">Features
 
 * 🪖 **Single-player experience**
 * 🌍 **Procedurally generated battlefields**
@@ -33,9 +54,11 @@ Each battle takes place on a **newly generated WWI battlefield**, forcing player
 * 🔄 **Generate a new defense scenario after each victory**
 * 🚪 **Choose to continue fighting or leave after each completed level**
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🎮 Gameplay Loop
+## 🎮 <a name="gameplay-loop">Gameplay Loop
 
 ```text
 Generate Battlefield
@@ -55,9 +78,11 @@ Choose:
 • Exit Game
 ```
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🛡️ Buildable Defenses
+## 🛡️ <a name="buildable-defenses">Buildable Defenses
 
 | Structure                  | Purpose                            |
 | -------------------------- | ---------------------------------- |
@@ -67,9 +92,11 @@ Choose:
 | 💥 Artillery Position      | Long-range bombardment             |
 | 📦 Supply Tent *(planned)* | Resource generation                |
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## ⚔️ Enemy Types
+## ⚔️ <a name="enemy-types">Enemy Types
 
 ### Current
 
@@ -86,9 +113,11 @@ Choose:
 | 🎯 Mortar Teams | Indirect fire support |
 | 🚜 Tanks | Armored breakthrough units |
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🎯 Objective
+## 🎯 <a name="objectives">Objectives
 
 Hold your position until all required enemy assaults have been defeated.
 
@@ -103,7 +132,7 @@ Victory grants you a choice:
 
 ---
 
-## 🎮 Controls
+## 🎮 <a name="controls">Controls
 
 ### General
 
@@ -121,9 +150,11 @@ Victory grants you a choice:
 | `3` | 🧱 Bunker    |
 | `4` | 💥 Artillery |
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🗂️ Project Structure
+## 🗂️ <a name="project-structure">Project Structure
 
 ```text
 hold_the_trench/
@@ -178,9 +209,11 @@ hold_the_trench/
 └── saves/
 ```
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🚀 Installation
+## 🚀 <a name="installation">Installation
 
 ### 1. Clone the repository
 
@@ -201,9 +234,11 @@ pip install -r requirements.txt
 python main.py
 ```
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🪖 How to Play
+## 🪖 <a name="how-to-play">How to Play
 
 ### Step 1: Generate a Battlefield
 
@@ -245,13 +280,13 @@ After each successful defense, you may choose to:
 
 Every new battlefield is procedurally generated, creating a unique campaign experience each time.
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🔒 Running Hold the Trench in an Isolated Environment
+## 🔒 <a name="isolated-environment">Running Hold the Trench in an Isolated Environment
 
-Because Hold the Trench is a fully offline single-player game, it can easily be executed in isolated environments.
-
-### Option 1: Python Virtual Environment (Recommended)
+Because Hold the Trench is a fully offline single-player game, it can easily be executed in a Python Virtual Environment.
 
 Create an isolated Python environment:
 
@@ -285,57 +320,11 @@ Run the game:
 python main.py
 ```
 
----
-
-### Option 2: Docker Container
-
-Create a Docker image:
-
-```bash
-docker build -t hold-the-trench .
-```
-
-Run the game:
-
-```bash
-docker run hold-the-trench
-```
-
-This keeps all dependencies isolated from the host operating system.
-
-> Note:
-> Running pygame applications inside Docker requires graphical display
-> forwarding (X11, Wayland, WSLg, or similar technologies).
-> For most players, a Python virtual environment or virtual machine is
-> the simpler option.
+[Back to Table of Contents](#toc)
 
 ---
 
-### Option 3: Virtual Machine
-
-For complete operating-system isolation, run Hold the Trench inside a virtual machine using:
-
-* VirtualBox
-* VMware
-* Hyper-V
-* KVM/QEMU
-
-Install Python and the game normally inside the guest operating system.
-
----
-
-### Option 4: Air-Gapped Systems
-
-Hold the Trench requires no internet connection and can be played on:
-
-* Disconnected computers
-* Isolated networks
-* Sandboxed environments
-* Offline development workstations
-
----
-
-## 🧭 Development Roadmap
+## 🧭 <a name="development-roadmap">Development Roadmap
 
 ### ✅ Vertical Slice V1
 
@@ -370,9 +359,11 @@ Hold the Trench requires no internet connection and can be played on:
 * [ ] Difficulty modifiers
 * [ ] Steam achievements
 
+[Back to Table of Contents](#toc)
+
 ---
 
-## 🎨 Inspiration
+## 🎨 <a name="inspiration">Inspiration
 
 While **Hold the Trench** aims to establish its own identity, it draws inspiration from:
 
@@ -380,14 +371,26 @@ While **Hold the Trench** aims to establish its own identity, it draws inspirati
 * Procedural roguelites
 * Historical WWI trench warfare
 
----
-
-## 📜 License
-
-This project is currently under active development.
-
-A license will be selected prior to public release.
+[Back to Table of Contents](#toc)
 
 ---
 
-### 🎖️ *"Hold the line. Defeat the assault. Decide when your war ends."*
+## 📬 <a name="contact">License, Usage & Contact
+
+Hold the Trench is released under the MIT License, which allows you to freely use, modify, distribute, and build upon the project, including creating your own scenarios, game modes, assets, tools, ports, or derivative works.
+
+You may not claim authorship of Hold the Trench or misrepresent modified versions as the original project.
+
+For full legal details, refer to the **[LICENSE](https://github.com/g-amador/Hold-the-Trench/blob/main/LICENSE)** file included with this repository.
+
+If you have questions, suggestions, bug reports, or wish to share your own battlefield stories and modifications, feel free to get in touch:
+
+📧 **[g.n.p.amador@gmail.com](mailto:g.n.p.amador@gmail.com)**
+
+Good luck, Commander, and hold the line.
+
+[Back to Table of Contents](#toc)
+
+---
+
+> Built with ❤️, Python, Pygame, a sprinkle of Copilot magic... and a determination to survive one more assault.
