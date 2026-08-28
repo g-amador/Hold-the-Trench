@@ -4,13 +4,13 @@ world/tilemap.py
 Tile grid system for Hold the Trench.
 """
 
-from src.config import (
+from config import (
     MAP_WIDTH,
     MAP_HEIGHT,
     TILE_SIZE
 )
 
-from src.world.tile import Tile
+from world.tile import Tile
 
 class TileMap:
     """

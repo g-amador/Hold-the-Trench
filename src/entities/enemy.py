@@ -6,7 +6,7 @@ Basic enemy infantry unit for Hold the Trench.
 
 import pygame
 
-from src.config import (
+from config import (
     TILE_SIZE,
     RED
 )

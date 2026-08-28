@@ -8,7 +8,7 @@ Players build defenses before the assault begins.
 
 import pygame
 
-from src.config import (
+from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     BLACK,
@@ -16,14 +16,14 @@ from src.config import (
     PREP_TIME_SECONDS
 )
 
-from src.world.tilemap import TileMap
-from src.world.map_generator import MapGenerator
+from world.tilemap import TileMap
+from world.map_generator import MapGenerator
 
-from src.systems.building_system import BuildingSystem
-from src.systems.economy_system import EconomySystem
-from src.systems.scenario_generator import ScenarioGenerator
+from systems.building_system import BuildingSystem
+from systems.economy_system import EconomySystem
+from systems.scenario_generator import ScenarioGenerator
 
-from src.states.assault_phase import AssaultPhase
+from states.assault_phase import AssaultPhase
 
 
 class PrepPhase:

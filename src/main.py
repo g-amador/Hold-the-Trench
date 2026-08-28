@@ -6,7 +6,7 @@ Entry point for Hold the Trench.
 
 import sys
 
-from src.engine.game import Game
+from engine.game import Game
 
 
 def main():

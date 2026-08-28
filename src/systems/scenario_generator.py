@@ -7,7 +7,7 @@ for Hold the Trench.
 
 import random
 
-from src.config import (
+from config import (
     STARTING_SUPPLIES,
     MIN_WAVES,
     MAX_WAVES

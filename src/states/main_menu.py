@@ -6,14 +6,14 @@ Main menu for Hold the Trench.
 
 import pygame
 
-from src.config import (
+from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     BLACK,
     WHITE
 )
 
-from src.states.prep_phase import PrepPhase
+from states.prep_phase import PrepPhase
 
 
 class MainMenu:

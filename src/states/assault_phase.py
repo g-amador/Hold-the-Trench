@@ -6,20 +6,20 @@ Enemy assault phase for Hold the Trench.
 
 import pygame
 
-from src.config import (
+from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     BLACK,
     WHITE
 )
 
-from src.systems.wave_director import WaveDirector
-from src.systems.combat_system import CombatSystem
-from src.systems.building_query import BuildingQuery
-from src.systems.weather_system import WeatherSystem
+from systems.wave_director import WaveDirector
+from systems.combat_system import CombatSystem
+from systems.building_query import BuildingQuery
+from systems.weather_system import WeatherSystem
 
-from src.states.post_battle_state import PostBattleState
-from src.states.game_over_state import GameOverState
+from states.post_battle_state import PostBattleState
+from states.game_over_state import GameOverState
 
 
 class AssaultPhase:

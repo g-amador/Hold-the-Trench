@@ -6,18 +6,18 @@ Displayed after a battle is completed.
 
 import pygame
 
-from src.config import (
+from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
     BLACK,
     WHITE
 )
 
-from src.systems.scenario_generator import (
+from systems.scenario_generator import (
     ScenarioGenerator
 )
 
-from src.states.prep_phase import (
+from states.prep_phase import (
     PrepPhase
 )
 

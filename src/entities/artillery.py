@@ -6,7 +6,7 @@ WWI field artillery for Hold the Trench.
 
 import pygame
 
-from src.config import (
+from config import (
     TILE_SIZE
 )
 
