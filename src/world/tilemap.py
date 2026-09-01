@@ -1,10 +1,16 @@
 """
 Tilemap with bunker behind trench, structured MG, barracks, and artillery positions.
+Build spots dynamically match total gold obtainable.
 """
 
 import pygame
 from config import TILE_SIZE
 from world.trench_generator import TrenchGenerator, TILE_TRENCH, TILE_CRATER, TILE_WIRE, TILE_MUD
+
+
+MG_COST = 20
+BARRACKS_COST = 30
+ARTILLERY_COST = 60
 
 
 class Tile:
@@ -54,31 +60,44 @@ class TileMap:
         self.build_spots = []
         self.spot_types = {}
 
-    def configure_build_spots(self, wave_strength, has_tanks, has_cavalry):
+    def configure_build_spots(self, wave_strength, has_tanks, has_cavalry, total_gold_available):
         self.build_spots = []
         self.spot_types = {}
 
         trench_y = self.trench_y
 
+        # Costs
+        mg_cost = MG_COST
+        barracks_cost = BARRACKS_COST
+        artillery_cost = ARTILLERY_COST
+
+        # Build spot candidates
         mg_positions = [6, 8, 10]
-        for x in mg_positions:
-            self.build_spots.append((x, trench_y))
-            self.spot_types[(x, trench_y)] = "mg"
-
         barracks_positions = [4, 12]
-        for x in barracks_positions:
-            self.build_spots.append((x, trench_y - 1))
-            self.spot_types[(x, trench_y - 1)] = "barracks"
-
         artillery_positions = [2, 14]
-        for x in artillery_positions:
-            self.build_spots.append((x, trench_y - 2))
-            self.spot_types[(x, trench_y - 2)] = "artillery"
 
         if has_tanks or wave_strength > 500:
-            extra_x = 16
-            self.build_spots.append((extra_x, trench_y - 2))
-            self.spot_types[(extra_x, trench_y - 2)] = "artillery"
+            artillery_positions.append(16)
+
+        # Build spots in priority order
+        ordered_spots = []
+
+        for x in mg_positions:
+            ordered_spots.append((x, trench_y, "mg", mg_cost))
+
+        for x in barracks_positions:
+            ordered_spots.append((x, trench_y - 1, "barracks", barracks_cost))
+
+        for x in artillery_positions:
+            ordered_spots.append((x, trench_y - 2, "artillery", artillery_cost))
+
+        # Select spots until total cost matches total gold available
+        running_cost = 0
+        for (x, y, spot_type, cost) in ordered_spots:
+            if running_cost + cost <= total_gold_available:
+                self.build_spots.append((x, y))
+                self.spot_types[(x, y)] = spot_type
+                running_cost += cost
 
     def is_build_spot(self, x, y):
         return (x, y) in self.build_spots

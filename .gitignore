@@ -1,5 +1,6 @@
 venv/*
 src/__pycache__/*
+src/engine/__pycache__/*
 src/entities/__pycache__/*
 src/states/__pycache__/*
 src/systems/__pycache__/*

@@ -33,7 +33,7 @@ class AssaultPhase:
 
         self.hud = HUD()
         self.economy = EconomySystem()
-        self.wave_director = WaveDirector(self.tilemap, 3, 5)
+        self.wave_director = WaveDirector(self.tilemap, self.economy, 5)
         self.combat = CombatSystem()
 
         self.player = Player(3 * 32, (self.tilemap.trench_y + 1) * 32)
