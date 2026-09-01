@@ -1,414 +1,190 @@
 """
-states/assault_phase.py
-
-Enemy assault phase for Hold the Trench.
+Main gameplay state: player, camera, waves, combat, building placement, gold pickups, player shooting.
 """
 
 import pygame
 
-from config import (
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    BLACK,
-    WHITE
-)
-
 from systems.wave_director import WaveDirector
 from systems.combat_system import CombatSystem
+from systems.economy_system import EconomySystem
 from systems.building_query import BuildingQuery
-from systems.weather_system import WeatherSystem
 
-from states.post_battle_state import PostBattleState
-from states.game_over_state import GameOverState
+from ui.hud import HUD
+
+from entities.player import Player
+from entities.enemy import Infantry, Cavalry, Tank
+from entities.gold_pickup import GoldPickup
+from entities.bullet import Bullet
+
+from entities.trench import Trench
+from entities.mg_nest import MGNest
+from entities.bunker import Bunker
+from entities.artillery import Artillery
+
+from config import SCREEN_WIDTH
 
 
 class AssaultPhase:
-    """
-    Main combat phase.
-    """
-
-    def __init__(
-        self,
-        game,
-        tilemap,
-        economy,
-        weather=None
-    ):
-
+    def __init__(self, game):
         self.game = game
+        self.tilemap = game.tilemap
 
-        #
-        # Battlefield
-        #
-        self.tilemap = tilemap
+        self.hud = HUD()
+        self.economy = EconomySystem()
+        self.wave_director = WaveDirector(self.tilemap, 3, 5)
+        self.combat = CombatSystem()
 
-        #
-        # Economy
-        #
-        self.economy = economy
+        self.player = Player(3 * 32, 5 * 32)
+        self.player.max_world_x = self.tilemap.width * 32 - self.player.width
 
-        #
-        # Pause
-        #
-        self.paused = False
+        self.camera_x = 0
+        self.gold_pickups = []
+        self.bullets = []
 
-        #
-        # Prevent multiple state changes
-        #
-        self.battle_complete = False
-
-        #
-        # Cache defenses
-        #
-        self.current_buildings = []
-
-        #
-        # Weather
-        #
-        self.weather = WeatherSystem(
-            weather
-        )
-
-        #
-        # Enemy waves
-        #
-        self.wave_director = WaveDirector()
-
-        #
-        # Combat
-        #
-        self.combat_system = CombatSystem()
-
-        #
-        # Font
-        #
-        self.font = pygame.font.SysFont(
-            "Arial",
-            28
-        )
-
-    def handle_event(
-        self,
-        event
-    ):
-        """
-        Handle player input.
-        """
-
+    def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_SPACE:
+                bullet = self.player.shoot()
+                if bullet:
+                    self.bullets.append(bullet)
 
-            #
-            # Pause
-            #
-            if event.key == pygame.K_ESCAPE:
+            if event.key == pygame.K_1:
+                self.place_building(Trench)
+            if event.key == pygame.K_2:
+                self.place_building(MGNest)
+            if event.key == pygame.K_3:
+                self.place_building(Bunker)
+            if event.key == pygame.K_4:
+                self.place_building(Artillery)
 
-                self.paused = (
-                    not self.paused
-                )
+    def place_building(self, building_class):
+        tile_x = int(self.player.x / 32)
+        tile_y = int(self.player.y / 32)
 
-    def update(
-        self,
-        delta_time
-    ):
-        """
-        Update battle simulation.
-        """
-
-        if self.paused:
+        tile = self.tilemap.get_tile(tile_x, tile_y)
+        if not tile:
             return
 
-        #
-        # Weather
-        #
-        self.weather.update(
-            delta_time
-        )
+        if not self.tilemap.is_build_spot(tile_x, tile_y):
+            return
 
-        #
-        # Waves
-        #
-        self.wave_director.update(
-            delta_time
-        )
+        if tile.building:
+            return
 
-        #
+        cost = {
+            Trench: 0,
+            MGNest: 20,
+            Bunker: 40,
+            Artillery: 60
+        }[building_class]
+
+        if self.economy.supplies < cost:
+            return
+
+        self.economy.supplies -= cost
+        tile.building = building_class(tile_x, tile_y)
+
+    def update(self, dt):
+        self.player.update(dt)
+
+        # Camera clamped to map
+        self.camera_x = self.player.x - 200
+        max_camera = self.tilemap.width * 32 - SCREEN_WIDTH
+        if self.camera_x < 0:
+            self.camera_x = 0
+        if self.camera_x > max_camera:
+            self.camera_x = max_camera
+
+        self.wave_director.update()
+        enemies = self.wave_director.get_enemies()
+
+        # Bullets
+        remaining_bullets = []
+        for bullet in self.bullets:
+            bullet.update(dt)
+
+            hit = False
+            for enemy in enemies:
+                if enemy.dead:
+                    continue
+
+                if (bullet.x > enemy.x and
+                    bullet.x < enemy.x + enemy.width and
+                    bullet.y > enemy.y and
+                    bullet.y < enemy.y + enemy.height):
+
+                    enemy.take_damage(bullet.damage)
+                    bullet.dead = True
+                    hit = True
+                    break
+
+            if not bullet.dead:
+                remaining_bullets.append(bullet)
+
+        self.bullets = remaining_bullets
+
+        # Enemies + gold
+        new_gold = []
+        for enemy in enemies:
+            enemy.update(dt)
+            gold = enemy.spawn_gold()
+            if gold:
+                new_gold.append(gold)
+
+        self.gold_pickups.extend(new_gold)
+
+        remaining_gold = []
+        for gold in self.gold_pickups:
+            collected = gold.update(dt, self.player)
+            if collected:
+                self.economy.supplies += gold.amount
+            else:
+                remaining_gold.append(gold)
+
+        self.gold_pickups = remaining_gold
+
         # Buildings
-        #
-        self.current_buildings = (
-            BuildingQuery.get_all_buildings(
-                self.tilemap
-            )
-        )
+        buildings = BuildingQuery.get_all_buildings(self.tilemap)
+        for b in buildings:
+            b.update()
 
-        buildings = (
-            self.current_buildings
-        )
-
-        #
-        # Defeat
-        #
-        if (
-            len(buildings) == 0
-            and self.wave_director.current_wave > 0
-            and not self.battle_complete
-        ):
-
-            self.battle_complete = True
-
-            self.game.change_state(
-
-                GameOverState(
-                    self.game
-                )
-
-            )
-
-            return
-
-        #
         # Combat
-        #
-        self.combat_system.update(
-            buildings,
-            self.wave_director.enemies
+        self.combat.update(buildings, enemies)
+
+        # Bunker loss condition: if any enemy reaches trench line, damage bunker
+        bunkers = [b for b in buildings if isinstance(b, Bunker)]
+        if bunkers:
+            bunker = bunkers[0]
+            for enemy in enemies:
+                if not enemy.dead and enemy.x < 50:
+                    enemy.dead = True
+                    bunker.take_damage(20)
+
+            if bunker.is_destroyed():
+                # Simple "lose" behavior: back to main menu
+                from states.main_menu import MainMenu
+                self.game.change_state(MainMenu(self.game))
+
+    def render(self, screen):
+        self.tilemap.draw(screen, self.camera_x)
+
+        for enemy in self.wave_director.get_enemies():
+            enemy.draw(screen, self.camera_x)
+
+        for gold in self.gold_pickups:
+            gold.draw(screen, self.camera_x)
+
+        for bullet in self.bullets:
+            bullet.draw(screen, self.camera_x)
+
+        self.player.draw(screen, self.camera_x)
+
+        self.hud.draw(
+            screen,
+            self.economy.supplies,
+            self.wave_director.wave_number,
+            self.wave_director.total_waves
         )
 
-        #
-        # Remove dead enemies
-        #
-        self.wave_director.enemies = [
-
-            enemy
-
-            for enemy in
-            self.wave_director.enemies
-
-            if not enemy.is_dead()
-
-        ]
-
-        #
-        # Victory
-        #
-        if (
-            self.wave_director.is_victory()
-            and not self.battle_complete
-        ):
-
-            self.battle_complete = True
-
-            self.game.change_state(
-
-                PostBattleState(
-                    self.game
-                )
-
-            )
-
-    def render(
-        self,
-        screen
-    ):
-        """
-        Draw combat scene.
-        """
-
-        #
-        # Background
-        #
-        screen.fill(
-            BLACK
-        )
-
-        #
-        # Battlefield
-        #
-        self.tilemap.draw(
-            screen
-        )
-
-        #
-        # Enemies
-        #
-        self.wave_director.draw(
-            screen
-        )
-
-        #
-        # Weather
-        #
-        self.weather.draw_overlay(
-            screen
-        )
-
-        #
-        # Title
-        #
-        title = self.font.render(
-            "Assault Phase",
-            True,
-            WHITE
-        )
-
-        screen.blit(
-            title,
-            (20, 20)
-        )
-
-        #
-        # Wave count
-        #
-        wave_text = self.font.render(
-            f"Wave: "
-            f"{self.wave_director.current_wave}"
-            f"/"
-            f"{self.wave_director.total_waves}",
-            True,
-            WHITE
-        )
-
-        screen.blit(
-            wave_text,
-            (20, 60)
-        )
-
-        #
-        # Supplies
-        #
-        supplies_text = self.font.render(
-            f"Supplies: "
-            f"{self.economy.supplies}",
-            True,
-            WHITE
-        )
-
-        screen.blit(
-            supplies_text,
-            (20, 100)
-        )
-
-        #
-        # Enemies
-        #
-        enemy_text = self.font.render(
-            f"Enemies: "
-            f"{len(self.wave_director.enemies)}",
-            True,
-            WHITE
-        )
-
-        screen.blit(
-            enemy_text,
-            (20, 140)
-        )
-
-        #
-        # Defenses
-        #
-        defense_text = self.font.render(
-            f"Defenses: "
-            f"{len(self.current_buildings)}",
-            True,
-            WHITE
-        )
-
-        screen.blit(
-            defense_text,
-            (20, 180)
-        )
-
-        #
-        # Weather
-        #
-        weather_text = self.font.render(
-            f"Weather: "
-            f"{self.weather.get_description()}",
-            True,
-            WHITE
-        )
-
-        screen.blit(
-            weather_text,
-            (20, 220)
-        )
-
-        #
-        # Controls
-        #
-        controls_text = self.font.render(
-            "ESC = Pause",
-            True,
-            WHITE
-        )
-
-        screen.blit(
-            controls_text,
-            (
-                20,
-                SCREEN_HEIGHT - 50
-            )
-        )
-
-        #
-        # Pause overlay
-        #
-        if self.paused:
-
-            overlay = pygame.Surface(
-                (
-                    SCREEN_WIDTH,
-                    SCREEN_HEIGHT
-                )
-            )
-
-            overlay.set_alpha(
-                180
-            )
-
-            overlay.fill(
-                (
-                    30,
-                    30,
-                    30
-                )
-            )
-
-            screen.blit(
-                overlay,
-                (0, 0)
-            )
-
-            pause_text = self.font.render(
-                "PAUSED",
-                True,
-                WHITE
-            )
-
-            screen.blit(
-                pause_text,
-                (
-                    SCREEN_WIDTH // 2
-                    - pause_text.get_width() // 2,
-                    SCREEN_HEIGHT // 2
-                )
-            )
-
-        #
-        # Victory banner
-        #
-        if self.wave_director.is_victory():
-
-            victory_text = self.font.render(
-                "VICTORY!",
-                True,
-                WHITE
-            )
-
-            screen.blit(
-                victory_text,
-                (
-                    SCREEN_WIDTH // 2
-                    - victory_text.get_width() // 2,
-                    100
-                )
-            )
+        counts = BuildingQuery.count_buildings(self.tilemap)
+        self.hud.draw_building_counts(screen, counts)

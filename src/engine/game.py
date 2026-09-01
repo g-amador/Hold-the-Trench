@@ -1,183 +1,62 @@
 """
-engine/game.py
-
-Main game controller for Hold the Trench.
+Main game controller and state manager.
+Handles the game loop and switching between states.
 """
 
 import pygame
+from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 
-from config import (
-    SCREEN_WIDTH,
-    SCREEN_HEIGHT,
-    GAME_TITLE,
-    FPS
-)
-
-from engine.asset_manager import AssetManager
+from world.tilemap import TileMap
 from states.main_menu import MainMenu
 
 
 class Game:
     """
-    Main game controller.
+    Controls the game loop and manages states.
     """
 
     def __init__(self):
-        """
-        Initialize the game.
-        """
-
-        #
-        # Initialize pygame
-        #
+        # Initialize Pygame
         pygame.init()
-        pygame.font.init()
-        pygame.mixer.init()
+        pygame.display.set_caption("Hold the Trench")
 
-        #
-        # Window
-        #
-        self.screen = pygame.display.set_mode(
-            (
-                SCREEN_WIDTH,
-                SCREEN_HEIGHT
-            )
-        )
-
-        pygame.display.set_caption(
-            GAME_TITLE
-        )
-
-        #
-        # Timing
-        #
+        # Create window and clock
+        self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
 
-        self.delta_time = 0
+        # Shared tilemap used by AssaultPhase
+        self.tilemap = TileMap()
 
-        #
-        # Running state
-        #
+        # Game state
         self.running = True
+        self.state = MainMenu(self)
 
-        #
-        # Asset manager
-        #
-        self.assets = AssetManager()
-
-        #
-        # Current game state
-        #
-        self.current_state = MainMenu(
-            self
-        )
-
-    def change_state(
-        self,
-        new_state
-    ):
+    def change_state(self, new_state):
         """
-        Change active game state.
+        Switch to a new game state.
         """
+        self.state = new_state
 
-        self.current_state = new_state
-
-    def handle_events(
-        self
-    ):
-        """
-        Handle pygame events.
-        """
-
-        for event in pygame.event.get():
-
-            #
-            # Window close
-            #
-            if event.type == pygame.QUIT:
-
-                self.running = False
-
-                return
-
-            #
-            # Forward to active state
-            #
-            self.current_state.handle_event(
-                event
-            )
-
-    def update(
-        self
-    ):
-        """
-        Update active state.
-        """
-
-        self.current_state.update(
-            self.delta_time
-        )
-
-    def render(
-        self
-    ):
-        """
-        Render active state.
-        """
-
-        self.current_state.render(
-            self.screen
-        )
-
-        pygame.display.flip()
-
-    def run(
-        self
-    ):
+    def run(self):
         """
         Main game loop.
         """
 
         while self.running:
+            dt = self.clock.tick(FPS)
 
-            #
-            # Frame timing
-            #
-            self.delta_time = (
-                self.clock.tick(
-                    FPS
-                ) / 1000.0
-            )
+            # Event handling
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.running = False
+                else:
+                    self.state.handle_event(event)
 
-            #
-            # Input
-            #
-            self.handle_events()
+            # Update current state
+            self.state.update(dt)
 
-            #
-            # Simulation
-            #
-            self.update()
-
-            #
-            # Rendering
-            #
-            self.render()
-
-        self.shutdown()
-
-    def shutdown(
-        self
-    ):
-        """
-        Cleanup.
-        """
-
-        try:
-
-            self.assets.unload_all()
-
-        except Exception:
-            pass
+            # Render current state
+            self.state.render(self.screen)
+            pygame.display.flip()
 
         pygame.quit()

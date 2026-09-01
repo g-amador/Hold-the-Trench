@@ -1,61 +1,33 @@
 """
-systems/building_query.py
-
-Utility for collecting structures
-placed on the battlefield.
+Utility functions to query buildings from the tilemap.
 """
+
+from collections import Counter
 
 
 class BuildingQuery:
-    """
-    Query helper for map buildings.
-    """
-
     @staticmethod
     def get_all_buildings(tilemap):
         """
-        Return every placed structure.
+        Return a list of all buildings in the tilemap.
         """
-
         buildings = []
-
-        for column in tilemap.tiles:
-
-            for tile in column:
-
-                if tile.building is not None:
-
-                    buildings.append(
-                        tile.building
-                    )
-
+        for y in range(tilemap.height):
+            for x in range(tilemap.width):
+                tile = tilemap.get_tile(x, y)
+                if tile and tile.building:
+                    buildings.append(tile.building)
         return buildings
 
     @staticmethod
-    def get_buildings_of_type(
-        tilemap,
-        building_type
-    ):
+    def count_buildings(tilemap):
         """
-        Return structures matching a type.
+        Return a dict with counts per building type.
         """
-
-        buildings = []
-
-        for column in tilemap.tiles:
-
-            for tile in column:
-
-                if tile.building is None:
-                    continue
-
-                if isinstance(
-                    tile.building,
-                    building_type
-                ):
-
-                    buildings.append(
-                        tile.building
-                    )
-
-        return buildings
+        counts = Counter()
+        for y in range(tilemap.height):
+            for x in range(tilemap.width):
+                tile = tilemap.get_tile(x, y)
+                if tile and tile.building:
+                    counts[type(tile.building).__name__] += 1
+        return counts

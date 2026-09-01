@@ -1,162 +1,68 @@
 """
-systems/wave_director.py
-
-Controls enemy wave generation and victory conditions.
+Wave director.
+Spawns enemies in waves and exposes them to the AssaultPhase.
 """
 
-import random
-
-from config import (
-    MIN_WAVES,
-    MAX_WAVES,
-    MAP_WIDTH
-)
-
-from entities.enemy import Enemy
+from entities.enemy import Infantry, Cavalry, Tank
 
 
 class WaveDirector:
-    """
-    Handles all enemy assaults.
-    """
+    def __init__(self, tilemap, waves, enemies_per_wave):
+        self.tilemap = tilemap
+        self.total_waves = waves
+        self.enemies_per_wave = enemies_per_wave
 
-    def __init__(self):
-
-        #
-        # Total waves required
-        #
-        self.total_waves = random.randint(
-            MIN_WAVES,
-            MAX_WAVES
-        )
-
-        #
-        # Current wave number
-        #
-        self.current_wave = 0
-
-        #
-        # Active enemies
-        #
+        self.wave_number = 1
         self.enemies = []
 
-        #
-        # Has the scenario ended?
-        #
-        self.victory = False
+        self.spawn_wave()
 
-        #
-        # Delay between waves
-        #
-        self.wave_cooldown = 3.0
-
-        self.cooldown_timer = 0.0
-
-        self.waiting_for_next_wave = True
-
-    def update(self, delta_time):
+    def spawn_wave(self):
         """
-        Update wave progression.
+        Spawn a new wave of enemies at the right side of the map.
+        Also configure build spots based on wave strength.
         """
+        self.enemies = []
 
-        #
-        # Update enemies
-        #
-        for enemy in self.enemies:
-            enemy.update(delta_time)
+        spawn_x = self.tilemap.width * 32 + 200
+        spawn_y_base = (self.tilemap.height // 2) * 32
 
-        #
-        # Remove dead enemies
-        #
-        self.enemies = [
-            enemy
-            for enemy in self.enemies
-            if not enemy.is_dead()
-        ]
+        for i in range(self.enemies_per_wave):
+            y = spawn_y_base + (i % 5) * 10
 
-        #
-        # Wave finished?
-        #
-        if (
-            len(self.enemies) == 0
-            and not self.waiting_for_next_wave
-        ):
+            if self.wave_number == 1:
+                # Mostly infantry
+                self.enemies.append(Infantry(spawn_x, y))
+            elif self.wave_number == 2:
+                # Mix infantry + cavalry
+                if i % 2 == 0:
+                    self.enemies.append(Cavalry(spawn_x, y))
+                else:
+                    self.enemies.append(Infantry(spawn_x, y))
+            else:
+                # Tanks + infantry
+                if i % 3 == 0:
+                    self.enemies.append(Tank(spawn_x, y))
+                else:
+                    self.enemies.append(Infantry(spawn_x, y))
 
-            self.waiting_for_next_wave = True
-            self.cooldown_timer = self.wave_cooldown
+        # Compute wave strength (sum of HP)
+        strength = sum(e.hp for e in self.enemies)
+        self.tilemap.configure_build_spots(strength)
 
-        #
-        # Spawn next wave
-        #
-        if self.waiting_for_next_wave:
-
-            self.cooldown_timer -= delta_time
-
-            if self.cooldown_timer <= 0:
-
-                self.start_next_wave()
-
-    def start_next_wave(self):
+    def update(self):
         """
-        Spawn a new assault wave.
+        Remove dead enemies and spawn next wave when cleared.
         """
+        # Keep only alive enemies
+        self.enemies = [e for e in self.enemies if not e.dead]
 
-        #
-        # Victory check
-        #
-        if self.current_wave >= self.total_waves:
+        # If no enemies left and waves remain, spawn next
+        if not self.enemies and self.wave_number < self.total_waves:
+            self.wave_number += 1
+            # Increase wave size slightly
+            self.enemies_per_wave += 2
+            self.spawn_wave()
 
-            self.victory = True
-
-            print("Scenario completed!")
-
-            return
-
-        self.current_wave += 1
-
-        self.waiting_for_next_wave = False
-
-        enemy_count = (
-            3 +
-            self.current_wave * 2
-        )
-
-        print(
-            f"Wave "
-            f"{self.current_wave}/"
-            f"{self.total_waves}"
-        )
-
-        #
-        # Spawn enemies
-        #
-        for _ in range(enemy_count):
-
-            spawn_x = random.randint(
-                0,
-                MAP_WIDTH - 1
-            )
-
-            spawn_y = 0
-
-            enemy = Enemy(
-                spawn_x,
-                spawn_y
-            )
-
-            self.enemies.append(enemy)
-
-    def draw(self, screen):
-        """
-        Draw all active enemies.
-        """
-
-        for enemy in self.enemies:
-            enemy.draw(screen)
-
-    def is_victory(self):
-        """
-        Scenario completed?
-        """
-
-        return self.victory
+    def get_enemies(self):
+        return self.enemies

@@ -1,138 +1,73 @@
 """
-entities/enemy.py
-
-Basic enemy infantry unit for Hold the Trench.
+WW1 enemies: Infantry, Cavalry, Tank.
+Move leftward across no man's land and drop gold once on death.
 """
 
 import pygame
-
-from config import (
-    TILE_SIZE,
-    RED
-)
+from entities.gold_pickup import GoldPickup
 
 
-class Enemy:
-    """
-    Basic enemy infantry unit.
-    """
+class EnemyBase:
+    def __init__(self, x, y, speed, hp, gold_drop):
+        self.x = x
+        self.y = y
 
-    def __init__(self, tile_x, tile_y):
-        """
-        Create an enemy at the given tile coordinates.
-        """
+        self.speed = speed
+        self.hp = hp
+        self.gold_drop = gold_drop
 
-        #
-        # Position (tile-based)
-        #
-        self.tile_x = tile_x
-        self.tile_y = tile_y
+        self.width = 24
+        self.height = 32
 
-        #
-        # Statistics
-        #
-        self.max_health = 50
-        self.health = self.max_health
+        self.dead = False
+        self.gold_spawned = False  # ensure gold only spawns once
 
-        self.damage = 10
+    def update(self, dt):
+        if self.dead:
+            return
 
-        #
-        # Movement
-        #
-        self.speed = 1.0          # tiles per second
+        self.x -= self.speed * dt / 1000
 
-        self.move_timer = 0.0
+        if self.hp <= 0:
+            self.dead = True
 
-        #
-        # Future pathfinding support
-        #
-        self.path = []
-
-        #
-        # Suppression support
-        #
-        self.suppressed = False
-
-    def update(self, delta_time):
-        """
-        Update the enemy.
-        """
-
-        #
-        # Milestone 1:
-        # Simple downward movement
-        #
-        self.move_timer += delta_time
-
-        if self.move_timer >= 1.0 / self.speed:
-
-            self.move_timer = 0.0
-
-            self.tile_y += 1
-
-    def draw(self, screen):
-        """
-        Draw the enemy.
-        """
-
-        padding = 6
-
-        rect = pygame.Rect(
-            self.tile_x * TILE_SIZE + padding,
-            self.tile_y * TILE_SIZE + padding,
-            TILE_SIZE - padding * 2,
-            TILE_SIZE - padding * 2
-        )
+    def draw(self, screen, camera_x):
+        if self.dead:
+            return
 
         pygame.draw.rect(
             screen,
-            RED,
-            rect
+            (200, 50, 50),
+            (self.x - camera_x, self.y, self.width, self.height)
         )
 
-        #
-        # Health bar
-        #
-        bar_width = TILE_SIZE - 8
+    def take_damage(self, dmg):
+        self.hp -= dmg
 
-        health_ratio = (
-            self.health /
-            self.max_health
-        )
-
-        health_rect = pygame.Rect(
-            self.tile_x * TILE_SIZE + 4,
-            self.tile_y * TILE_SIZE + 2,
-            int(bar_width * health_ratio),
-            4
-        )
-
-        pygame.draw.rect(
-            screen,
-            (0, 255, 0),
-            health_rect
-        )
-
-    def take_damage(self, amount):
+    def spawn_gold(self):
         """
-        Apply damage.
+        Create a GoldPickup only once.
         """
+        if self.dead and not self.gold_spawned and self.gold_drop > 0:
+            self.gold_spawned = True
+            return GoldPickup(self.x, self.y, self.gold_drop)
+        return None
 
-        self.health -= amount
 
-        if self.health < 0:
-            self.health = 0
+class Infantry(EnemyBase):
+    def __init__(self, x, y):
+        super().__init__(x, y, speed=60, hp=40, gold_drop=1)
 
-    def is_dead(self):
-        """
-        Has the unit died?
-        """
 
-        return self.health <= 0
+class Cavalry(EnemyBase):
+    def __init__(self, x, y):
+        super().__init__(x, y, speed=120, hp=80, gold_drop=2)
+        self.width = 32
+        self.height = 32
 
-    def reached_defenses(self, map_height):
-        """
-        Check if the enemy has crossed the battlefield.
-        """
 
-        return self.tile_y >= map_height - 1
+class Tank(EnemyBase):
+    def __init__(self, x, y):
+        super().__init__(x, y, speed=30, hp=300, gold_drop=5)
+        self.width = 48
+        self.height = 32

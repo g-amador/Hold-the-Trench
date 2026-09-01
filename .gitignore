@@ -1,1 +1,6 @@
 venv/*
+src/entities/__pycache__/*
+src/states/__pycache__/*
+src/systems/__pycache__/*
+src/ui/__pycache__/*
+src/world/__pycache__/*
