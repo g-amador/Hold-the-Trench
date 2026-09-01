@@ -1,17 +1,21 @@
 """
 Wave director.
 Spawns enemies in waves and configures build spots based on wave composition.
+Wave count is now random between 5 and 10.
 """
 
+import random
 from entities.enemy import Infantry, Cavalry, Tank
 
 
 class WaveDirector:
-    def __init__(self, tilemap, waves, enemies_per_wave):
+    def __init__(self, tilemap, waves=None, enemies_per_wave=5):
         self.tilemap = tilemap
-        self.total_waves = waves
-        self.enemies_per_wave = enemies_per_wave
 
+        # Random number of waves between 5 and 10
+        self.total_waves = random.randint(5, 10)
+
+        self.enemies_per_wave = enemies_per_wave
         self.wave_number = 1
         self.enemies = []
 
