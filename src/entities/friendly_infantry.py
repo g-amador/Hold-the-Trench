@@ -1,8 +1,9 @@
 """
 Friendly infantry spawned from barracks.
-Advance and fight enemy infantry in melee.
+Advance toward closest enemy, engage in melee, and eventually die.
 """
 
+import math
 import pygame
 
 
@@ -11,7 +12,7 @@ class FriendlyInfantry:
         self.x = x
         self.y = y
 
-        self.speed = 50
+        self.speed = 40
         self.hp = 40
         self.width = 20
         self.height = 28
@@ -21,17 +22,32 @@ class FriendlyInfantry:
         if self.dead:
             return
 
-        self.x += self.speed * dt / 1000
-
+        target = None
+        best_dist = None
         for e in enemies:
             if e.dead:
                 continue
-            if (self.x < e.x + e.width and
-                self.x + self.width > e.x and
-                self.y < e.y + e.height and
-                self.y + self.height > e.y):
-                e.take_damage(10)
-                self.hp -= 10
+            dist = math.hypot(e.x - self.x, e.y - self.y)
+            if best_dist is None or dist < best_dist:
+                best_dist = dist
+                target = e
+
+        if target:
+            dx = target.x - self.x
+            dy = target.y - self.y
+            length = math.hypot(dx, dy)
+            if length > 0:
+                dx /= length
+                dy /= length
+                self.x += dx * self.speed * dt / 1000
+                self.y += dy * self.speed * dt / 1000
+
+            if (self.x < target.x + target.width and
+                self.x + self.width > target.x and
+                self.y < target.y + target.height and
+                self.y + self.height > target.y):
+                target.take_damage(5)
+                self.hp -= 5
                 if self.hp <= 0:
                     self.dead = True
 

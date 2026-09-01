@@ -1,6 +1,6 @@
 """
 Barracks building.
-Spawns friendly infantry.
+Spawns friendly infantry slowly.
 """
 
 import pygame
@@ -12,7 +12,7 @@ class Barracks:
         self.tile_x = tile_x
         self.tile_y = tile_y
 
-        self.spawn_cooldown = 3.0
+        self.spawn_cooldown = 30.0
         self.timer = 0
 
     def update(self, dt, friendlies):

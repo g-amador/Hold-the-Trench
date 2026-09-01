@@ -22,17 +22,12 @@ class GoldPickup:
         self.height = 12
 
     def update(self, dt, player):
-        """
-        Floating animation + pickup check.
-        Returns True if collected this frame.
-        """
         if self.collected:
             return False
 
         self.float_phase += dt / 200
         self.y_offset = math.sin(self.float_phase) * 3
 
-        # 2 tiles distance (64px)
         dist = math.hypot(player.x - self.x, player.y - self.y)
         if dist < 64:
             self.collected = True

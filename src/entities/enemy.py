@@ -20,7 +20,7 @@ class EnemyBase:
         self.height = 32
 
         self.dead = False
-        self.gold_spawned = False  # ensure gold only spawns once
+        self.gold_spawned = False
 
     def update(self, dt):
         if self.dead:
@@ -45,9 +45,6 @@ class EnemyBase:
         self.hp -= dmg
 
     def spawn_gold(self):
-        """
-        Create a GoldPickup only once.
-        """
         if self.dead and not self.gold_spawned and self.gold_drop > 0:
             self.gold_spawned = True
             return GoldPickup(self.x, self.y, self.gold_drop)

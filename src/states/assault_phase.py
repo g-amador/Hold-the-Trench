@@ -49,16 +49,15 @@ class AssaultPhase:
         self.bullets = []
         self.friendlies = []
 
-        self.economy.register_cost(20)   # MG
-        self.economy.register_cost(30)   # Barracks
-        self.economy.register_cost(60)   # Artillery
+        self.economy.register_cost(20)
+        self.economy.register_cost(30)
+        self.economy.register_cost(60)
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_SPACE:
-                bullet = self.player.shoot()
-                if bullet:
-                    self.bullets.append(bullet)
+                enemies = self.wave_director.get_enemies()
+                self.player.auto_fire(0, enemies, self.bullets)
 
     def auto_place_if_possible(self):
         tile_x = int(self.player.x / 32)
@@ -163,6 +162,10 @@ class AssaultPhase:
         for b in buildings:
             if isinstance(b, Barracks):
                 b.update(dt, self.friendlies)
+            elif isinstance(b, MGNest):
+                b.update(dt, enemies, self.bullets)
+            elif isinstance(b, Artillery):
+                b.update(dt, enemies, self.bullets)
             else:
                 b.update()
 

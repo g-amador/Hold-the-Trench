@@ -1,44 +1,35 @@
 """
 Bullet fired by the player.
-Moves forward and damages enemies.
+Moves toward target direction and damages enemies.
 """
 
 import pygame
 
 
 class Bullet:
-    def __init__(self, x, y):
-        # World position
+    def __init__(self, x, y, dx, dy):
         self.x = x
         self.y = y
 
-        # Speed (pixels per second)
         self.speed = 400
-
-        # Damage dealt to enemies
         self.damage = 20
 
-        # Bullet size
         self.width = 6
         self.height = 3
 
-        # Removal flag
         self.dead = False
 
-    def update(self, dt):
-        """
-        Move bullet forward.
-        """
-        self.x += self.speed * dt / 1000
+        self.dx = dx
+        self.dy = dy
 
-        # Remove if too far
-        if self.x > 5000:
+    def update(self, dt):
+        self.x += self.dx * self.speed * dt / 1000
+        self.y += self.dy * self.speed * dt / 1000
+
+        if self.x > 5000 or self.x < -500 or self.y < -500 or self.y > 5000:
             self.dead = True
 
     def draw(self, screen, camera_x):
-        """
-        Draw bullet.
-        """
         pygame.draw.rect(
             screen,
             (255, 255, 0),

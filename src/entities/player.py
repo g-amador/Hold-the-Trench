@@ -1,7 +1,8 @@
 """
-WW1 infantry player with free WASD movement, autofire, and world boundaries.
+WW1 infantry player with free WASD movement, autofire toward closest enemy, and world boundaries.
 """
 
+import math
 import pygame
 from config import SCREEN_HEIGHT
 
@@ -65,13 +66,26 @@ class Player:
     def can_shoot(self):
         return self.shoot_timer <= 0
 
-    def shoot(self):
+    def shoot_toward(self, target):
         if not self.can_shoot():
             return None
 
         from entities.bullet import Bullet
 
-        bullet = Bullet(self.x + self.width, self.y + self.height // 2)
+        tx = target.x + target.width / 2
+        ty = target.y + target.height / 2
+
+        dx = tx - (self.x + self.width / 2)
+        dy = ty - (self.y + self.height / 2)
+
+        length = math.hypot(dx, dy)
+        if length == 0:
+            return None
+
+        dx /= length
+        dy /= length
+
+        bullet = Bullet(self.x + self.width / 2, self.y + self.height / 2, dx, dy)
         self.shoot_timer = self.shoot_cooldown
         return bullet
 
@@ -83,16 +97,14 @@ class Player:
         for e in enemies:
             if e.dead:
                 continue
-            if e.x < self.x:
-                continue
-            dist = e.x - self.x
+            dist = math.hypot(e.x - self.x, e.y - self.y)
             if dist <= fire_range:
                 if best_dist is None or dist < best_dist:
                     best_dist = dist
                     target = e
 
         if target and self.can_shoot():
-            bullet = self.shoot()
+            bullet = self.shoot_toward(target)
             if bullet:
                 bullets.append(bullet)
 

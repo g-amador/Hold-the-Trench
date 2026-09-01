@@ -1,5 +1,5 @@
 """
-Tilemap with procedural trenches, bunker behind trench, and structured build spots.
+Tilemap with bunker behind trench, structured MG, barracks, and artillery positions.
 """
 
 import pygame
@@ -60,25 +60,21 @@ class TileMap:
 
         trench_y = self.trench_y
 
-        # MG nests: forward trench positions
         mg_positions = [6, 8, 10]
         for x in mg_positions:
             self.build_spots.append((x, trench_y))
             self.spot_types[(x, trench_y)] = "mg"
 
-        # Barracks: inside/behind trench
         barracks_positions = [4, 12]
         for x in barracks_positions:
             self.build_spots.append((x, trench_y - 1))
             self.spot_types[(x, trench_y - 1)] = "barracks"
 
-        # Artillery: hill behind bunker (back row)
         artillery_positions = [2, 14]
         for x in artillery_positions:
             self.build_spots.append((x, trench_y - 2))
             self.spot_types[(x, trench_y - 2)] = "artillery"
 
-        # Extra artillery if strong wave or tanks
         if has_tanks or wave_strength > 500:
             extra_x = 16
             self.build_spots.append((extra_x, trench_y - 2))

@@ -1,6 +1,6 @@
 """
 Bunker building.
-Acts as the player's castle with health and larger size.
+Acts as the player's castle with health and larger vertical size.
 """
 
 import pygame
@@ -14,7 +14,7 @@ class Bunker:
 
         self.hp = 200
         self.width = TILE_SIZE * 2
-        self.height = TILE_SIZE * 2
+        self.height = TILE_SIZE * 3
 
     def update(self):
         pass

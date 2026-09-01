@@ -8,9 +8,6 @@ from collections import Counter
 class BuildingQuery:
     @staticmethod
     def get_all_buildings(tilemap):
-        """
-        Return a list of all buildings in the tilemap.
-        """
         buildings = []
         for y in range(tilemap.height):
             for x in range(tilemap.width):
@@ -21,9 +18,6 @@ class BuildingQuery:
 
     @staticmethod
     def count_buildings(tilemap):
-        """
-        Return a dict with counts per building type.
-        """
         counts = Counter()
         for y in range(tilemap.height):
             for x in range(tilemap.width):

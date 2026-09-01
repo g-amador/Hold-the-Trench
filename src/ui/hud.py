@@ -1,5 +1,5 @@
 """
-HUD drawing: supplies, wave info, building counts, bunker HP, and legend.
+HUD drawing: supplies, wave info, building counts, bunker HP, and legend with cost.
 """
 
 import pygame
