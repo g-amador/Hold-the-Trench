@@ -1,5 +1,6 @@
 """
-Main gameplay state: player, camera, waves, combat, structured defenses, bunker castle, autofire, auto-placement.
+Main gameplay state: player, camera, waves, combat, structured defenses, bunker castle,
+autofire, auto-placement, dynamic gold budget, game over and win states.
 """
 
 import pygame
@@ -186,8 +187,12 @@ class AssaultPhase:
                     bunker.take_damage(10)
 
             if bunker.is_destroyed():
-                from states.main_menu import MainMenu
-                self.game.change_state(MainMenu(self.game))
+                from states.game_over import GameOverState
+                self.game.change_state(GameOverState(self.game))
+
+        if self.wave_director.wave_number == self.wave_director.total_waves and not enemies:
+            from states.win_state import WinState
+            self.game.change_state(WinState(self.game))
 
     def render(self, screen):
         self.tilemap.draw(screen, self.camera_x)
