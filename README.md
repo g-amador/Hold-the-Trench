@@ -161,54 +161,54 @@ Victory grants you a choice:
 ```text
 hold_the_trench/
 │
-├── main.py
-├── config.py
-├── requirements.txt
-├── README.md
-│
 ├── assets/
 │   ├── images/
 │   ├── sounds/
 │   └── music/
 │
-├── engine/
-│   ├── game.py
-│   ├── renderer.py
-│   └── asset_manager.py
+├── src
+│   │
+│   ├──engine/
+│   │   └── game.py
+│   │
+│   ├── entities/
+│   │   ├── artillery.py
+│   │   ├── barracks.py
+│   │   ├── bullet.py
+│   │   ├── bunker.py
+│   │   ├── enemy.py
+│   │   ├── friendly_infantry.py
+│   │   ├── gold_pickup.py
+│   │   ├── mg_nest.py
+│   │   ├── player.py
+│   │   └── trench.py
+│   │
+│   ├── states/
+│   │   ├── assault_phase.py
+│   │   ├── game_over.py
+│   │   ├── main_menu.py
+│   │   └── win_state.py
+│   │
+│   ├── systems/
+│   │   ├── building_query.py
+│   │   ├── combat_system.py
+│   │   ├── economy_system.py
+│   │   └── wave_director.py
+│   │
+│   ├── ui/
+│   │   └── hud.py
+│   │
+│   ├── world/
+│   │   ├── tilemap.py
+│   │   └── trench_generator.py
+│   │
+│   ├── config.py
+│   └── main.py
 │
-├── states/
-│   ├── main_menu.py
-│   ├── prep_phase.py
-│   ├── assault_phase.py
-│   ├── post_battle_state.py
-│   └── game_over_state.py
 │
-├── systems/
-│   ├── economy_system.py
-│   ├── building_system.py
-│   ├── building_query.py
-│   ├── combat_system.py
-│   ├── wave_director.py
-│   ├── scenario_generator.py
-│   ├── pathfinding.py
-│   ├── progression_system.py
-│   ├── weather_system.py
-│   └── save_system.py
-│
-├── entities/
-│   ├── enemy.py
-│   ├── trench.py
-│   ├── mg_nest.py
-│   ├── bunker.py
-│   └── artillery.py
-│
-├── world/
-│   ├── map_generator.py
-│   ├── tile.py
-│   └── tilemap.py
-│
-│
-└── saves/
+├── LICENSE
+├── README.md
+└── requirements.txt
 ```
 
 [Back to Table of Contents](#toc)
@@ -293,7 +293,7 @@ Because Hold the Trench is a fully offline single-player game, it can easily be 
 Create an isolated Python environment:
 
 ```bash
-python -m venv venv
+py -3.11 -m venv venv
 ```
 
 Activate the environment:
@@ -301,7 +301,7 @@ Activate the environment:
 **Windows**
 
 ```bash
-venv\Scripts\activate
+.\venv\Scripts\activate
 ```
 
 **Linux/macOS**
@@ -313,13 +313,13 @@ source venv/bin/activate
 Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+(venv) pip install -r requirements.txt
 ```
 
 Run the game:
 
 ```bash
-python main.py
+(venv) python src/main.py
 ```
 
 [Back to Table of Contents](#toc)
@@ -395,4 +395,4 @@ Good luck, Commander, and hold the line.
 
 ---
 
-> Built with ❤️, Python, Pygame, a sprinkle of ChatGPT magic... and a determination to survive one more assault.
+> Built with ❤️, Python, Pygame, a sprinkle of AI magic... and a determination to survive one more assault.
