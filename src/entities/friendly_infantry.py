@@ -1,6 +1,7 @@
 """
 Friendly infantry spawned from barracks.
-Advance toward closest enemy, engage in melee, and eventually die.
+Moves toward nearest enemy, engages in melee.
+Kills exactly one enemy and dies.
 """
 
 import math
@@ -18,10 +19,14 @@ class FriendlyInfantry:
         self.height = 28
         self.dead = False
 
+        # Tracks if this infantry already killed one enemy
+        self.kill_count = 0
+
     def update(self, dt, enemies):
         if self.dead:
             return
 
+        # Find nearest enemy
         target = None
         best_dist = None
         for e in enemies:
@@ -32,6 +37,7 @@ class FriendlyInfantry:
                 best_dist = dist
                 target = e
 
+        # Move toward enemy
         if target:
             dx = target.x - self.x
             dy = target.y - self.y
@@ -42,14 +48,20 @@ class FriendlyInfantry:
                 self.x += dx * self.speed * dt / 1000
                 self.y += dy * self.speed * dt / 1000
 
+            # Melee combat
             if (self.x < target.x + target.width and
                 self.x + self.width > target.x and
                 self.y < target.y + target.height and
                 self.y + self.height > target.y):
-                target.take_damage(5)
-                self.hp -= 5
-                if self.hp <= 0:
-                    self.dead = True
+
+                # Kill exactly one enemy
+                if self.kill_count == 0:
+                    target.take_damage(target.hp)
+                    self.kill_count = 1
+
+                # Infantry dies after killing one enemy
+                self.hp = 0
+                self.dead = True
 
     def draw(self, screen, camera_x):
         pygame.draw.rect(

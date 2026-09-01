@@ -43,6 +43,8 @@ class EnemyBase:
 
     def take_damage(self, dmg):
         self.hp -= dmg
+        if self.hp <= 0:
+            self.dead = True
 
     def spawn_gold(self):
         if self.dead and not self.gold_spawned and self.gold_drop > 0:
