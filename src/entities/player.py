@@ -1,5 +1,5 @@
 """
-WW1 infantry player with free WASD movement, shooting, and world boundaries.
+WW1 infantry player with free WASD movement, autofire, and world boundaries.
 """
 
 import pygame
@@ -18,7 +18,6 @@ class Player:
         self.shoot_cooldown = 0.25
         self.shoot_timer = 0
 
-        # Set by AssaultPhase
         self.max_world_x = 2000
 
     def handle_input(self, dt):
@@ -44,14 +43,13 @@ class Player:
         self.y += dy * self.speed * dt / 1000
 
     def clamp_to_world(self):
-        # Horizontal
+        hud_height = 40
+
         if self.x < 0:
             self.x = 0
         if self.x > self.max_world_x:
             self.x = self.max_world_x
 
-        # Vertical: HUD bar is 40px tall
-        hud_height = 40
         if self.y < hud_height:
             self.y = hud_height
         if self.y > SCREEN_HEIGHT - self.height:
@@ -76,6 +74,27 @@ class Player:
         bullet = Bullet(self.x + self.width, self.y + self.height // 2)
         self.shoot_timer = self.shoot_cooldown
         return bullet
+
+    def auto_fire(self, dt, enemies, bullets):
+        fire_range = 300
+
+        target = None
+        best_dist = None
+        for e in enemies:
+            if e.dead:
+                continue
+            if e.x < self.x:
+                continue
+            dist = e.x - self.x
+            if dist <= fire_range:
+                if best_dist is None or dist < best_dist:
+                    best_dist = dist
+                    target = e
+
+        if target and self.can_shoot():
+            bullet = self.shoot()
+            if bullet:
+                bullets.append(bullet)
 
     def draw(self, screen, camera_x):
         pygame.draw.rect(

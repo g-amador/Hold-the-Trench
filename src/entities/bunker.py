@@ -1,6 +1,6 @@
 """
 Bunker building.
-Stronger defensive structure with higher damage and health.
+Acts as the player's castle with health and larger size.
 """
 
 import pygame
@@ -12,12 +12,9 @@ class Bunker:
         self.tile_x = tile_x
         self.tile_y = tile_y
 
-        self.range = 220
-        self.damage = 20
-        self.fire_rate = 0.3
-        self.cooldown = 0
-
-        self.hp = 100  # bunker health
+        self.hp = 200
+        self.width = TILE_SIZE * 2
+        self.height = TILE_SIZE * 2
 
     def update(self):
         pass
@@ -28,9 +25,8 @@ class Bunker:
     def is_destroyed(self):
         return self.hp <= 0
 
-    def draw(self, screen):
-        px = self.tile_x * TILE_SIZE
-        py = self.tile_y * TILE_SIZE
-
-        rect = pygame.Rect(px + 2, py + 2, TILE_SIZE - 4, TILE_SIZE - 4)
+    def draw(self, screen, camera_x):
+        px = self.tile_x * TILE_SIZE - camera_x
+        py = self.tile_y * TILE_SIZE - (self.height - TILE_SIZE)
+        rect = pygame.Rect(px, py, self.width, self.height)
         pygame.draw.rect(screen, GREY, rect)

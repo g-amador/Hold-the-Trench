@@ -12,24 +12,16 @@ class MGNest:
         self.tile_x = tile_x
         self.tile_y = tile_y
 
-        # Simple stats
         self.range = 200
         self.damage = 10
-        self.fire_rate = 0.5  # shots per second
+        self.fire_rate = 0.5
         self.cooldown = 0
 
     def update(self):
-        """
-        Cooldown timer is handled in combat_system.
-        """
         pass
 
-    def draw(self, screen):
-        """
-        Draw MG nest as a grey square.
-        """
-        px = self.tile_x * TILE_SIZE
+    def draw(self, screen, camera_x):
+        px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE
-
         rect = pygame.Rect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8)
         pygame.draw.rect(screen, GREY, rect)

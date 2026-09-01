@@ -1,5 +1,5 @@
 """
-Tilemap with procedural trenches and dynamic build spots.
+Tilemap with procedural trenches, bunker behind trench, and structured build spots.
 """
 
 import pygame
@@ -34,7 +34,7 @@ class Tile:
         pygame.draw.rect(screen, (20, 20, 20), rect, 1)
 
         if self.building:
-            self.building.draw(screen)
+            self.building.draw(screen, camera_x)
 
 
 class TileMap:
@@ -50,30 +50,39 @@ class TileMap:
             for y in range(height)
         ]
 
-        # Build spots: will be configured per wave
-        self.build_spots = []
         self.trench_y = height // 2
-
-    def configure_build_spots(self, wave_strength):
-        """
-        Decide where build spots are based on wave strength.
-        More strength → more spots further forward.
-        """
         self.build_spots = []
+        self.spot_types = {}
 
-        # Base number of spots
-        base_spots = 3
-        extra_spots = min(3, wave_strength // 200)
-        total_spots = base_spots + extra_spots
+    def configure_build_spots(self, wave_strength, has_tanks, has_cavalry):
+        self.build_spots = []
+        self.spot_types = {}
 
-        # Place them along trench line, spaced
-        start_x = 4
-        step = 2
+        trench_y = self.trench_y
 
-        for i in range(total_spots):
-            x = start_x + i * step
-            if x < self.width // 3:  # keep them near trench
-                self.build_spots.append((x, self.trench_y))
+        # MG nests: forward trench positions
+        mg_positions = [6, 8, 10]
+        for x in mg_positions:
+            self.build_spots.append((x, trench_y))
+            self.spot_types[(x, trench_y)] = "mg"
+
+        # Barracks: inside/behind trench
+        barracks_positions = [4, 12]
+        for x in barracks_positions:
+            self.build_spots.append((x, trench_y - 1))
+            self.spot_types[(x, trench_y - 1)] = "barracks"
+
+        # Artillery: hill behind bunker (back row)
+        artillery_positions = [2, 14]
+        for x in artillery_positions:
+            self.build_spots.append((x, trench_y - 2))
+            self.spot_types[(x, trench_y - 2)] = "artillery"
+
+        # Extra artillery if strong wave or tanks
+        if has_tanks or wave_strength > 500:
+            extra_x = 16
+            self.build_spots.append((extra_x, trench_y - 2))
+            self.spot_types[(extra_x, trench_y - 2)] = "artillery"
 
     def is_build_spot(self, x, y):
         return (x, y) in self.build_spots
@@ -88,7 +97,6 @@ class TileMap:
             for x in range(self.width):
                 self.tiles[y][x].draw(screen, camera_x)
 
-        # Draw build spots as faint squares
         for (bx, by) in self.build_spots:
             px = bx * TILE_SIZE - camera_x
             py = by * TILE_SIZE

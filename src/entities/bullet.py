@@ -15,14 +15,14 @@ class Bullet:
         # Speed (pixels per second)
         self.speed = 400
 
-        # Damage
+        # Damage dealt to enemies
         self.damage = 20
 
         # Bullet size
         self.width = 6
         self.height = 3
 
-        # Whether the bullet should be removed
+        # Removal flag
         self.dead = False
 
     def update(self, dt):
@@ -32,7 +32,7 @@ class Bullet:
         self.x += self.speed * dt / 1000
 
         # Remove if too far
-        if self.x > 5000:  # arbitrary far limit
+        if self.x > 5000:
             self.dead = True
 
     def draw(self, screen, camera_x):

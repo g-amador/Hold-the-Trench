@@ -1,5 +1,5 @@
 """
-Main gameplay state: player, camera, waves, combat, building placement, gold pickups, player shooting.
+Main gameplay state: player, camera, waves, combat, structured defenses, bunker castle, autofire, auto-placement.
 """
 
 import pygame
@@ -20,6 +20,8 @@ from entities.trench import Trench
 from entities.mg_nest import MGNest
 from entities.bunker import Bunker
 from entities.artillery import Artillery
+from entities.barracks import Barracks
+from entities.friendly_infantry import FriendlyInfantry
 
 from config import SCREEN_WIDTH
 
@@ -34,12 +36,22 @@ class AssaultPhase:
         self.wave_director = WaveDirector(self.tilemap, 3, 5)
         self.combat = CombatSystem()
 
-        self.player = Player(3 * 32, 5 * 32)
+        self.player = Player(3 * 32, (self.tilemap.trench_y + 1) * 32)
         self.player.max_world_x = self.tilemap.width * 32 - self.player.width
+
+        bunker_x = 2
+        bunker_y = self.tilemap.trench_y + 1
+        bunker_tile = self.tilemap.get_tile(bunker_x, bunker_y)
+        bunker_tile.building = Bunker(bunker_x, bunker_y)
 
         self.camera_x = 0
         self.gold_pickups = []
         self.bullets = []
+        self.friendlies = []
+
+        self.economy.register_cost(20)   # MG
+        self.economy.register_cost(30)   # Barracks
+        self.economy.register_cost(60)   # Artillery
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -48,16 +60,7 @@ class AssaultPhase:
                 if bullet:
                     self.bullets.append(bullet)
 
-            if event.key == pygame.K_1:
-                self.place_building(Trench)
-            if event.key == pygame.K_2:
-                self.place_building(MGNest)
-            if event.key == pygame.K_3:
-                self.place_building(Bunker)
-            if event.key == pygame.K_4:
-                self.place_building(Artillery)
-
-    def place_building(self, building_class):
+    def auto_place_if_possible(self):
         tile_x = int(self.player.x / 32)
         tile_y = int(self.player.y / 32)
 
@@ -71,25 +74,38 @@ class AssaultPhase:
         if tile.building:
             return
 
-        cost = {
-            Trench: 0,
-            MGNest: 20,
-            Bunker: 40,
-            Artillery: 60
-        }[building_class]
+        spot_type = self.tilemap.spot_types.get((tile_x, tile_y))
+
+        if spot_type == "mg":
+            building_class = MGNest
+            cost = 20
+        elif spot_type == "barracks":
+            building_class = Barracks
+            cost = 30
+        elif spot_type == "artillery":
+            building_class = Artillery
+            cost = 60
+        else:
+            return
 
         if self.economy.supplies < cost:
             return
 
-        self.economy.supplies -= cost
+        self.economy.spend(cost)
         tile.building = building_class(tile_x, tile_y)
 
     def update(self, dt):
         self.player.update(dt)
 
-        # Camera clamped to map
+        enemies = self.wave_director.get_enemies()
+        self.player.auto_fire(dt, enemies, self.bullets)
+
+        self.auto_place_if_possible()
+
         self.camera_x = self.player.x - 200
         max_camera = self.tilemap.width * 32 - SCREEN_WIDTH
+        if max_camera < 0:
+            max_camera = 0
         if self.camera_x < 0:
             self.camera_x = 0
         if self.camera_x > max_camera:
@@ -98,7 +114,6 @@ class AssaultPhase:
         self.wave_director.update()
         enemies = self.wave_director.get_enemies()
 
-        # Bullets
         remaining_bullets = []
         for bullet in self.bullets:
             bullet.update(dt)
@@ -123,7 +138,6 @@ class AssaultPhase:
 
         self.bullets = remaining_bullets
 
-        # Enemies + gold
         new_gold = []
         for enemy in enemies:
             enemy.update(dt)
@@ -143,25 +157,32 @@ class AssaultPhase:
 
         self.gold_pickups = remaining_gold
 
-        # Buildings
         buildings = BuildingQuery.get_all_buildings(self.tilemap)
-        for b in buildings:
-            b.update()
+        bunkers = [b for b in buildings if isinstance(b, Bunker)]
 
-        # Combat
+        for b in buildings:
+            if isinstance(b, Barracks):
+                b.update(dt, self.friendlies)
+            else:
+                b.update()
+
+        remaining_friendlies = []
+        for f in self.friendlies:
+            f.update(dt, enemies)
+            if not f.dead:
+                remaining_friendlies.append(f)
+        self.friendlies = remaining_friendlies
+
         self.combat.update(buildings, enemies)
 
-        # Bunker loss condition: if any enemy reaches trench line, damage bunker
-        bunkers = [b for b in buildings if isinstance(b, Bunker)]
         if bunkers:
             bunker = bunkers[0]
             for enemy in enemies:
                 if not enemy.dead and enemy.x < 50:
                     enemy.dead = True
-                    bunker.take_damage(20)
+                    bunker.take_damage(10)
 
             if bunker.is_destroyed():
-                # Simple "lose" behavior: back to main menu
                 from states.main_menu import MainMenu
                 self.game.change_state(MainMenu(self.game))
 
@@ -177,13 +198,23 @@ class AssaultPhase:
         for bullet in self.bullets:
             bullet.draw(screen, self.camera_x)
 
+        for f in self.friendlies:
+            f.draw(screen, self.camera_x)
+
         self.player.draw(screen, self.camera_x)
+
+        buildings = BuildingQuery.get_all_buildings(self.tilemap)
+        bunkers = [b for b in buildings if isinstance(b, Bunker)]
+        bunker_hp = bunkers[0].hp if bunkers else 0
 
         self.hud.draw(
             screen,
             self.economy.supplies,
             self.wave_director.wave_number,
-            self.wave_director.total_waves
+            self.wave_director.total_waves,
+            bunker_hp,
+            self.economy.total_defense_cost,
+            self.economy.spent_defense_cost
         )
 
         counts = BuildingQuery.count_buildings(self.tilemap)

@@ -18,17 +18,10 @@ class Artillery:
         self.cooldown = 0
 
     def update(self):
-        """
-        Behavior handled in combat_system.
-        """
         pass
 
-    def draw(self, screen):
-        """
-        Draw artillery as a tall grey rectangle.
-        """
-        px = self.tile_x * TILE_SIZE
+    def draw(self, screen, camera_x):
+        px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE
-
         rect = pygame.Rect(px + 8, py, TILE_SIZE - 16, TILE_SIZE)
         pygame.draw.rect(screen, GREY, rect)
