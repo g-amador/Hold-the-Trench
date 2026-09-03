@@ -61,6 +61,9 @@ class TileMap:
         # Build spot types
         self.spot_types = {(c["x"], c["y"]): c["type"] for c in self.build_candidates}
 
+        # Track how much the player has paid for each build spot
+        self.paid_amount = { (x, y): 0 for (x, y) in self.spot_types }
+
         # trench_y detection
         self.trench_y = next(
             (y for y in range(self.height) for x in range(self.width // 3)

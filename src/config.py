@@ -20,3 +20,15 @@ GREY = (150, 150, 150)
 GOLD = (255, 215, 0)
 RED = (200, 50, 50)
 BLUE = (0, 200, 255)
+
+BUILD_COSTS = {
+    "mg": 20,
+    "bunker": 40,
+    "barracks": 60,
+    "artillery": 100,
+
+    "enemy_mg": 0,
+    "enemy_bunker": 0,
+    "enemy_barracks": 0,
+    "enemy_artillery": 0,
+}

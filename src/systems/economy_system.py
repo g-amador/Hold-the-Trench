@@ -3,6 +3,12 @@ Economy system.
 Tracks supplies, total defense cost, spent cost, and total gold obtainable.
 """
 
+BUILD_COSTS = {
+    "mg": 20,
+    "bunker": 40,
+    "barracks": 30,
+    "artillery": 60,
+}
 
 class EconomySystem:
     def __init__(self):

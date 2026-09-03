@@ -7,7 +7,7 @@ import pygame
 
 from systems.wave_director import WaveDirector
 from systems.combat_system import CombatSystem
-from systems.economy_system import EconomySystem
+from systems.economy_system import EconomySystem, BUILD_COSTS
 from systems.building_query import BuildingQuery
 
 from ui.hud import HUD
@@ -50,9 +50,10 @@ class AssaultPhase:
         self.bullets = []
         self.friendlies = []
 
-        self.economy.register_cost(20)
-        self.economy.register_cost(30)
-        self.economy.register_cost(60)
+        # Register defense costs (for HUD stats)
+        self.economy.register_cost(BUILD_COSTS["mg"])
+        self.economy.register_cost(BUILD_COSTS["barracks"])
+        self.economy.register_cost(BUILD_COSTS["artillery"])
 
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
@@ -78,21 +79,21 @@ class AssaultPhase:
 
         if spot_type == "mg":
             building_class = MGNest
-            cost = 20
         elif spot_type == "barracks":
             building_class = Barracks
-            cost = 30
         elif spot_type == "artillery":
             building_class = Artillery
-            cost = 60
         else:
             return
+
+        cost = BUILD_COSTS.get(spot_type, 0)
 
         if self.economy.supplies < cost:
             return
 
         self.economy.spend(cost)
         tile.building = building_class(tile_x, tile_y)
+        self.tilemap.paid_amount[(tile_x, tile_y)] = cost
 
     def update(self, dt):
         self.player.update(dt)
@@ -224,6 +225,27 @@ class AssaultPhase:
             self.economy.total_defense_cost,
             self.economy.spent_defense_cost
         )
+
+        # Show cost info above the build spot
+        tile_x = int(self.player.x / 32)
+        tile_y = int(self.player.y / 32)
+
+        if self.tilemap.is_build_spot(tile_x, tile_y):
+            spot_type = self.tilemap.spot_types[(tile_x, tile_y)]
+            cost = BUILD_COSTS.get(spot_type, 0)
+            paid = self.tilemap.paid_amount[(tile_x, tile_y)]
+            coins = self.economy.supplies
+
+            if paid >= cost:
+                text = f"{spot_type.upper()}: BUILT"
+            else:
+                text = f"{spot_type.upper()}: {cost}/{coins}"
+
+            px = tile_x * 32 - self.camera_x
+            py = tile_y * 32 - 20
+
+            surf = self.hud.font.render(text, True, (255, 255, 255))
+            screen.blit(surf, (px, py))
 
         counts = BuildingQuery.count_buildings(self.tilemap)
         self.hud.draw_building_counts(screen, counts)
