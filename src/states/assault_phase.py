@@ -4,6 +4,7 @@ autofire, auto-placement, dynamic gold budget, game over and win states.
 """
 
 import pygame
+from collections import deque
 
 from systems.wave_director import WaveDirector
 from systems.combat_system import CombatSystem
@@ -37,13 +38,57 @@ class AssaultPhase:
         self.wave_director = WaveDirector(self.tilemap, self.economy, 5)
         self.combat = CombatSystem()
 
-        self.player = Player(3 * 32, (self.tilemap.trench_y + 1) * 32)
-        self.player.max_world_x = self.tilemap.width * 32 - self.player.width
+        # --- Spawn logic: B1 + P1 + S1 ---
 
-        bunker_x = 2
-        bunker_y = self.tilemap.trench_y + 1
+        # Find first bunker build spot (B1 rule)
+        bunker_pos = None
+        for (x, y), t in self.tilemap.spot_types.items():
+            if t == "bunker":
+                bunker_pos = (x, y)
+                break
+
+        if bunker_pos is None:
+            # Fallback: original hardcoded position if no bunker spot exists
+            bunker_x = 2
+            bunker_y = self.tilemap.trench_y + 1
+        else:
+            bunker_x, bunker_y = bunker_pos
+
+        # Place bunker building at its tile
         bunker_tile = self.tilemap.get_tile(bunker_x, bunker_y)
-        bunker_tile.building = Bunker(bunker_x, bunker_y)
+        if bunker_tile:
+            bunker_tile.building = Bunker(bunker_x, bunker_y)
+
+        # Friendly boundary (S1 rule): first '|' in row 0
+        boundary = self.tilemap.friendly_boundary
+
+        # BFS search for nearest '.' tile on friendly side (P1 rule)
+        queue = deque([(bunker_x, bunker_y)])
+        visited = set([(bunker_x, bunker_y)])
+        spawn_tile = None
+
+        while queue:
+            x, y = queue.popleft()
+
+            if x < boundary and self.tilemap.is_walkable(x, y):
+                spawn_tile = (x, y)
+                break
+
+            for nx, ny in [(x + 1, y), (x - 1, y), (x, y + 1), (x, y - 1)]:
+                if (nx, ny) not in visited and self.tilemap.get_tile(nx, ny):
+                    visited.add((nx, ny))
+                    queue.append((nx, ny))
+
+        if spawn_tile is None:
+            # Fallback: original spawn if no valid tile found
+            spawn_x = 3 * 32
+            spawn_y = (self.tilemap.trench_y + 1) * 32
+        else:
+            spawn_x = spawn_tile[0] * 32
+            spawn_y = spawn_tile[1] * 32
+
+        self.player = Player(spawn_x, spawn_y)
+        self.player.max_world_x = self.tilemap.width * 32 - self.player.width
 
         self.camera_x = 0
         self.gold_pickups = []
@@ -96,7 +141,7 @@ class AssaultPhase:
         self.tilemap.paid_amount[(tile_x, tile_y)] = cost
 
     def update(self, dt):
-        self.player.update(dt)
+        self.player.update(dt, self.tilemap)
 
         enemies = self.wave_director.get_enemies()
         self.player.auto_fire(dt, enemies, self.bullets)

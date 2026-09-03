@@ -9,10 +9,12 @@ import pygame
 from config import TILE_SIZE
 from world.trench_generator import (
     TrenchGenerator,
+    TILE_EMPTY,
     TILE_TRENCH,
     TILE_CRATER,
     TILE_WIRE,
-    TILE_MUD
+    TILE_MUD,
+    TILE_HILL
 )
 
 
@@ -23,16 +25,31 @@ class Tile:
         self.type = tile_type
         self.building = None
 
+        # Convert numeric tile type → ASCII character
+        if tile_type == TILE_TRENCH:
+            self.type_char = "#"
+        elif tile_type == TILE_CRATER:
+            self.type_char = "C"
+        elif tile_type == TILE_WIRE:
+            self.type_char = "W"
+        elif tile_type == TILE_MUD:
+            self.type_char = "~"
+        elif tile_type == TILE_HILL:
+            self.type_char = "H"
+        else:
+            self.type_char = "."
+
     def draw(self, screen, camera_x):
         px = self.x * TILE_SIZE - camera_x
         py = self.y * TILE_SIZE
 
         colors = {
-            0: (50, 50, 50),
-            1: (90, 60, 40),
-            2: (70, 50, 50),
-            3: (150, 150, 150),
-            4: (80, 70, 50),
+            TILE_EMPTY: (50, 50, 50),
+            TILE_TRENCH: (90, 60, 40),
+            TILE_CRATER: (70, 50, 50),
+            TILE_WIRE: (150, 150, 150),
+            TILE_MUD: (80, 70, 50),
+            TILE_HILL: (120, 100, 60),
         }
 
         pygame.draw.rect(screen, colors[self.type], (px, py, TILE_SIZE, TILE_SIZE))
@@ -58,22 +75,20 @@ class TileMap:
             for y in range(self.height)
         ]
 
-        # Build spot types
+        # Build spot types (mg, bunker, barracks, artillery, enemy versions)
         self.spot_types = {(c["x"], c["y"]): c["type"] for c in self.build_candidates}
 
         # Track how much the player has paid for each build spot
-        self.paid_amount = { (x, y): 0 for (x, y) in self.spot_types }
+        self.paid_amount = {(x, y): 0 for (x, y) in self.spot_types}
 
-        # trench_y detection
-        self.trench_y = next(
-            (y for y in range(self.height) for x in range(self.width // 3)
-             if layout[y][x] == TILE_TRENCH),
-            self.height // 2
-        )
+        # Friendly boundary = first '|' in row 0 (S1 rule)
+        row0 = generator.ascii_map[0]
+        self.friendly_boundary = row0.index("|")
 
-    # Required by WaveDirector
+    # WaveDirector expects this to exist
     def configure_build_spots(self, *args, **kwargs):
-        pass
+        # Build spots already come from TrenchGenerator; nothing else needed.
+        return
 
     def is_build_spot(self, x, y):
         return (x, y) in self.spot_types
@@ -82,6 +97,14 @@ class TileMap:
         if 0 <= x < self.width and 0 <= y < self.height:
             return self.tiles[y][x]
         return None
+
+    def is_walkable(self, x, y):
+        tile = self.get_tile(x, y)
+        if not tile:
+            return False
+
+        # Only '.' counts as empty for spawning (Option B)
+        return tile.type_char == "."
 
     def draw(self, screen, camera_x):
         for y in range(self.height):

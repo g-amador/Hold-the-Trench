@@ -1,10 +1,14 @@
 """
-WW1 infantry player with free WASD movement, autofire toward closest enemy, and world boundaries.
+WW1 infantry player with WASD movement, collision, sliding, snapping, and wire slow-down.
 """
 
 import math
 import pygame
-from config import SCREEN_HEIGHT
+from config import SCREEN_HEIGHT, TILE_SIZE
+
+BLOCKING_TILES = {"#", "H"}
+BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery"}
+SLOW_TILES = {"W"}
 
 
 class Player:
@@ -21,7 +25,7 @@ class Player:
 
         self.max_world_x = 2000
 
-    def handle_input(self, dt):
+    def handle_input(self, dt, tilemap):
         keys = pygame.key.get_pressed()
 
         dx = 0
@@ -40,24 +44,55 @@ class Player:
             dx *= 0.707
             dy *= 0.707
 
-        self.x += dx * self.speed * dt / 1000
-        self.y += dy * self.speed * dt / 1000
+        tile = tilemap.get_tile(int(self.x / TILE_SIZE), int(self.y / TILE_SIZE))
+        speed = self.speed
+        if tile and tile.type_char in SLOW_TILES:
+            speed *= 0.45
+
+        move_x = dx * speed * dt / 1000
+        move_y = dy * speed * dt / 1000
+
+        new_x = self.x + move_x
+        new_y = self.y + move_y
+
+        # X collision
+        tile_x = int(new_x / TILE_SIZE)
+        tile_y = int(self.y / TILE_SIZE)
+        tile = tilemap.get_tile(tile_x, tile_y)
+
+        block_x = tile and (
+            tile.type_char in BLOCKING_TILES or
+            (tile.building and hasattr(tile.building, "type") and tile.building.type in BLOCKING_BUILDINGS)
+        )
+
+        # Y collision
+        tile_x = int(self.x / TILE_SIZE)
+        tile_y = int(new_y / TILE_SIZE)
+        tile = tilemap.get_tile(tile_x, tile_y)
+
+        block_y = tile and (
+            tile.type_char in BLOCKING_TILES or
+            (tile.building and hasattr(tile.building, "type") and tile.building.type in BLOCKING_BUILDINGS)
+        )
+
+        if not block_x:
+            self.x = new_x
+        else:
+            self.x = round(self.x / TILE_SIZE) * TILE_SIZE
+
+        if not block_y:
+            self.y = new_y
+        else:
+            self.y = round(self.y / TILE_SIZE) * TILE_SIZE
 
     def clamp_to_world(self):
         hud_height = 40
 
-        if self.x < 0:
-            self.x = 0
-        if self.x > self.max_world_x:
-            self.x = self.max_world_x
+        self.x = max(0, min(self.x, self.max_world_x))
+        self.y = max(hud_height, min(self.y, SCREEN_HEIGHT - self.height))
 
-        if self.y < hud_height:
-            self.y = hud_height
-        if self.y > SCREEN_HEIGHT - self.height:
-            self.y = SCREEN_HEIGHT - self.height
-
-    def update(self, dt):
-        self.handle_input(dt)
+    def update(self, dt, tilemap):
+        self.handle_input(dt, tilemap)
         self.clamp_to_world()
 
         if self.shoot_timer > 0:

@@ -9,6 +9,8 @@ from config import TILE_SIZE, GREY
 
 class Bunker:
     def __init__(self, tile_x, tile_y):
+        self.type = "bunker"
+
         self.tile_x = tile_x
         self.tile_y = tile_y
 

@@ -9,6 +9,8 @@ from config import TILE_SIZE
 
 class Barracks:
     def __init__(self, tile_x, tile_y):
+        self.type = "barracks"
+
         self.tile_x = tile_x
         self.tile_y = tile_y
 

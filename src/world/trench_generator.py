@@ -35,6 +35,7 @@ TILE_TRENCH = 1
 TILE_CRATER = 2
 TILE_WIRE   = 3
 TILE_MUD    = 4
+TILE_HILL   = 5
 
 # ASCII → tile type
 ASCII_TO_TILE = {
@@ -47,7 +48,7 @@ ASCII_TO_TILE = {
     'R': TILE_TRENCH,
 
     'A': TILE_EMPTY,
-    'H': TILE_MUD,
+    'H': TILE_HILL,
     'C': TILE_CRATER,
     'W': TILE_WIRE,
     '~': TILE_MUD,
@@ -57,7 +58,7 @@ ASCII_TO_TILE = {
     'e': TILE_TRENCH,
     'r': TILE_TRENCH,
     'a': TILE_EMPTY,
-    'h': TILE_MUD,
+    'h': TILE_HILL,
 
     # Visual separator
     '|': TILE_EMPTY,
@@ -86,9 +87,6 @@ STATIC_MAP = [
 
 class TrenchGenerator:
     def __init__(self):
-        """
-        No padding needed — rows are already readable and consistent.
-        """
         self.ascii_map = STATIC_MAP
         self.height = len(STATIC_MAP)
         self.width = len(STATIC_MAP[0])
@@ -110,6 +108,7 @@ class TrenchGenerator:
                 if ch == 'R': build_candidates.append({"x": x, "y": y, "type": "barracks"})
                 if ch == 'A': build_candidates.append({"x": x, "y": y, "type": "artillery"})
 
+                # Enemy buildings
                 if ch == 'm': build_candidates.append({"x": x, "y": y, "type": "enemy_mg"})
                 if ch == 'e': build_candidates.append({"x": x, "y": y, "type": "enemy_bunker"})
                 if ch == 'r': build_candidates.append({"x": x, "y": y, "type": "enemy_barracks"})
