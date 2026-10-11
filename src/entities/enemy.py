@@ -3,6 +3,7 @@ WW1 enemies: Infantry, Cavalry, Tank.
 Move leftward across no man's land and drop gold once on death.
 """
 
+import math
 import pygame
 
 from entities.gold_pickup import GoldPickup
@@ -80,3 +81,65 @@ class Tank(EnemyBase):
         super().__init__(x, y, speed=30, hp=300, gold_drop=20)
         self.width = 48
         self.height = 32
+
+class EnemyInfantry(Infantry):
+    def __init__(self, x, y):
+        super().__init__(x, y)
+        self.is_barracks_unit = True
+    
+    def update(self, dt, friendlies):
+        if self.dead:
+            return
+
+        target = None
+        best_dist = None
+
+        for friendly in friendlies:
+            if friendly.dead:
+                continue
+
+            dist = math.hypot(
+                friendly.x + friendly.width / 2
+                - (self.x + self.width / 2),
+                friendly.y + friendly.height / 2
+                - (self.y + self.height / 2),
+            )
+
+            if best_dist is None or dist < best_dist:
+                best_dist = dist
+                target = friendly
+
+        # No friendly infantry nearby: advance toward the player's side.
+        if target is None:
+            self.x -= self.speed * dt / 1000
+            return
+
+        dx = (
+            target.x + target.width / 2
+            - (self.x + self.width / 2)
+        )
+        dy = (
+            target.y + target.height / 2
+            - (self.y + self.height / 2)
+        )
+
+        length = math.hypot(dx, dy)
+
+        if length > 0:
+            dx /= length
+            dy /= length
+            self.x += dx * self.speed * dt / 1000
+            self.y += dy * self.speed * dt / 1000
+
+        enemy_rect = self.get_hitbox()
+        friendly_rect = pygame.Rect(
+            round(target.x),
+            round(target.y),
+            target.width,
+            target.height,
+        )
+
+        if enemy_rect.colliderect(friendly_rect):
+            target.hp -= self.hp
+            target.dead = True
+            self.take_damage(self.hp)

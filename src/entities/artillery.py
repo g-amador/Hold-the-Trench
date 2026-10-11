@@ -9,6 +9,7 @@ from config import TILE_SIZE, GREY
 
 
 class Artillery:
+
     def __init__(self, tile_x, tile_y, is_enemy=False):
         self.type = "enemy_artillery" if is_enemy else "artillery"
         self.is_enemy = is_enemy

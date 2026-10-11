@@ -26,42 +26,45 @@ class FriendlyInfantry:
         if self.dead:
             return
 
-        # Find nearest enemy
         target = None
         best_dist = None
-        for e in enemies:
-            if e.dead:
+
+        for enemy in enemies:
+            if enemy.dead:
                 continue
-            dist = math.hypot(e.x - self.x, e.y - self.y)
+
+            dist = math.hypot(enemy.x - self.x, enemy.y - self.y)
             if best_dist is None or dist < best_dist:
                 best_dist = dist
-                target = e
+                target = enemy
 
-        # Move toward enemy
-        if target:
-            dx = target.x - self.x
-            dy = target.y - self.y
-            length = math.hypot(dx, dy)
-            if length > 0:
-                dx /= length
-                dy /= length
-                self.x += dx * self.speed * dt / 1000
-                self.y += dy * self.speed * dt / 1000
+        if target is None:
+            return
 
-            # Melee combat
-            if (self.x < target.x + target.width and
-                self.x + self.width > target.x and
-                self.y < target.y + target.height and
-                self.y + self.height > target.y):
+        dx = target.x - self.x
+        dy = target.y - self.y
+        length = math.hypot(dx, dy)
 
-                # Kill exactly one enemy
-                if self.kill_count == 0:
-                    target.take_damage(target.hp)
-                    self.kill_count = 1
+        if length > 0:
+            dx /= length
+            dy /= length
+            self.x += dx * self.speed * dt / 1000
+            self.y += dy * self.speed * dt / 1000
 
-                # Infantry dies after killing one enemy
-                self.hp = 0
-                self.dead = True
+        friendly_rect = pygame.Rect(
+            round(self.x), round(self.y), self.width, self.height
+        )
+        enemy_rect = target.get_hitbox() if hasattr(target, "get_hitbox") else pygame.Rect(
+            round(target.x), round(target.y), target.width, target.height
+        )
+
+        if friendly_rect.colliderect(enemy_rect):
+            if self.kill_count == 0:
+                target.take_damage(target.hp)
+                self.kill_count = 1
+
+            self.hp = 0
+            self.dead = True
 
     def draw(self, screen, camera_x):
         pygame.draw.rect(

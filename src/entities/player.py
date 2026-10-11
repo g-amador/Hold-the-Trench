@@ -19,7 +19,7 @@ class Player:
         self.x = float(x)
         self.y = float(y)
 
-        self.speed = 200
+        self.speed = 120
         self.width = 28
         self.height = 28
 
