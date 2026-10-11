@@ -4,6 +4,7 @@ Move leftward across no man's land and drop gold once on death.
 """
 
 import pygame
+
 from entities.gold_pickup import GoldPickup
 
 
@@ -31,6 +32,15 @@ class EnemyBase:
         if self.hp <= 0:
             self.dead = True
 
+    def get_hitbox(self):
+        """Return the enemy's collision rectangle in world coordinates."""
+        return pygame.Rect(
+            round(self.x),
+            round(self.y),
+            self.width,
+            self.height,
+        )
+
     def draw(self, screen, camera_x):
         if self.dead:
             return
@@ -51,22 +61,22 @@ class EnemyBase:
             self.gold_spawned = True
             return GoldPickup(self.x, self.y, self.gold_drop)
         return None
-
+    
 
 class Infantry(EnemyBase):
     def __init__(self, x, y):
-        super().__init__(x, y, speed=60, hp=40, gold_drop=1)
+        super().__init__(x, y, speed=60, hp=40, gold_drop=5)
 
 
 class Cavalry(EnemyBase):
     def __init__(self, x, y):
-        super().__init__(x, y, speed=120, hp=80, gold_drop=2)
+        super().__init__(x, y, speed=120, hp=80, gold_drop=10)
         self.width = 32
         self.height = 32
 
 
 class Tank(EnemyBase):
     def __init__(self, x, y):
-        super().__init__(x, y, speed=30, hp=300, gold_drop=5)
+        super().__init__(x, y, speed=30, hp=300, gold_drop=20)
         self.width = 48
         self.height = 32

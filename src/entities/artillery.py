@@ -9,8 +9,9 @@ from config import TILE_SIZE, GREY
 
 
 class Artillery:
-    def __init__(self, tile_x, tile_y):
-        self.type = "artillery"
+    def __init__(self, tile_x, tile_y, is_enemy=False):
+        self.type = "enemy_artillery" if is_enemy else "artillery"
+        self.is_enemy = is_enemy
 
         self.tile_x = tile_x
         self.tile_y = tile_y
@@ -56,5 +57,5 @@ class Artillery:
     def draw(self, screen, camera_x):
         px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE
-        rect = pygame.Rect(px + 8, py, TILE_SIZE - 16, TILE_SIZE)
+        rect = pygame.Rect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8)
         pygame.draw.rect(screen, GREY, rect)

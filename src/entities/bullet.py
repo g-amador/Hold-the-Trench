@@ -29,6 +29,15 @@ class Bullet:
         if self.x > 5000 or self.x < -500 or self.y < -500 or self.y > 5000:
             self.dead = True
 
+    def get_hitbox(self):
+        """Return the bullet's collision rectangle in world coordinates."""
+        return pygame.Rect(
+            round(self.x),
+            round(self.y),
+            self.width,
+            self.height,
+        )
+
     def draw(self, screen, camera_x):
         pygame.draw.rect(
             screen,
