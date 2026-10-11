@@ -14,7 +14,8 @@ from world.trench_generator import (
     TILE_CRATER,
     TILE_WIRE,
     TILE_MUD,
-    TILE_HILL
+    TILE_HILL,
+    TILE_HILL_PATH,
 )
 
 
@@ -36,6 +37,8 @@ class Tile:
             self.type_char = "~"
         elif tile_type == TILE_HILL:
             self.type_char = "H"
+        elif tile_type == TILE_HILL_PATH:
+            self.type_char = "P"
         else:
             self.type_char = "."
 
@@ -50,6 +53,7 @@ class Tile:
             TILE_WIRE: (150, 150, 150),
             TILE_MUD: (80, 70, 50),
             TILE_HILL: (120, 100, 60),
+            TILE_HILL_PATH: (100, 80, 20),
         }
 
         pygame.draw.rect(screen, colors[self.type], (px, py, TILE_SIZE, TILE_SIZE))
