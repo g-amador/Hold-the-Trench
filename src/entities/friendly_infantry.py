@@ -13,10 +13,10 @@ class FriendlyInfantry:
         self.x = x
         self.y = y
 
-        self.speed = 40
+        self.speed = 120
         self.hp = 40
-        self.width = 20
-        self.height = 28
+        self.width = 24
+        self.height = 24
         self.dead = False
 
         # Tracks if this infantry already killed one enemy
@@ -65,6 +65,14 @@ class FriendlyInfantry:
 
             self.hp = 0
             self.dead = True
+
+    def get_hitbox(self):
+        return pygame.Rect(
+            round(self.x),
+            round(self.y),
+            self.width,
+            self.height,
+        )
 
     def draw(self, screen, camera_x):
         pygame.draw.rect(

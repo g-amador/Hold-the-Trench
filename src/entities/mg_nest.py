@@ -5,7 +5,9 @@ Auto-shoots enemies in range, only when close enough and in arc.
 
 import math
 import pygame
+
 from config import TILE_SIZE, GREY
+from entities.bullet import Bullet
 
 
 class MGNest:
@@ -50,7 +52,6 @@ class MGNest:
             dx /= length
             dy /= length
 
-            from entities.bullet import Bullet
             bullet = Bullet(cx, cy, dx, dy)
             bullets.append(bullet)
             self.cooldown = self.fire_rate

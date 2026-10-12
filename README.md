@@ -2,9 +2,9 @@
 
 > **A single-player procedural WWI defense roguelite.**
 
-Build trench networks, establish machine-gun nests, and hold the line against increasingly desperate enemy assaults.
+Build barracks, establish machine-gun nests, and deploy artillery positions to defend your territory against a continuous enemy assault.
 
-Defeat all enemy assault waves to secure victory, then decide:
+Protect your bunker, manage your supplies, and destroy the enemy bunker to secure victory. Then decide:
 
 **Will you continue to the next battlefield, or leave the front?**
 
@@ -43,13 +43,16 @@ Each battle takes place on a **newly generated WWI battlefield**, forcing player
 
 * 🪖 **Single-player experience**
 * 🌍 **Procedurally generated battlefields**
-* 🕳️ **Build and expand trench networks**
+* 🕳️ **Procedurally generated trench networks**
 * 🔫 **Deploy machine-gun nests**
 * 💥 **Call in artillery support**
 * 🧱 **Construct defensive bunkers**
-* 🧠 **Enemy pathfinding and tactical assaults**
+* 🪖 **Recruit friendly infantry**
+* 🏭 **Enemy barracks continuously spawn infantry**
+* ⚔️ **Real-time infantry combat**
+* 🪙 **Collect supplies from defeated enemies**
+* 🎯 **Destroy the enemy bunker to win**
 * 🌧️ **Random weather conditions**
-* 📈 **Escalating wave difficulty**
 * ⏸️ **Pause and resume at any time**
 * 🔄 **Generate a new defense scenario after each victory**
 * 🚪 **Choose to continue fighting or leave after each completed level**
@@ -66,8 +69,13 @@ Generate Battlefield
 Preparation Phase
 (Build Defenses)
         ↓
-Enemy Assaults
-(Defeat All Waves)
+Continuous Enemy Assault
+(Enemy Barracks Spawn Infantry)
+        ↓
+Defend Your Bunker
+(Eliminate Enemies and Collect Supplies)
+        ↓
+Destroy Enemy Bunker
         ↓
 Victory or Defeat
         ↓
@@ -86,11 +94,9 @@ Choose:
 
 | Structure                  | Purpose                            |
 | -------------------------- | ---------------------------------- |
-| 🕳️ Trench                  | Basic defensive position           |
+| 🏭 Barracks                | Recruit or spawn infantry          |
 | 🔫 MG Nest                 | Anti-infantry fire support         |
-| 🧱 Bunker                  | Durable defensive strongpoint      |
 | 💥 Artillery Position      | Long-range bombardment             |
-| 📦 Supply Tent *(planned)* | Resource generation                |
 
 [Back to Table of Contents](#toc)
 
@@ -119,9 +125,17 @@ Choose:
 
 ## 🎯 <a name="objectives">Objectives
 
-Hold your position until all required enemy assaults have been defeated.
+Your primary objective is to destroy the enemy bunker while protecting your own.
 
-Each scenario has a **randomized number of waves**, ensuring that no two battles play exactly the same.
+* 🏭 Enemy barracks continuously spawn enemy infantry.
+* 🪖 Friendly infantry engage enemy troops in close combat.
+* 🔫 Machine-gun nests and artillery provide defensive fire support.
+* 🪙 Defeated enemies can drop supplies that you can collect.
+* 🧱 Build and maintain defenses to protect your bunker.
+
+Victory: Destroy the enemy bunker.
+
+Defeat: Lose your bunker.
 
 Victory grants you a choice:
 
@@ -142,15 +156,6 @@ Victory grants you a choice:
 | ------------- | ---------------- |
 | `ESC`         | Pause / Resume   |
 | `Left Click`  | Build / Select   |
-
-### Construction
-
-| Key | Structure    |
-| --- | ------------ |
-| `1` | 🕳️ Trench    |
-| `2` | 🔫 MG Nest   |
-| `3` | 🧱 Bunker    |
-| `4` | 💥 Artillery |
 
 [Back to Table of Contents](#toc)
 
@@ -192,8 +197,7 @@ hold_the_trench/
 │   ├── systems/
 │   │   ├── building_query.py
 │   │   ├── combat_system.py
-│   │   ├── economy_system.py
-│   │   └── wave_director.py
+│   │   └── economy_system.py
 │   │
 │   ├── ui/
 │   │   └── hud.py
@@ -244,34 +248,37 @@ python main.py
 
 ### Step 1: Generate a Battlefield
 
-Starting a new game creates a procedurally generated WWI battlefield with randomized terrain, weather conditions, enemy strength, and assault duration.
+Starting a new game creates a procedurally generated WWI battlefield and trenches with randomized terrain, weather conditions, and enemy strength.
 
 No two battles are exactly alike.
 
 ### Step 2: Prepare Your Defenses
 
-During the preparation phase, use your available supplies to construct defensive positions:
+Use your available supplies to construct defensive positions, including:
 
-* 🕳️ Trench networks
 * 🔫 Machine-gun nests
 * 🧱 Bunkers
 * 💥 Artillery positions
 
-Careful planning is essential, as supplies are limited.
+Friendly barracks can recruit infantry to help defend your position
 
-### Step 3: Begin the Assault
+### Step 3: Defend your position
 
-Once your defenses are ready, the enemy assault begins.
+Enemy barracks continuously spawn infantry. Enemy troops will engage your friendly infantry and advance toward your bunker when no friendly infantry remain.
 
-Enemy forces attack in multiple waves while your defensive structures automatically engage hostile units.
+Your machine-gun nests and artillery provide supporting fire against enemy infantry.
 
-### Step 4: Hold the Line
+### Step 4: Collect Supplies
 
-Defeat all enemy assault waves to achieve victory.
+Defeated enemies can drop supplies. Collect them to help fund additional defenses.
 
-If your defenses collapse and the battlefield is overrun, the battle is lost.
+### Step 5: Destroy the Enemy Bunker
 
-### Step 5: Decide Your Fate
+Advance your defenses and eliminate enemy forces while protecting your own bunker.
+
+Destroy the enemy bunker to win. If your bunker is destroyed, the battle is lost.
+
+### Step 6: Decide Your Fate
 
 After each successful defense, you may choose to:
 
@@ -330,36 +337,33 @@ Run the game:
 
 ### ✅ Vertical Slice V1
 
-* [x] Procedural scenarios
-* [x] Wave-based assaults
-* [x] Trench construction
 * [x] Machine-gun nests
 * [x] Bunkers
 * [x] Artillery positions
-* [x] Weather system
-* [x] Campaign progression
-* [x] Save/load support
-* [x] Pause and resume
+* [x] Continuous enemy infantry spawning
+* [x] Enemy bunker destruction objective
 * [x] Post-battle decisions
 * [x] Victory and defeat states
 
 ### 🚧 Planned Improvements
 
+* [ ] Procedural scenarios
 * [ ] Additional enemy types
-* [ ] Improved battlefield generation
 * [ ] Better pathfinding
 * [ ] Visual effects
 * [ ] Sound effects
 * [ ] Music
+* [ ] Weather system
+* [ ] Campaign progression
+* [ ] Save/load support
+* [ ] Pause and resume
 * [ ] Gameplay balancing
 
 ### 📌 Future Features
 
 * [ ] Tanks
-* [ ] Mortar teams
-* [ ] Supply tents
+* [ ] Cavalry
 * [ ] Difficulty modifiers
-* [ ] Steam achievements
 
 [Back to Table of Contents](#toc)
 

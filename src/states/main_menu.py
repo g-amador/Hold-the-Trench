@@ -4,7 +4,9 @@ Press ENTER to start.
 """
 
 import pygame
+
 from config import WHITE, BLACK
+from world.tilemap import TileMap
 
 
 class MainMenu:
@@ -17,8 +19,9 @@ class MainMenu:
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_RETURN:
                 from states.assault_phase import AssaultPhase
-                self.game.change_state(AssaultPhase(self.game))
 
+                self.game.tilemap = TileMap()
+                self.game.change_state(AssaultPhase(self.game))
             if event.key == pygame.K_q:
                 self.game.running = False
 

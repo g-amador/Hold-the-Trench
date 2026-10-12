@@ -5,7 +5,9 @@ Slow but high-damage long-range attack from hill positions.
 
 import math
 import pygame
+
 from config import TILE_SIZE, GREY
+from entities.bullet import Bullet
 
 
 class Artillery:
@@ -50,7 +52,6 @@ class Artillery:
             dx /= length
             dy /= length
 
-            from entities.bullet import Bullet
             bullet = Bullet(cx, cy, dx, dy)
             bullets.append(bullet)
             self.cooldown = self.fire_rate

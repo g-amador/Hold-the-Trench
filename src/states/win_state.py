@@ -4,7 +4,9 @@ Player can restart or quit.
 """
 
 import pygame
+
 from config import WHITE, BLACK
+from states.main_menu import MainMenu
 
 
 class WinState:
@@ -16,7 +18,6 @@ class WinState:
     def handle_event(self, event):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_r:
-                from states.main_menu import MainMenu
                 self.game.change_state(MainMenu(self.game))
             if event.key == pygame.K_q:
                 self.game.running = False

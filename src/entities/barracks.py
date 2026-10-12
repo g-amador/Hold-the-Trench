@@ -4,7 +4,10 @@ Spawns friendly infantry every 5 seconds.
 """
 
 import pygame
+
 from config import TILE_SIZE
+from entities.enemy import EnemyInfantry
+from entities.friendly_infantry import FriendlyInfantry
 
 
 class Barracks:
@@ -31,10 +34,8 @@ class Barracks:
         y = self.tile_y * TILE_SIZE
 
         if self.is_enemy:
-            from entities.enemy import EnemyInfantry
             units.append(EnemyInfantry(x, y))
-        else:
-            from entities.friendly_infantry import FriendlyInfantry
+        else:            
             units.append(FriendlyInfantry(x, y))
 
     def draw(self, screen, camera_x):

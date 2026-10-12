@@ -1,5 +1,5 @@
 """
-Main gameplay state: player, camera, waves, combat, structured defenses,
+Main gameplay state: player, camera, combat, structured defenses,
 bunker, autofire, automatic building, partial payments, and HUD.
 """
 
@@ -8,24 +8,19 @@ import math
 
 from collections import deque
 
-from systems.wave_director import WaveDirector
-from systems.combat_system import CombatSystem
+from states.game_over import GameOverState
+from states.win_state import WinState
+
 from systems.economy_system import EconomySystem, BUILD_COSTS
 from systems.building_query import BuildingQuery
 
 from ui.hud import HUD
 
 from entities.player import Player
-from entities.enemy import Infantry, Cavalry, Tank
-from entities.gold_pickup import GoldPickup
-from entities.bullet import Bullet
-
-from entities.trench import Trench
 from entities.mg_nest import MGNest
 from entities.bunker import Bunker
 from entities.artillery import Artillery
 from entities.barracks import Barracks
-from entities.friendly_infantry import FriendlyInfantry
 
 from config import SCREEN_WIDTH, TILE_SIZE
 
@@ -51,12 +46,6 @@ class AssaultPhase:
 
         self.hud = HUD()
         self.economy = EconomySystem()
-        self.wave_director = WaveDirector(
-            self.tilemap,
-            self.economy,
-            5,
-        )
-        self.combat = CombatSystem()
 
         # Find the first bunker build spot.
         bunker_pos = None
@@ -123,12 +112,7 @@ class AssaultPhase:
         self.enemy_bullets = []
         self.friendlies = []
         self.enemy_barracks_units = []
-
-        # Register defense costs for HUD statistics.
-        self.economy.register_cost(BUILD_COSTS["mg"])
-        self.economy.register_cost(BUILD_COSTS["barracks"])
-        self.economy.register_cost(BUILD_COSTS["artillery"])
-
+        
         self.build_prompt_radius = 72
         self.place_enemy_buildings()
 
@@ -145,7 +129,7 @@ class AssaultPhase:
                 self.player.auto_fire(0, targets, self.bullets)
 
     def place_enemy_buildings(self):
-        """Place enemy defenses from lowercase map markers without charging supplies."""
+        """Place enemy defenses from lowercase map markers without charging gold."""
         for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
             building_class = ENEMY_BUILDING_CLASSES.get(spot_type)
             if building_class is None:
@@ -193,7 +177,7 @@ class AssaultPhase:
             # Remember payments even while the spot is still empty.
             paid = self.tilemap.paid_amount.get(key, 0)
             remaining = max(0, cost - paid)
-            payment = min(remaining, max(0, self.economy.supplies))
+            payment = min(remaining, max(0, self.economy.gold))
 
             if payment > 0:
                 self.economy.spend(payment)
@@ -206,20 +190,20 @@ class AssaultPhase:
                 return
 
     def _collect_gold_and_pay_debts(self):
-        """Collect gold and apply available supplies to unpaid buildings."""
+        """Collect gold and apply available gold to unpaid buildings."""
         remaining_gold = []
 
         for gold in self.gold_pickups:
             collected = gold.update(0, self.player)
 
             if collected:
-                self.economy.supplies += gold.amount
+                self.economy.gold += gold.amount
             else:
                 remaining_gold.append(gold)
 
         self.gold_pickups = remaining_gold
 
-        # Pay existing debts using available supplies.
+        # Pay existing debts using available gold.
         for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
             if spot_type not in BUILDING_CLASSES:
                 continue
@@ -232,377 +216,215 @@ class AssaultPhase:
             paid = self.tilemap.paid_amount.get((tile_x, tile_y), 0)
             debt = max(0, cost - paid)
 
-            payment = min(debt, max(0, self.economy.supplies))
+            payment = min(debt, max(0, self.economy.gold))
             if payment > 0:
                 self.economy.spend(payment)
                 self.tilemap.paid_amount[(tile_x, tile_y)] = paid + payment
 
     def update(self, dt):
-        # The wave director is intentionally not updated.
-        # All combatants now come from barracks.
-        self.player.update(dt, self.tilemap, self.enemy_barracks_units)
-
+        # Retrieve all buildings from the tilemap.
         buildings = BuildingQuery.get_all_buildings(self.tilemap)
-        bunkers = [b for b in buildings if isinstance(b, Bunker)]
+
         player_bunkers = [
-            b for b in bunkers if not getattr(b, "is_enemy", False)
+            b for b in buildings
+            if isinstance(b, Bunker) and not b.is_enemy
         ]
         enemy_bunkers = [
-            b for b in bunkers if getattr(b, "is_enemy", False)
+            b for b in buildings
+            if isinstance(b, Bunker) and b.is_enemy
         ]
 
-        # Spawn infantry from both sides' barracks.
-        for building in buildings:
-            if isinstance(building, Barracks):
-                if getattr(building, "is_enemy", False):
-                    building.update(dt, self.enemy_barracks_units)
-                else:
-                    building.update(dt, self.friendlies)
-
-        # Player automatic fire can target enemy infantry and the enemy bunker.
-        targets = list(self.enemy_barracks_units)
-        targets.extend(
-            bunker for bunker in enemy_bunkers
-            if not bunker.is_destroyed()
+        # Update the player.
+        self.player.update(
+            dt,
+            self.tilemap,
+            self.enemy_barracks_units,
         )
-        self.player.auto_fire(dt, targets, self.bullets)
 
+        # Update barracks and spawn infantry.
+        for building in buildings:
+            if not isinstance(building, Barracks):
+                continue
+
+            if building.is_enemy:
+                building.update(dt, self.enemy_barracks_units)
+            else:
+                building.update(dt, self.friendlies)
+
+        # Update bunkers.
+        for bunker in player_bunkers + enemy_bunkers:
+            bunker.update()
+
+        # Player targets enemy infantry and enemy bunkers.
+        player_targets = [
+            enemy for enemy in self.enemy_barracks_units
+            if not enemy.dead
+        ]
+        player_targets.extend(
+            bunker for bunker in enemy_bunkers
+            if not bunker.dead
+        )
+
+        # Temporarily disabled player shooting.
+        self.player.auto_fire(dt, player_targets, self.bullets)
+
+        # Automatically build when close to a valid build spot.
         self.auto_place_if_possible()
 
-        # Keep the camera inside the map.
-        self.camera_x = self.player.x - 200
-        max_camera = max(
-            0,
-            self.tilemap.width * TILE_SIZE - SCREEN_WIDTH,
-        )
-        self.camera_x = max(0, min(self.camera_x, max_camera))
+        # Camera follows the player.
+        world_width = self.tilemap.width * TILE_SIZE
+        max_camera_x = max(0, world_width - SCREEN_WIDTH)
 
-        # Update player bullets and hit only enemy infantry or enemy bunker.
+        self.camera_x = max(
+            0,
+            min(
+                self.player.x - SCREEN_WIDTH // 2,
+                max_camera_x,
+            ),
+        )
+        
+        # Player bullets damage enemy infantry or enemy bunkers.
         remaining_bullets = []
+
         for bullet in self.bullets:
             bullet.update(dt)
-            bullet_rect = bullet.get_hitbox()
+
+            if getattr(bullet, "dead", False):
+                continue
+
             hit = False
 
-            for unit in self.enemy_barracks_units:
-                if unit.dead:
+            for enemy in self.enemy_barracks_units:
+                if enemy.dead:
                     continue
-                if bullet_rect.colliderect(unit.get_hitbox()):
-                    unit.take_damage(bullet.damage)
-                    bullet.dead = True
+
+                if bullet.get_hitbox().colliderect(enemy.get_hitbox()):
+                    enemy.take_damage(bullet.damage)
                     hit = True
                     break
 
             if not hit:
                 for bunker in enemy_bunkers:
-                    if (
-                        not bunker.is_destroyed()
-                        and bullet_rect.colliderect(bunker.get_hitbox())
+                    if bunker.dead:
+                        continue
+
+                    if bullet.get_hitbox().colliderect(
+                        bunker.get_hitbox()
                     ):
                         bunker.take_damage(bullet.damage)
-                        bullet.dead = True
                         hit = True
                         break
 
-            if not bullet.dead and not hit:
+            if not hit:
                 remaining_bullets.append(bullet)
 
         self.bullets = remaining_bullets
 
-        # Update enemy infantry. They fight friendly infantry in melee.
-        remaining_enemy_units = []
-        for unit in self.enemy_barracks_units:
-            unit.update(dt, self.friendlies)
-            if not unit.dead:
-                remaining_enemy_units.append(unit)
-        self.enemy_barracks_units = remaining_enemy_units
+        # Enemy infantry fights friendly infantry in melee.
+        player_bunker = player_bunkers[0] if player_bunkers else None
 
-        # Friendly infantry fight enemy barracks infantry in melee.
-        remaining_friendlies = []
+        for enemy in self.enemy_barracks_units:
+            enemy.update(dt, self.friendlies, player_bunker)
+
+        # Spawn gold before removing dead enemy infantry.
+        for enemy in self.enemy_barracks_units:
+            if enemy.dead and not enemy.gold_spawned:
+                gold = enemy.spawn_gold()
+                if gold is not None:
+                    self.gold_pickups.append(gold)
+
+        self.enemy_barracks_units = [
+            enemy for enemy in self.enemy_barracks_units
+            if not enemy.dead
+        ]
+
+        # Friendly infantry fights enemy infantry in melee.
         for friendly in self.friendlies:
             friendly.update(dt, self.enemy_barracks_units)
-            if not friendly.dead:
-                remaining_friendlies.append(friendly)
-        self.friendlies = remaining_friendlies
 
-        # Friendly MGs and artillery shoot enemy barracks infantry.
-        # Enemy MGs and artillery shoot friendly infantry.
-        for building in buildings:
-            if isinstance(building, MGNest):
-                if getattr(building, "is_enemy", False):
-                    building.update(
-                        dt, self.friendlies, self.enemy_bullets
-                    )
-                else:
-                    building.update(
-                        dt, self.enemy_barracks_units, self.bullets
-                    )
-            elif isinstance(building, Artillery):
-                if getattr(building, "is_enemy", False):
-                    building.update(
-                        dt, self.friendlies, self.enemy_bullets
-                    )
-                else:
-                    building.update(
-                        dt, self.enemy_barracks_units, self.bullets
-                    )
-
-        # Enemy bullets can damage only friendly infantry.
-        remaining_enemy_bullets = []
-        for bullet in self.enemy_bullets:
-            bullet.update(dt)
-            bullet_rect = bullet.get_hitbox()
-
-            for friendly in self.friendlies:
-                if friendly.dead:
-                    continue
-                friendly_rect = pygame.Rect(
-                    round(friendly.x),
-                    round(friendly.y),
-                    friendly.width,
-                    friendly.height,
-                )
-                if bullet_rect.colliderect(friendly_rect):
-                    friendly.hp -= bullet.damage
-                    if friendly.hp <= 0:
-                        friendly.dead = True
-                    bullet.dead = True
-                    break
-
-            if not bullet.dead:
-                remaining_enemy_bullets.append(bullet)
-
-        self.enemy_bullets = remaining_enemy_bullets
         self.friendlies = [
             friendly for friendly in self.friendlies
             if not friendly.dead
         ]
 
-        # Keep gold pickups if existing gameplay uses them.
-        remaining_gold = []
-        for gold in self.gold_pickups:
-            if gold.update(dt, self.player):
-                self.economy.supplies += gold.amount
-            else:
-                remaining_gold.append(gold)
-        self.gold_pickups = remaining_gold
-
-        # Lose if your bunker is destroyed.
-        if player_bunkers and player_bunkers[0].is_destroyed():
-            from states.game_over import GameOverState
-            self.game.change_state(GameOverState(self.game))
-            return
-
-        # Win only when the enemy bunker is destroyed.
-        if enemy_bunkers and all(
-            bunker.is_destroyed() for bunker in enemy_bunkers
-        ):
-            from states.win_state import WinState
-            self.game.change_state(WinState(self.game))
-            return
-
-        enemies = self.wave_director.get_enemies()
-        self.player.update(dt, self.tilemap, enemies)
-
-        enemies = self.wave_director.get_enemies()
-        self.player.auto_fire(dt, enemies, self.bullets)
-
-        self.auto_place_if_possible()
-
-        # Camera follows the player and remains inside the map.
-        self.camera_x = self.player.x - 200
-        max_camera = max(
-            0,
-            self.tilemap.width * TILE_SIZE - SCREEN_WIDTH,
-        )
-        self.camera_x = max(0, min(self.camera_x, max_camera))
-
-        self.wave_director.update()
-        enemies = self.wave_director.get_enemies()
-
-        # Update bullets and check full hitboxes.
-        remaining_bullets = []
-
-        for bullet in self.bullets:
-            bullet.update(dt)
-
-            bullet_rect = pygame.Rect(
-                round(bullet.x),
-                round(bullet.y),
-                getattr(bullet, "width", 6),
-                getattr(bullet, "height", 3),
-            )
-
-            hit = False
-
-            for enemy in enemies:
-                if enemy.dead:
-                    continue
-
-                if hasattr(enemy, "get_hitbox"):
-                    enemy_rect = enemy.get_hitbox()
-                else:
-                    enemy_rect = pygame.Rect(
-                        round(enemy.x),
-                        round(enemy.y),
-                        enemy.width,
-                        enemy.height,
-                    )
-
-                if bullet_rect.colliderect(enemy_rect):
-                    enemy.take_damage(bullet.damage)
-                    bullet.dead = True
-                    hit = True
-                    break
-
-            if not getattr(bullet, "dead", False) and not hit:
-                remaining_bullets.append(bullet)
-
-        self.bullets = remaining_bullets
-
-        # Update enemies and collect gold drops.
-        new_gold = []
-
-        for enemy in enemies:
-            enemy.update(dt)
-            gold = enemy.spawn_gold()
-
-            if gold:
-                new_gold.append(gold)
-
-        self.gold_pickups.extend(new_gold)
-
-        # Keep the original GoldPickup API and pass the frame delta.
-        remaining_gold = []
-
-        for gold in self.gold_pickups:
-            collected = gold.update(dt, self.player)
-
-            if collected:
-                self.economy.supplies += gold.amount
-            else:
-                remaining_gold.append(gold)
-
-        self.gold_pickups = remaining_gold
-
-        # Pay outstanding building costs after collecting supplies.
-        for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
-            if spot_type not in BUILDING_CLASSES:
-                continue
-
-            tile = self.tilemap.get_tile(tile_x, tile_y)
-            if tile is None or tile.building is None:
-                continue
-
-            cost = BUILD_COSTS[spot_type]
-            paid = self.tilemap.paid_amount.get((tile_x, tile_y), 0)
-            debt = max(0, cost - paid)
-            payment = min(debt, max(0, self.economy.supplies))
-
-            if payment > 0:
-                self.economy.spend(payment)
-                self.tilemap.paid_amount[(tile_x, tile_y)] = paid + payment
-
-        # Update buildings.
-        buildings = BuildingQuery.get_all_buildings(self.tilemap)
-        bunkers = [b for b in buildings if isinstance(b, Bunker)]
-        
+        # Update machine guns and artillery.
         for building in buildings:
-            if isinstance(building, Barracks):
-                if getattr(building, "is_enemy", False):
-                    building.update(dt, self.enemy_barracks_units)
-                else:
-                    building.update(dt, self.friendlies)
-            elif isinstance(building, MGNest):
-                if getattr(building, "is_enemy", False):
-                    building.update(dt, self.friendlies, self.enemy_bullets)
-                else:
-                    building.update(dt, enemies, self.bullets)
-            elif isinstance(building, Artillery):
-                if getattr(building, "is_enemy", False):
-                    building.update(dt, self.friendlies, self.enemy_bullets)
-                else:
-                    building.update(dt, enemies, self.bullets)
+            if not isinstance(building, (MGNest, Artillery)):
+                continue
+
+            if building.is_enemy:
+                building.update(
+                    dt,
+                    self.friendlies,
+                    self.enemy_bullets,
+                )
             else:
-                building.update()
+                building.update(
+                    dt,
+                    self.enemy_barracks_units,
+                    self.bullets,
+                )
 
-        # Update enemy barracks infantry separately.
-        remaining_enemy_barracks_units = []
-
-        for unit in self.enemy_barracks_units:
-            unit.update(dt, self.friendlies)
-
-            if not unit.dead:
-                remaining_enemy_barracks_units.append(unit)
-
-        self.enemy_barracks_units = remaining_enemy_barracks_units
-
-        # Update friendly infantry.
-        remaining_friendlies = []
-
-        for friendly in self.friendlies:
-            friendly.update(dt, enemies)
-
-            if not friendly.dead:
-                remaining_friendlies.append(friendly)
-
-        self.friendlies = remaining_friendlies
-
+        # Enemy bullets can damage friendly infantry only.
         remaining_enemy_bullets = []
 
         for bullet in self.enemy_bullets:
             bullet.update(dt)
-            bullet_rect = bullet.get_hitbox()
+
+            if getattr(bullet, "dead", False):
+                continue
+
+            hit = False
 
             for friendly in self.friendlies:
                 if friendly.dead:
                     continue
 
-                friendly_rect = pygame.Rect(
-                    round(friendly.x),
-                    round(friendly.y),
-                    friendly.width,
-                    friendly.height,
-                )
-
-                if bullet_rect.colliderect(friendly_rect):
+                if bullet.get_hitbox().colliderect(
+                    friendly.get_hitbox()
+                ):
                     friendly.hp -= bullet.damage
 
                     if friendly.hp <= 0:
                         friendly.dead = True
 
-                    bullet.dead = True
+                    hit = True
                     break
 
-            if not bullet.dead:
+            if not hit:
                 remaining_enemy_bullets.append(bullet)
 
         self.enemy_bullets = remaining_enemy_bullets
 
-        self.combat.update(buildings, enemies)
+        self.friendlies = [
+            friendly for friendly in self.friendlies
+            if not friendly.dead
+        ]
 
-        # Enemies reaching the defensive line damage the bunker.
-        if bunkers:
-            bunker = bunkers[0]
+        # Collect gold pickups and add their full value to gold.
+        remaining_gold = []
 
-            for enemy in enemies:
-                if not enemy.dead and enemy.x < 50:
-                    enemy.dead = True
-                    bunker.take_damage(10)
+        for gold in self.gold_pickups:
+            if gold.update(dt, self.player):
+                self.economy.gold += gold.amount
+            else:
+                remaining_gold.append(gold)
 
-            if bunker.is_destroyed():
-                from states.game_over import GameOverState
-                self.game.change_state(GameOverState(self.game))
-                return
+        self.gold_pickups = remaining_gold
 
-        # Preserve the original win condition.
-        if (
-            self.wave_director.wave_number
-            == self.wave_director.total_waves
-            and not enemies
-        ):
-            from states.win_state import WinState
-            self.game.change_state(WinState(self.game))
+        # Lose if the player's bunker is destroyed.
+        if player_bunkers and all(
+            bunker.is_destroyed() for bunker in player_bunkers
+        ):            
+            self.game.state = GameOverState(self.game)
+            return
+
+        # Win when all enemy bunkers are destroyed.
+        if enemy_bunkers and all(
+            bunker.is_destroyed() for bunker in enemy_bunkers
+        ):            
+            self.game.state = WinState(self.game)
+            return
 
     def get_nearby_build_spot(self):
         """Return the nearest build spot within interaction range."""
@@ -641,8 +463,7 @@ class AssaultPhase:
 
         cost = BUILD_COSTS.get(spot_type, 0)
         paid = self.tilemap.paid_amount.get((tile_x, tile_y), 0)
-        supplies = self.economy.supplies
-        debt = max(0, cost - paid)
+        gold = self.economy.gold
         
         if tile and tile.building is not None:
             message = f"{spot_type.upper()}: BUILT | PAID {paid}/{cost}"
@@ -650,7 +471,7 @@ class AssaultPhase:
             remaining = max(0, cost - paid)
             message = (
                 f"{spot_type.upper()}: PAID {paid}/{cost} | "
-                f"OWES {remaining} | HAVE {supplies}"
+                f"OWES {remaining} | HAVE {gold}"
             )
 
         text = self.hud.font.render(
@@ -714,12 +535,8 @@ class AssaultPhase:
 
         self.hud.draw(
             screen,
-            self.economy.supplies,
-            0,
-            0,
             bunker_hp,
-            self.economy.total_defense_cost,
-            self.economy.spent_defense_cost,
+            self.economy.gold  
         )
 
         self.draw_build_prompt(screen)

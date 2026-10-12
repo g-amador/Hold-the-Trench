@@ -63,83 +63,96 @@ class EnemyBase:
             return GoldPickup(self.x, self.y, self.gold_drop)
         return None
     
-
-class Infantry(EnemyBase):
+class EnemyInfantry(EnemyBase):
     def __init__(self, x, y):
-        super().__init__(x, y, speed=60, hp=40, gold_drop=5)
+        super().__init__(
+            x,
+            y,
+            speed=120,
+            hp=40,
+            gold_drop=5,
+        )
+        
+        self.width = 24
+        self.height = 24
+        self.is_barracks_unit = True
+    
+    
+    def update(self, dt, friendlies, player_bunker=None):
+        if self.dead:
+            return
 
+        move_amount = self.speed * dt / 1000
 
+        # Priority 1: attack living friendly infantry.
+        living_friendlies = [
+            friendly for friendly in friendlies if not friendly.dead
+        ]
+
+        if living_friendlies:
+            target = min(
+                living_friendlies,
+                key=lambda friendly: math.hypot(
+                    friendly.x - self.x,
+                    friendly.y - self.y
+                )
+            )
+
+            dx = target.x - self.x
+            dy = target.y - self.y
+            distance = math.hypot(dx, dy)
+
+            if distance > 0:
+                self.x += dx / distance * move_amount
+                self.y += dy / distance * move_amount
+
+            if self.get_hitbox().colliderect(target.get_hitbox()):
+                target.hp -= self.hp
+                target.dead = target.hp <= 0
+                self.take_damage(self.hp)
+
+            return
+
+        # Priority 2: charge toward the player's bunker.
+        if player_bunker is None or player_bunker.dead:
+            return
+
+        bunker_rect = player_bunker.get_hitbox()
+        enemy_rect = self.get_hitbox()
+
+        # If touching the bunker, explode and deal damage.
+        if enemy_rect.colliderect(bunker_rect):
+            player_bunker.take_damage(self.hp)
+            self.take_damage(self.hp)
+            return
+
+        # Move toward the bunker center in both axes.
+        enemy_cx = self.x + self.width / 2
+        enemy_cy = self.y + self.height / 2
+        bunker_cx = bunker_rect.centerx
+        bunker_cy = bunker_rect.centery
+
+        dx = bunker_cx - enemy_cx
+        dy = bunker_cy - enemy_cy
+        distance = math.hypot(dx, dy)
+
+        if distance > 0:
+            self.x += dx / distance * move_amount
+            self.y += dy / distance * move_amount
+
+        # Check collision again after moving, so contact triggers immediately.
+        if self.get_hitbox().colliderect(bunker_rect):
+            player_bunker.take_damage(self.hp)
+            self.take_damage(self.hp)
+    
 class Cavalry(EnemyBase):
     def __init__(self, x, y):
         super().__init__(x, y, speed=120, hp=80, gold_drop=10)
         self.width = 32
         self.height = 32
 
-
 class Tank(EnemyBase):
     def __init__(self, x, y):
         super().__init__(x, y, speed=30, hp=300, gold_drop=20)
         self.width = 48
         self.height = 32
-
-class EnemyInfantry(Infantry):
-    def __init__(self, x, y):
-        super().__init__(x, y)
-        self.is_barracks_unit = True
-    
-    def update(self, dt, friendlies):
-        if self.dead:
-            return
-
-        target = None
-        best_dist = None
-
-        for friendly in friendlies:
-            if friendly.dead:
-                continue
-
-            dist = math.hypot(
-                friendly.x + friendly.width / 2
-                - (self.x + self.width / 2),
-                friendly.y + friendly.height / 2
-                - (self.y + self.height / 2),
-            )
-
-            if best_dist is None or dist < best_dist:
-                best_dist = dist
-                target = friendly
-
-        # No friendly infantry nearby: advance toward the player's side.
-        if target is None:
-            self.x -= self.speed * dt / 1000
-            return
-
-        dx = (
-            target.x + target.width / 2
-            - (self.x + self.width / 2)
-        )
-        dy = (
-            target.y + target.height / 2
-            - (self.y + self.height / 2)
-        )
-
-        length = math.hypot(dx, dy)
-
-        if length > 0:
-            dx /= length
-            dy /= length
-            self.x += dx * self.speed * dt / 1000
-            self.y += dy * self.speed * dt / 1000
-
-        enemy_rect = self.get_hitbox()
-        friendly_rect = pygame.Rect(
-            round(target.x),
-            round(target.y),
-            target.width,
-            target.height,
-        )
-
-        if enemy_rect.colliderect(friendly_rect):
-            target.hp -= self.hp
-            target.dead = True
-            self.take_damage(self.hp)

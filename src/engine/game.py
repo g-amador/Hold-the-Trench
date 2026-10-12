@@ -3,9 +3,10 @@ Game engine: manages states and main loop.
 """
 
 import pygame
+
 from config import SCREEN_WIDTH, SCREEN_HEIGHT
 from states.main_menu import MainMenu
-
+from world.tilemap import TileMap
 
 class Game:
     def __init__(self):
@@ -14,7 +15,6 @@ class Game:
         self.clock = pygame.time.Clock()
         self.running = True
 
-        from world.tilemap import TileMap
         self.tilemap = TileMap()
 
         self.state = MainMenu(self)

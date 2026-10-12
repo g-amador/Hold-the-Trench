@@ -7,6 +7,7 @@ import math
 import pygame
 
 from config import SCREEN_HEIGHT, TILE_SIZE
+from entities.bullet import Bullet
 
 BLOCKING_TILES = {"#", "H"}
 BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery"}
@@ -20,8 +21,8 @@ class Player:
         self.y = float(y)
 
         self.speed = 120
-        self.width = 28
-        self.height = 28
+        self.width = 24
+        self.height = 24
 
         self.shoot_cooldown = 0.25
         self.shoot_timer = 0
@@ -175,8 +176,6 @@ class Player:
     def shoot_toward(self, target, bullets):
         if self.shoot_timer > 0:
             return
-
-        from entities.bullet import Bullet
 
         start_x = self.x + self.width / 2
         start_y = self.y + self.height / 2

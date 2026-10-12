@@ -6,6 +6,7 @@ Everything is exactly as written in ASCII.
 """
 
 import pygame
+
 from config import TILE_SIZE
 from world.trench_generator import (
     TrenchGenerator,
