@@ -48,10 +48,10 @@ ASCII_TO_TILE = {
     'M': TILE_TRENCH,
     'B': TILE_TRENCH,
     'R': TILE_TRENCH,
-
-    'A': TILE_EMPTY,
+    
     'H': TILE_HILL,
     'P': TILE_HILL_PATH,
+    'A': TILE_HILL_PATH,
     'C': TILE_CRATER,
     'W': TILE_WIRE,
     '~': TILE_MUD,
@@ -59,10 +59,10 @@ ASCII_TO_TILE = {
     # Enemy
     'm': TILE_TRENCH,
     'e': TILE_TRENCH,
-    'r': TILE_TRENCH,
-    'a': TILE_EMPTY,
+    'r': TILE_TRENCH,    
     'h': TILE_HILL,
     'p': TILE_HILL_PATH,
+    'a': TILE_HILL_PATH,
 
     # Visual separator
     '|': TILE_EMPTY,
