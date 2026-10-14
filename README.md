@@ -35,6 +35,9 @@ Protect your bunker, manage your supplies, and destroy the enemy bunker to secur
 
 Each battle takes place on a **newly generated WWI battlefield**, forcing players to adapt their defenses, manage supplies, and make difficult tactical decisions.
 
+The animated .gif bellow illustrates running the current game alpha.
+![Game Alpha](assets\Hold-the-trench-alpha.gif "Game Alpha")
+
 [Back to Table of Contents](#toc)
 
 ---
