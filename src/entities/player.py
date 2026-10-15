@@ -4,12 +4,11 @@ snapping, wire slow-down, sprite animation, and shooting.
 """
 
 import math
-
 import pygame
+import random
 
 from config import SCREEN_HEIGHT, TILE_SIZE
 from entities.bullet import Bullet
-from utils.image_loader import load_image
 from graphics.sprite_generator import SpriteGenerator
 
 
@@ -33,23 +32,24 @@ class Player:
 
         self.max_world_x = 2000
 
-        # Sprite loading and rendering.
+        # Randomly choose between German and Austrian assets
+        faction = random.choice(["brit", "fr"])
+        prefix = f"infantry_unit_{faction}_1"
+        
+        # Sprites (Enemy Assets)
         self.sprite_generator = SpriteGenerator()
 
-        # Legs: standing and running frames.
-        self.legs_idle = self.sprite_generator.load(
-            "unit_ger_1_a.png")
+        # Use the prefix to load the random faction's sprites
+        self.legs_idle = self.sprite_generator.load(f"{prefix}_a.png")
         self.legs_run = self.sprite_generator.load_animation([
-            "unit_ger_1_a.png",
-            "unit_ger_1_b.png",
-            "unit_ger_1_c.png",
+            f"{prefix}_a.png",
+            f"{prefix}_b.png",
+            f"{prefix}_c.png"
         ])
 
         # Upper body: weapon lowered and raised.
-        self.upper_idle = self.sprite_generator.load(
-            "unit_ger_1_d.png")
-        self.upper_aim = self.sprite_generator.load(
-            "unit_ger_1_e.png")
+        self.upper_idle = self.sprite_generator.load(f"{prefix}_d.png")
+        self.upper_aim = self.sprite_generator.load(f"{prefix}_e.png")
 
         # Animation timing.
         self.run_frame = 0
@@ -234,7 +234,7 @@ class Player:
         )
 
     def shoot_toward(self, target, bullets):
-        """Fire at a target in front of the player."""
+        """Fire at a target within a 90-degree cone in front of the player."""
         if self.shoot_timer > 0:
             return
 
@@ -246,29 +246,31 @@ class Player:
 
         dx = target_x - start_x
         dy = target_y - start_y
-
-        # Do not shoot behind the player.
-        if self.facing == 1 and dx <= 0:
-            return
-
-        if self.facing == -1 and dx >= 0:
-            return
-
         distance = math.hypot(dx, dy)
 
         if distance == 0:
             return
 
-        dx /= distance
-        dy /= distance
+        # Normalize target vector
+        nx, ny = dx / distance, dy / distance
 
-        bullets.append(Bullet(start_x, start_y, dx, dy))
+        # Facing vector: (1, 0) if right, (-1, 0) if left
+        fx, fy = (self.facing, 0)
+
+        # Dot product of normalized vectors = cos(theta)
+        # cos(45 degrees) is approx 0.707
+        dot_product = nx * fx + ny * fy
+
+        if dot_product < 0.707:
+            return
+
+        bullets.append(Bullet(start_x, start_y, nx, ny))
 
         self.shoot_timer = self.shoot_cooldown
         self.shoot_animation_timer = self.shoot_animation_duration
 
     def auto_fire(self, dt, enemies, bullets):
-        """Shoot the nearest enemy in front, within 300 pixels."""
+        """Shoot the nearest enemy within a 90-degree cone in front, within 300 pixels."""
         if self.shoot_timer > 0:
             return
 
@@ -285,20 +287,27 @@ class Player:
             enemy_x = enemy.x + enemy.width / 2
             enemy_y = enemy.y + enemy.height / 2
             dx = enemy_x - player_x
+            dy = enemy_y - player_y
+            distance = math.hypot(dx, dy)
 
-            # Ignore enemies behind the direction the player is facing.
-            if self.facing == 1 and dx <= 0:
-                continue
-            if self.facing == -1 and dx >= 0:
+            if distance == 0 or distance > 300:
                 continue
 
-            distance = math.hypot(dx, enemy_y - player_y)
+            # Normalize target vector
+            nx, ny = dx / distance, dy / distance
+            
+            # Dot product with facing vector (self.facing, 0)
+            dot_product = nx * self.facing
+
+            # Only consider enemies within 45 degrees up/down (total 90 deg cone)
+            if dot_product < 0.707:
+                continue
 
             if distance < nearest_distance:
                 nearest_distance = distance
                 nearest_enemy = enemy
 
-        if nearest_enemy and nearest_distance <= 300:
+        if nearest_enemy:
             self.shoot_toward(nearest_enemy, bullets)
 
     def draw(self, screen, camera_x):
