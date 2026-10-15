@@ -1,13 +1,17 @@
 """
-WW1 infantry player with WASD movement, collision, sliding, snapping,
-and wire slow-down.
+WW1 infantry player with WASD movement, collision, sliding,
+snapping, wire slow-down, sprite animation, and shooting.
 """
 
 import math
+
 import pygame
 
 from config import SCREEN_HEIGHT, TILE_SIZE
 from entities.bullet import Bullet
+from utils.image_loader import load_image
+from graphics.sprite_generator import SpriteGenerator
+
 
 BLOCKING_TILES = {"#", "H"}
 BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery"}
@@ -28,6 +32,35 @@ class Player:
         self.shoot_timer = 0
 
         self.max_world_x = 2000
+
+        # Sprite loading and rendering.
+        self.sprite_generator = SpriteGenerator()
+
+        # Legs: standing and running frames.
+        self.legs_idle = self.sprite_generator.load(
+            "unit_ger_1_a.png")
+        self.legs_run = self.sprite_generator.load_animation([
+            "unit_ger_1_a.png",
+            "unit_ger_1_b.png",
+            "unit_ger_1_c.png",
+        ])
+
+        # Upper body: weapon lowered and raised.
+        self.upper_idle = self.sprite_generator.load(
+            "unit_ger_1_d.png")
+        self.upper_aim = self.sprite_generator.load(
+            "unit_ger_1_e.png")
+
+        # Animation timing.
+        self.run_frame = 0
+        self.run_timer = 0.0
+        self.run_frame_duration = 0.12
+
+        self.shoot_animation_timer = 0.0
+        self.shoot_animation_duration = 0.18
+
+        self.is_moving = False
+        self.facing = 1  # 1 = right, -1 = left
 
     def get_hitbox(self):
         """Return the player's hitbox in world coordinates."""
@@ -64,18 +97,15 @@ class Player:
 
                 spot_type = tilemap.spot_types.get((tile_x, tile_y))
 
-                # An empty build spot is solid until construction occurs.
-                if (
-                    spot_type in BUILDABLE_SPOTS
-                    and tile.building is None
-                ):
+                # An empty build spot is solid until construction.
+                if spot_type in BUILDABLE_SPOTS and tile.building is None:
                     return True
 
                 building = tile.building
+
                 if (
                     building is not None
-                    and getattr(building, "type", None)
-                    in BLOCKING_BUILDINGS
+                    and getattr(building, "type", None) in BLOCKING_BUILDINGS
                 ):
                     return True
 
@@ -126,6 +156,7 @@ class Player:
             remaining -= step_size
 
     def handle_input(self, dt, tilemap, enemies=None):
+        """Handle movement input and preserve wall sliding."""
         keys = pygame.key.get_pressed()
 
         dx = 0
@@ -140,6 +171,12 @@ class Player:
         if keys[pygame.K_s] or keys[pygame.K_DOWN]:
             dy += 1
 
+        # Face the direction of horizontal movement.
+        if dx > 0:
+            self.facing = 1
+        elif dx < 0:
+            self.facing = -1
+
         # Normalize diagonal movement.
         if dx and dy:
             length = math.hypot(dx, dy)
@@ -151,6 +188,7 @@ class Player:
         tile = tilemap.get_tile(tile_x, tile_y)
 
         move_speed = self.speed
+
         if tile and tile.type_char in SLOW_TILES:
             move_speed *= 0.45
 
@@ -162,18 +200,41 @@ class Player:
         self._move_axis(move_y, "y", tilemap, enemies)
 
     def _clamp_to_bounds(self):
+        """Keep the player within the playable area."""
         self.x = max(0, min(self.x, self.max_world_x))
         self.y = max(40, min(self.y, SCREEN_HEIGHT - self.height))
 
     def update(self, dt, tilemap, enemies=None):
+        """Update movement, running animation, and shot timers."""
+        old_x = self.x
+        old_y = self.y
+
         self.handle_input(dt, tilemap, enemies)
         self._clamp_to_bounds()
 
-        self.shoot_timer -= dt / 1000
-        if self.shoot_timer < 0:
-            self.shoot_timer = 0
+        self.is_moving = (
+            abs(self.x - old_x) > 0.01
+            or abs(self.y - old_y) > 0.01
+        )
+
+        if self.is_moving:
+            self.run_timer += dt / 1000
+
+            while self.run_timer >= self.run_frame_duration:
+                self.run_timer -= self.run_frame_duration
+                self.run_frame = (self.run_frame + 1) % len(self.legs_run)
+        else:
+            self.run_frame = 0
+            self.run_timer = 0.0
+
+        self.shoot_timer = max(0.0, self.shoot_timer - dt / 1000)
+        self.shoot_animation_timer = max(
+            0.0,
+            self.shoot_animation_timer - dt / 1000,
+        )
 
     def shoot_toward(self, target, bullets):
+        """Fire at a target in front of the player."""
         if self.shoot_timer > 0:
             return
 
@@ -186,7 +247,15 @@ class Player:
         dx = target_x - start_x
         dy = target_y - start_y
 
+        # Do not shoot behind the player.
+        if self.facing == 1 and dx <= 0:
+            return
+
+        if self.facing == -1 and dx >= 0:
+            return
+
         distance = math.hypot(dx, dy)
+
         if distance == 0:
             return
 
@@ -194,9 +263,12 @@ class Player:
         dy /= distance
 
         bullets.append(Bullet(start_x, start_y, dx, dy))
+
         self.shoot_timer = self.shoot_cooldown
+        self.shoot_animation_timer = self.shoot_animation_duration
 
     def auto_fire(self, dt, enemies, bullets):
+        """Shoot the nearest enemy in front, within 300 pixels."""
         if self.shoot_timer > 0:
             return
 
@@ -207,16 +279,20 @@ class Player:
         nearest_distance = float("inf")
 
         for enemy in enemies:
-            if enemy.dead:
+            if getattr(enemy, "dead", False):
                 continue
 
             enemy_x = enemy.x + enemy.width / 2
             enemy_y = enemy.y + enemy.height / 2
+            dx = enemy_x - player_x
 
-            distance = math.hypot(
-                enemy_x - player_x,
-                enemy_y - player_y,
-            )
+            # Ignore enemies behind the direction the player is facing.
+            if self.facing == 1 and dx <= 0:
+                continue
+            if self.facing == -1 and dx >= 0:
+                continue
+
+            distance = math.hypot(dx, enemy_y - player_y)
 
             if distance < nearest_distance:
                 nearest_distance = distance
@@ -226,6 +302,24 @@ class Player:
             self.shoot_toward(nearest_enemy, bullets)
 
     def draw(self, screen, camera_x):
-        rect = self.get_hitbox()
-        rect.x -= round(camera_x)
-        pygame.draw.rect(screen, (0, 200, 255), rect)
+        """Draw animated legs and upper body facing the correct direction."""
+        screen_x = round(self.x - camera_x)
+        screen_y = round(self.y)
+
+        if self.is_moving:
+            legs = self.legs_run[self.run_frame]
+        else:
+            legs = self.legs_idle
+
+        if self.shoot_animation_timer > 0:
+            upper = self.upper_aim
+        else:
+            upper = self.upper_idle
+
+        position = (screen_x, screen_y)
+        self.sprite_generator.draw(
+            screen, legs, position, self.facing
+        )
+        self.sprite_generator.draw(
+            screen, upper, position, self.facing
+        )
