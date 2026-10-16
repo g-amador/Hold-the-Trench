@@ -3,6 +3,9 @@ Barracks building.
 Spawns friendly infantry every 5 seconds.
 """
 
+import pygame
+import random
+
 from config import TILE_SIZE
 from entities.enemy import EnemyInfantry
 from entities.friendly_infantry import FriendlyInfantry
@@ -21,13 +24,15 @@ class Barracks:
         self.spawn_cooldown = 5.0
         self.timer = 0
 
-        #filename = random.choice(["barraks_fr.png", "barraks_uk.png"]) if is_enemy else random.choice(["barraks_ger.png"])
-        filename = "barraks_ger.png"
+        filename = random.choice(["barraks_fr.png", "barraks_brit.png"]) if is_enemy else random.choice(["barraks_ger.png"])        
         self.image = load_image(
             filename,
             alpha=True, 
             size=(TILE_SIZE, TILE_SIZE),
         )
+
+        if is_enemy:
+            self.image = pygame.transform.flip(self.image, True, False)
 
     def update(self, dt, units):
         self.timer += dt / 1000

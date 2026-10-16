@@ -5,9 +5,11 @@ Auto-shoots enemies in range, only when close enough and in arc.
 
 import math
 import pygame
+import random
 
 from config import TILE_SIZE, GREY
 from entities.bullet import Bullet
+from utils.image_loader import load_image
 
 
 class MGNest:
@@ -23,6 +25,16 @@ class MGNest:
         self.damage = 8
         self.fire_rate = 0.2
         self.cooldown = 0
+
+        filename = random.choice(["mg_nest_fr.png", "mg_nest_brit.png"]) if is_enemy else random.choice(["mg_nest_ger.png"])        
+        self.image = load_image(
+            filename,
+            alpha=True, 
+            size=(TILE_SIZE, TILE_SIZE),
+        )
+
+        if is_enemy:
+            self.image = pygame.transform.flip(self.image, True, False)
 
     def update(self, dt, enemies, bullets):
         self.cooldown -= dt / 1000
@@ -59,5 +71,7 @@ class MGNest:
     def draw(self, screen, camera_x):
         px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE
-        rect = pygame.Rect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8)
-        pygame.draw.rect(screen, GREY, rect)
+        #rect = pygame.Rect(px + 4, py + 4, TILE_SIZE - 8, TILE_SIZE - 8)
+        #pygame.draw.rect(screen, GREY, rect)
+
+        screen.blit(self.image, (px, py))
