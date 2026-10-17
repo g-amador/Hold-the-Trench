@@ -19,7 +19,7 @@ Protect your bunker, manage your supplies, and destroy the enemy bunker to secur
 5. [⚔️ Enemy Types](#enemy-types)
 6. [🎯 Objectives](#objectives)
 7. [🎮 Controls](#controls)
-8. [🗂️ Project Structure](#project-structure)
+8. [🗂️ Project Architecture](#project-architecture)
 9. [🚀 Installation](#installation)
 10. [🪖 How to Play](#how-to-play)
 11. [🔒 Running in an Isolated Environment](#isolated-environment)
@@ -165,59 +165,34 @@ Victory grants you a choice:
 
 ---
 
-## 🗂️ <a name="project-structure">Project Structure
+## 🗂️ <a name="project-architecture">Project Architecture
+
+- `systems/` for combat, economy, faction rules, spawning, and wave management.
+- `ui/` for HUD, menus, tooltips, and overlays.
+- `config.py` 
 
 ```text
 hold_the_trench/
-│
 ├── assets/
-│   ├── images/
-│   ├── sounds/
-│   └── music/
-│
 ├── src
-│   │
-│   ├──engine/
-│   │   └── game.py
-│   │
-│   ├── entities/
-│   │   ├── artillery.py
-│   │   ├── barracks.py
-│   │   ├── bullet.py
-│   │   ├── bunker.py
-│   │   ├── enemy.py
-│   │   ├── friendly_infantry.py
-│   │   ├── gold_pickup.py
-│   │   ├── mg_nest.py
-│   │   ├── player.py
-│   │   └── trench.py
-│   │
-│   ├── states/
-│   │   ├── assault_phase.py
-│   │   ├── game_over.py
-│   │   ├── main_menu.py
-│   │   └── win_state.py
-│   │
-│   ├── systems/
-│   │   ├── building_query.py
-│   │   ├── combat_system.py
-│   │   └── economy_system.py
-│   │
-│   ├── ui/
-│   │   └── hud.py
-│   │
-│   ├── world/
-│   │   ├── tilemap.py
-│   │   └── trench_generator.py
-│   │
-│   ├── config.py
-│   └── main.py
-│
-│
-├── LICENSE
-├── README.md
-└── requirements.txt
+│   ├── engine/
+│   ├── entities/               # for units, buildings, projectiles, and pickups.
+│   ├── graphics/               # for sprite generation, animation helpers, and rendering-related utilities where appropriate.
+│   ├── states/                 # for menus, battles, victory, defeat, and other game screens.
+│   ├── systems/                # for combat, economy, faction rules, spawning, and wave management.
+│   ├── ui/                     # for HUD, menus, tooltips, and overlays.
+│   ├── utils/
+│   └── world/                  # for map generation, tiles, terrain, and battlefield configuration.
+├── AI.md                       # Prompts for generating Prolog rules & translators
+├── ARCHITECTURE.md             # Detailed project architecture & directory structure
+├── CONTRIBUTING.md             # Guide for adding new languages & endpoints
+├── LICENSE                     # License details
+└── README.md                   # Main project documentation
 ```
+
+For a complete, file-by-file breakdown of the repository, see [ARCHITECTURE.md](https://github.com/g-amador/Hold-the-Trench/blob/main/ARCHITECTURE.md).
+
+Back to Table of contents
 
 [Back to Table of Contents](#toc)
 
