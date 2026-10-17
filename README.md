@@ -192,8 +192,6 @@ hold_the_trench/
 
 For a complete, file-by-file breakdown of the repository, see [ARCHITECTURE.md](https://github.com/g-amador/Hold-the-Trench/blob/main/ARCHITECTURE.md).
 
-Back to Table of contents
-
 [Back to Table of Contents](#toc)
 
 ---
