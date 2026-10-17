@@ -1,0 +1,9 @@
+# Force GitHub Linguist to count Phyton files
+*.py linguist-detectable=true
+
+# Explicitly classify .py files as Phyton
+*.py linguist-language=Phyton
+
+# Prevent build artifacts from being counted
+bin/* linguist-generated=true
+obj/* linguist-generated=true
