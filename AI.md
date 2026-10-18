@@ -11,62 +11,12 @@ Priorities:
 
 Work with the existing codebase. Do not assume the game should be rebuilt.
 
-# Working Rules
+# PROJECT GITHUB REPO
+https://github.com/g-amador/Gamification-Blazor-App/tree/V1.0
 
-Before writing or modifying code:
+# PROJECT ORGANIZATION
 
-1. Inspect relevant files.
-2. Identify dependencies, interfaces, shared state, and potential regressions.
-3. Explain which files must change and why.
-4. Prefer small patches over large rewrites.
-5. Specify exact file paths and insertion/replacement locations.
-6. Provide complete replacement methods when practical.
-7. Explain any new imports, assets, modules, classes, or configuration.
-8. Verify compatibility with existing code.
-9. Consider future extensibility.
-10. Provide testing instructions.
-
-Do not claim code was executed, applied, or tested unless it actually was.
-
-Do not remove existing functionality simply to simplify new features.
-
-Never modify README.md unless explicitly requested.
-
-## Verification Rule
-
-Never assume a class, method, variable, event, asset path, configuration value, or module exists.
-
-If it has not been shown:
-- State that it is unverified.
-- Explain which file is needed.
-- Do not depend on it as a confirmed interface.
-
-## Confidence Levels
-
-Include one of:
-- High: verified directly from supplied files.
-- Medium: based on supplied files but dependent on unseen code.
-- Low: requires assumptions due to missing files.
-
-## Development Checklist
-Maintain:
-1. Completed
-- 
-
-2. In Progress
-- 
-
-3. Pending
-- 
-
-4. Blocked 
-- (reason)
-
-Request missing files only when required and avoid re-requesting files already supplied.
-
-# Project Structure
-
-Expected structure:
+Current structure:
 
 ```text
 hold_the_trench/
@@ -128,7 +78,60 @@ Responsibilities:
 
 Avoid unnecessary abstractions.
 
-# Initial Priority Features
+# WORKING RULES
+
+Before writing or modifying code:
+
+1. Inspect relevant files.
+2. Identify dependencies, interfaces, shared state, and potential regressions.
+3. Explain which files must change and why.
+4. Prefer small patches over large rewrites.
+5. Specify exact file paths and insertion/replacement locations.
+6. Provide complete replacement methods when practical.
+7. Explain any new imports, assets, modules, classes, or configuration.
+8. Verify compatibility with existing code.
+9. Consider future extensibility.
+10. Provide testing instructions.
+
+Do not claim code was executed, applied, or tested unless it actually was.
+
+Do not remove existing functionality simply to simplify new features.
+
+Never modify README.md unless explicitly requested.
+
+## Verification Rule
+
+Never assume a class, method, variable, event, asset path, configuration value, or module exists.
+
+If it has not been shown:
+- State that it is unverified.
+- Explain which file is needed.
+- Do not depend on it as a confirmed interface.
+
+## Confidence Levels
+
+Include one of:
+- High: verified directly from supplied files.
+- Medium: based on supplied files but dependent on unseen code.
+- Low: requires assumptions due to missing files.
+
+## Development Checklist
+Maintain:
+1. Completed
+- 
+
+2. In Progress
+- 
+
+3. Pending
+- 
+
+4. Blocked 
+- (reason)
+
+Request missing files only when required and avoid re-requesting files already supplied.
+
+# INITIAL PRIORITARY FEATURES
 
 ## A. Graphics Toggle
 
@@ -225,7 +228,7 @@ When discussing history:
 
 Do not jump ahead if earlier stages are unstable.
 
-# Historical Standards
+# HISTORICAL STANDARDS
 
 Use reputable museums, archives, official institutions, and academic sources.
 
@@ -240,7 +243,7 @@ Clearly separate:
     - Balancing decisions inspired by history.
     - Do not invent units, equipment, capabilities, or national advantages.
 
-# Response Format
+# RESPONSE FORMAT
 
 For every feature:
 - Goal: What the change accomplishes.
@@ -253,7 +256,7 @@ For every feature:
 - Confidence: High / Medium / Low.
 - Status: Completed / In Progress / Pending / Blocked.
 
-# Immediate Action
+# IMMEDIATE ACTION
 
 Review previously supplied files before proposing changes.
 
