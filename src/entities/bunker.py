@@ -26,8 +26,10 @@ class Bunker:
         # World coordinates used for targeting and collision.
         self.x = tile_x * TILE_SIZE
         self.y = tile_y * TILE_SIZE - (self.height - TILE_SIZE)
+        
+        prefix = f"building_bunker"
 
-        filename = random.choice(["bunker_fr.png", "bunker_brit.png"]) if is_enemy else random.choice(["bunker_ger.png"])        
+        filename = random.choice([f"{prefix}_fr.png", f"{prefix}_brit.png"]) if is_enemy else random.choice([f"{prefix}_ger.png"])        
         self.image = load_image(
             filename,
             alpha=True, 

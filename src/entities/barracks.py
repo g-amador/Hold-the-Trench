@@ -24,7 +24,9 @@ class Barracks:
         self.spawn_cooldown = 5.0
         self.timer = 0
 
-        filename = random.choice(["barraks_fr.png", "barraks_brit.png"]) if is_enemy else random.choice(["barraks_ger.png"])        
+        prefix = f"building_barraks"
+
+        filename = random.choice([f"{prefix}_fr.png", f"{prefix}_brit.png"]) if is_enemy else random.choice([f"{prefix}_ger.png"])        
         self.image = load_image(
             filename,
             alpha=True, 

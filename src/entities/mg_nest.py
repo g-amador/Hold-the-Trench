@@ -26,7 +26,9 @@ class MGNest:
         self.fire_rate = 0.2
         self.cooldown = 0
 
-        filename = random.choice(["mg_nest_fr.png", "mg_nest_brit.png"]) if is_enemy else random.choice(["mg_nest_ger.png"])        
+        prefix = f"building_mg_nest"
+
+        filename = random.choice([f"{prefix}_fr.png", f"{prefix}_brit.png"]) if is_enemy else random.choice([f"{prefix}_ger.png"])        
         self.image = load_image(
             filename,
             alpha=True, 
