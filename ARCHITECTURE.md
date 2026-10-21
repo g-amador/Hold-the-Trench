@@ -20,8 +20,10 @@ hold_the_trench/
 │   │   ├── mg_nest.py
 │   │   ├── player.py
 │   │   └── trench.py
-│   ├── graphics/                   # for sprite generation, animation helpers, and rendering-related utilities where appropriate.
-│   │   └── sprite_generator.py
+│   ├── graphics/                   # for sprite generation, animation helpers, rendering utilities, and the graphics toggle.
+│   │   ├── sprite_generator.py                  # unit frame loading/animation/flipping
+│   │   ├── render_mode.py                        # global SPRITES/BLOCKS graphics toggle state (G key)
+│   │   └── block_drawer.py                       # block-mode rendering used by the toggle and as missing-asset fallback
 │   ├── states/                     # for menus, battles, victory, defeat, and other game screens.
 │   │   ├── assault_phase.py
 │   │   ├── game_over.py
