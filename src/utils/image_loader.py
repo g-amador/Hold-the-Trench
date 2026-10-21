@@ -1,5 +1,10 @@
 """
-Reusable image loader.
+Reusable image loader with a module-level cache.
+
+This is the ONLY place the game reads image files. Results are cached
+per (filename, alpha, size) so repeated loads return the same surface
+object, which is why loaded surfaces must never be mutated (flip or
+scale into a NEW surface instead).
 """
 
 from pathlib import Path
@@ -7,21 +12,38 @@ from pathlib import Path
 import pygame
 
 
+# Project assets root, resolved from this file so it works no matter
+# where the game is launched from: repo/assets/images.
 IMAGE_DIR = Path(__file__).resolve().parents[2] / "assets" / "images"
+
+# Cache storage, filled lazily on first request of each unique key.
+_image_cache = {}
 
 
 def load_image(filename, *, alpha=False, size=None):
-    """Load an image from the project's assets/images directory."""
-    path = IMAGE_DIR / filename
+    """Load an image from the project's assets/images directory.
 
-    if not path.is_file():
-        raise FileNotFoundError(f"Image not found: {path}")
+    alpha=True converts for per-pixel transparency (units, building
+    sprites); alpha=False is faster for opaque art. size rescales
+    before caching, so differently-sized loads are cached separately.
 
-    image = pygame.image.load(str(path))
-    image = image.convert_alpha() if alpha else image.convert()    
+    Raises FileNotFoundError for missing files; callers that can go
+    without the art should catch it and fall back (see block_drawer).
+    """
+    key = (filename, alpha, size)
 
-    if size is not None:
-        image = pygame.transform.scale(image, size)
+    if key not in _image_cache:
+        path = IMAGE_DIR / filename
 
-    return image
+        if not path.is_file():
+            raise FileNotFoundError(f"Image not found: {path}")
 
+        image = pygame.image.load(str(path))
+        image = image.convert_alpha() if alpha else image.convert()
+
+        if size is not None:
+            image = pygame.transform.scale(image, size)
+
+        _image_cache[key] = image
+
+    return _image_cache[key]
