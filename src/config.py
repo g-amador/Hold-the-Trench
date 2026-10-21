@@ -1,26 +1,39 @@
 """
-Global configuration: screen size, tile size, FPS, colors.
+Global configuration: screen size, tile size, FPS, colors, build costs.
+
+This file is the project's single source of truth for shared tunables.
+Other modules import constants from here — `systems/economy_system.py`
+re-exports BUILD_COSTS only for import compatibility.
 """
 
-# Screen dimensions
+# Window size in pixels. SCREEN_WIDTH also caps the camera scroll:
+# the camera never scrolls past (tilemap.width * TILE_SIZE) - it.
 SCREEN_WIDTH = 800
 SCREEN_HEIGHT = 480
 
-# Tile size (pixels)
+# Tile size in pixels. World coordinates are always multiples of this
+# for buildings; units use free float positions but tile-based collision.
 TILE_SIZE = 32
 
-# Frames per second
+# Frame rate cap. clock.tick() returns milliseconds consumed for the
+# last frame, which is the `dt` unit used across the whole project.
 FPS = 60
 
-# Colors (RGB)
+# ---------------- Colors (RGB) ----------------
+# Palette shared by tiles, HUD, texts, pickups, and block-mode rendering.
 WHITE = (255, 255, 255)
 BLACK = (0, 0, 0)
-BROWN = (90, 60, 40)
-GREY = (150, 150, 150)
-GOLD = (255, 215, 0)
-RED = (200, 50, 50)
-BLUE = (0, 200, 255)
+BROWN = (90, 60, 40)     # trench terrain
+GREY = (150, 150, 150)   # neutral buildings (e.g. artillery block)
+GOLD = (255, 215, 0)     # gold pickups
+RED = (200, 50, 50)      # enemy side (units, bullets, block fallback)
+BLUE = (0, 200, 255)     # ally side (units, block fallback)
 
+# ---------------- Build costs (gold) ----------------
+# Player buildings are paid in partial payments: AssaultPhase tracks
+# how much was already paid per spot in tilemap.paid_amount and
+# constructs the building only when the full cost is covered.
+# Enemy variants cost 0 because they are placed free from map markers.
 BUILD_COSTS = {
     "mg": 20,
     "bunker": 40,
