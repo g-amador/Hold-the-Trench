@@ -132,7 +132,7 @@ Choose:
 Your primary objective is to destroy the enemy bunker while protecting your own.
 
 * 🏭 Enemy barracks continuously spawn enemy infantry.
-* 🪖 Friendly infantry engage enemy troops in close combat.
+* 🪖 Friendly infantry engage enemy troops with rifle fire at range and in close combat.
 * 🔫 Machine-gun nests and artillery provide defensive fire support.
 * 🪙 Defeated enemies can drop supplies that you can collect.
 * 🧱 Build and maintain defenses to protect your bunker.
@@ -156,10 +156,16 @@ Victory grants you a choice:
 
 ### General
 
-| Key           | Action           |
-| ------------- | ---------------- |
-| `ESC`         | Pause / Resume   |
-| `Left Click`  | Build / Select   |
+| Key           | Action                                  |
+| ------------- | --------------------------------------- |
+| `SPACE`       | Pause / Resume (primary)                |
+| `ESC`         | Pause / Resume (secondary)              |
+| `WASD` / Arrows | Move player                           |
+| `Left Click`  | Build / Select                          |
+| `G`           | Toggle sprite / block graphics mode     |
+| `ENTER`       | Start battle (main menu)                |
+| `R`           | Restart after victory or defeat         |
+| `Q`           | Quit the game                           |
 
 [Back to Table of Contents](#toc)
 
@@ -183,9 +189,8 @@ hold_the_trench/
 │   ├── ui/                     # for HUD, menus, tooltips, and overlays.
 │   ├── utils/
 │   └── world/                  # for map generation, tiles, terrain, and battlefield configuration.
-├── AI.md                       # Prompts for generating Prolog rules & translators
+├── AI.md                       # Playbook for expanding the game
 ├── ARCHITECTURE.md             # Detailed project architecture & directory structure
-├── CONTRIBUTING.md             # Guide for adding new languages & endpoints
 ├── LICENSE                     # License details
 └── README.md                   # Main project documentation
 ```
@@ -321,6 +326,7 @@ Run the game:
 * [x] Enemy bunker destruction objective
 * [x] Post-battle decisions
 * [x] Victory and defeat states
+* [x] Pause and resume
 
 ### 🚧 Planned Improvements
 
@@ -333,7 +339,6 @@ Run the game:
 * [ ] Weather system
 * [ ] Campaign progression
 * [ ] Save/load support
-* [ ] Pause and resume
 * [ ] Gameplay balancing
 
 ### 📌 Future Features
@@ -341,6 +346,13 @@ Run the game:
 * [ ] Tanks
 * [ ] Cavalry
 * [ ] Difficulty modifiers
+
+### 📝 TODO (Planned — awaiting assets and design)
+
+* [ ] Distinct victory and defeat screens — dedicated images for the win and game-over screens (currently both reuse the menu background)
+* [ ] Faction selection on the main menu — choose **Axis or Allies** to start a battle instead of a plain "start game"
+* [ ] Unit selection that follows the chosen faction (available units change per side)
+* [ ] Post-battle faction choice — after a victory or defeat, play the same faction again or switch sides for the next battle
 
 [Back to Table of Contents](#toc)
 

@@ -113,6 +113,20 @@ For every feature: Goal / Current Behavior / Files Involved (paths + reason) / I
 - Special effects: keep it simple — small particle/overlay helpers in `graphics/` or `entities/`, no effects engine.
 - Sound: `pygame.mixer`, graceful failure when files or the mixer are unavailable; assets belong in `assets/sounds` / `assets/music` using the same canonical-filename discipline as images.
 
+# TODO — DOCUMENTED PLANS (NOT STARTED; do not code until the user asks)
+
+These are held as documentation only. No implementation, stubs, or scaffolding yet.
+
+## Distinct win / defeat screens (needs assets later)
+- Replace the current shared `Startmenu.jpeg` background on `WinState` and `GameOverState` with dedicated, different images (one for victory, one for defeat) once suitable assets exist.
+- Load paths must go through `utils/image_loader.py`; missing-asset behavior must fall back to whatever `Startmenu.jpeg`/blocks show today, never crash.
+
+## Faction selection in the main menu (expands the "Playable Axis / Allies" beta item)
+- The main menu replaces the plain "start game" action with a choice: pick **Axis or Allies**, then the battle starts as that side.
+- The chosen faction drives everything downstream: player side, unit appearance, building set, and unit selection (the roster/units available change according to the faction).
+- Post-battle (both victory and defeat): the player can choose to play the **same faction** again or **switch to the other faction** for the next battle; unit selection follows the newly chosen faction.
+- Implementation will consume the centralized faction table planned in Known Issue 3 / the "Playable Axis / Allies" guidelines above.
+
 # HISTORICAL STANDARDS
 
 Use reputable museums, archives, institutions, and academic sources; for significant claims give source, institution/author, and URL when available. Separate Historical Evidence from Gameplay Design. Balance baseline: 1916–1918. Do not invent units, equipment, capabilities, or national advantages; modifiers stay small, tunable, and faction-level.
