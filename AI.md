@@ -67,7 +67,7 @@ Treat this as a guideline, not a guarantee. Avoid unnecessary abstractions.
 3. Faction selection is a random placeholder: player/friendlies pick brit/fr, enemies pick ger/aust. Replace with a centralized faction table in the "Playable Axis/Allies" work.
 4. `CombatSystem` is an empty stub; combat logic lives inline in `AssaultPhase.update()`.
 5. `TileMap.configure_build_spots()` is a dead compatibility stub for a WaveDirector that does not exist.
-6. Key handling: SPACE fires in `AssaultPhase`; it must NOT also mean pause.
+6. (RESOLVED) Key handling: SPACE is the pause key in `AssaultPhase`; player shooting is automatic-only, with no manual fire key.
 
 # WORKING RULES
 
@@ -99,8 +99,9 @@ For every feature: Goal / Current Behavior / Files Involved (paths + reason) / I
 # BETA FEATURE GUIDELINES
 
 ## Game pause
-- SPACE is fire (existing). Pause/resume uses P (ESC accepted as secondary) to avoid the SPACE conflict.
-- While paused: window responsive, rendering continues, simulation stops, overlay + resume hint visible, no buffered action fires on resume.
+- SPACE pauses/resumes (event-based toggle, keydown only); ESC is a secondary key. Player fire is automatic (AssaultPhase.update calls auto_fire) so there is no manual fire key.
+- The HUD shows the SPACE: pause hint at all times; the paused overlay shows resume instructions and the full control reference.
+- While paused: window responsive, rendering continues, simulation stops, overlay + resume instructions visible; stray keydowns while paused trigger nothing.
 
 ## Playable Axis / Allies
 - Replace the random faction placeholders with one central faction table (in `config.py` or `systems/factions.py`): display name, asset prefix, block color, balance modifiers (default 1.0).
@@ -123,7 +124,7 @@ Stabilize systems → combat/AI pass → terrain effects → buildings/defenses 
 # IMMEDIATE ACTION
 
 For each task, verify affected files by reading them, then implement one small patch set in this order:
-1. Game pause (P / ESC overlay, per guidelines).
+1. Game pause (SPACE / ESC, per guidelines).
 2. Central faction table; wire Player and all unit spawners to it (Playable Axis/Allies).
 3. Static backgrounds/menus (main menu, in-game background).
 4. Special effects.
