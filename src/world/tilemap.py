@@ -1,8 +1,11 @@
 """
 Tilemap for static ASCII battlefield.
 
-Loads STATIC_MAP from TrenchGenerator.
-Everything is exactly as written in ASCII.
+Loads STATIC_MAP from TrenchGenerator and turns it into a Tile grid.
+Everything is exactly as written in ASCII: the map is the level
+editor. Buildings attach to tiles (tile.building), which makes the
+map the authority on layout, occupancy, and (with spot_types) build
+locations.
 """
 
 import pygame
@@ -21,13 +24,19 @@ from world.trench_generator import (
 
 
 class Tile:
+    """One world cell: terrain type plus an optional building anchor."""
+
     def __init__(self, x, y, tile_type):
         self.x = x
         self.y = y
         self.type = tile_type
+        # Buildings live on tiles: collision, queries, and drawing all
+        # walk the tile grid instead of a second entity list.
         self.building = None
 
-        # Convert numeric tile type → ASCII character
+        # Convert numeric tile type -> ASCII character: chars double as
+        # the tokens game logic tests against (player.py keeps sets of
+        # them); keep TileMap and TrenchGenerator in sync on these.
         if tile_type == TILE_TRENCH:
             self.type_char = "#"
         elif tile_type == TILE_CRATER:
@@ -44,6 +53,11 @@ class Tile:
             self.type_char = "."
 
     def draw(self, screen, camera_x):
+        """Paint this tile, then delegate to its building, if any.
+
+        Flat palette per terrain type plus a 1px grid outline; camera
+        only shifts x because the battlefield is a horizontal strip.
+        """
         px = self.x * TILE_SIZE - camera_x
         py = self.y * TILE_SIZE
 
@@ -65,7 +79,11 @@ class Tile:
 
 
 class TileMap:
+    """Grid of tiles from the ASCII map, plus build-spot bookkeeping."""
+
     def __init__(self):
+        # The generator is the single level source; rebuilding it gives
+        # a pristine battlefield (menu does this once per battle).
         generator = TrenchGenerator()
         result = generator.generate_sector()
 
@@ -75,35 +93,48 @@ class TileMap:
         self.width = len(layout[0])
         self.height = len(layout)
 
+        # Row-major tile grid; x grows right, y grows down.
         self.tiles = [
             [Tile(x, y, layout[y][x]) for x in range(self.width)]
             for y in range(self.height)
         ]
 
-        # Build spot types (mg, bunker, barracks, artillery, enemy versions)
+        # Build spot types (mg, bunker, barracks, artillery, enemy
+        # versions), keyed by tile coordinate for O(1) lookups.
         self.spot_types = {(c["x"], c["y"]): c["type"] for c in self.build_candidates}
 
-        # Track how much the player has paid for each build spot
+        # Partial payments: key (x, y) -> gold already paid by the
+        # player toward that spot. The battle state tops these up each
+        # frame; the building appears when payments cover the cost.
         self.paid_amount = {(x, y): 0 for (x, y) in self.spot_types}
 
-        # Friendly boundary = first '|' in row 0 (S1 rule)
+        # Friendly boundary = first '|' in row 0 (S1 rule): the player
+        # side ends at this tile column.
         row0 = generator.ascii_map[0]
         self.friendly_boundary = row0.index("|")
 
     # WaveDirector expects this to exist
     def configure_build_spots(self, *args, **kwargs):
-        # Build spots already come from TrenchGenerator; nothing else needed.
+        # KNOWN ISSUE (AI.md #5): dead compatibility stub; build spots
+        # already come from TrenchGenerator.
         return
 
     def is_build_spot(self, x, y):
+        """True when this tile is a player/enemy build spot marker."""
         return (x, y) in self.spot_types
 
     def get_tile(self, x, y):
+        """Return the tile, or None for any out-of-grid coordinate."""
         if 0 <= x < self.width and 0 <= y < self.height:
             return self.tiles[y][x]
         return None
 
     def is_walkable(self, x, y):
+        """Strict spawn-walkability: only '.' counts as empty ground.
+
+        Deliberately excludes trenches, mud, craters, wire, and hills:
+        units and spawn searches treat everything else as blocked.
+        """
         tile = self.get_tile(x, y)
         if not tile:
             return False
@@ -112,11 +143,14 @@ class TileMap:
         return tile.type_char == "."
 
     def draw(self, screen, camera_x):
+        """Draw every tile, then outline build spots for the player."""
         for y in range(self.height):
             for x in range(self.width):
                 self.tiles[y][x].draw(screen, camera_x)
 
-        # Draw green squares around build candidates
+        # Debug/assist overlay: green squares around build candidates.
+        # These also draw over constructed buildings, which is why a
+        # built spot still shows its outline in game.
         for (x, y) in self.spot_types:
             px = x * TILE_SIZE - camera_x
             py = y * TILE_SIZE

@@ -13,7 +13,7 @@ B = bunker
 R = barracks
 A = artillery
 H = hill
-H = hill path
+P = hill path
 C = crater
 T = tree
 D = dead tree
@@ -28,11 +28,13 @@ e = enemy bunker
 r = enemy barracks
 a = enemy artillery
 h = enemy hill
+p = enemy hill path
 
 '|' is a visual separator (ignored).
 """
 
-# Tile type constants
+# Tile type constants: integers stored on Tile, converted to ASCII
+# chars by Tile (game logic tests the chars, art tests the ints).
 TILE_EMPTY     = 0
 TILE_TRENCH    = 1
 TILE_CRATER    = 2
@@ -41,7 +43,10 @@ TILE_MUD       = 4
 TILE_HILL      = 5
 TILE_HILL_PATH = 6
 
-# ASCII → tile type
+# ASCII -> tile type. Notably: trees, dead trees, and N collapse into
+# empty ground; friendly AND enemy building markers both become their
+# ground type here (the building itself is a build candidate, not a
+# tile type).
 ASCII_TO_TILE = {
     '.': TILE_EMPTY,
     'N': TILE_EMPTY,
@@ -94,12 +99,23 @@ STATIC_MAP = [
 ]
 
 class TrenchGenerator:
+    """Parse STATIC_MAP into tile rows plus build candidates."""
+
     def __init__(self):
+        # Keep the raw rows around: TileMap reads row 0 later to find
+        # the '|' friendly boundary marker.
         self.ascii_map = STATIC_MAP
         self.height = len(STATIC_MAP)
         self.width = len(STATIC_MAP[0])
 
     def generate_sector(self):
+        """Convert every ASCII character into a tile type and, when the
+        char marks a building, record it as a build candidate.
+
+        Returns tiles (row-major ints), build_candidates ({x, y, type}
+        dicts), and trench_graph (kept None: reserved for future
+        pathfinding work).
+        """
         tiles = []
         build_candidates = []
 
@@ -107,16 +123,19 @@ class TrenchGenerator:
             tile_row = []
 
             for x, ch in enumerate(row):
+                # Unknown characters fall back to empty ground: the map
+                # is safe to hand-edit without breaking the game.
                 tile_type = ASCII_TO_TILE.get(ch, TILE_EMPTY)
                 tile_row.append(tile_type)
 
-                # Buildings
+                # Buildings: player markers create purchasable spots.
                 if ch == 'M': build_candidates.append({"x": x, "y": y, "type": "mg"})
                 if ch == 'B': build_candidates.append({"x": x, "y": y, "type": "bunker"})
                 if ch == 'R': build_candidates.append({"x": x, "y": y, "type": "barracks"})
                 if ch == 'A': build_candidates.append({"x": x, "y": y, "type": "artillery"})
 
-                # Enemy buildings
+                # Enemy buildings: lowercase markers create free
+                # pre-placed enemy defenses (AssaultPhase places them).
                 if ch == 'm': build_candidates.append({"x": x, "y": y, "type": "enemy_mg"})
                 if ch == 'e': build_candidates.append({"x": x, "y": y, "type": "enemy_bunker"})
                 if ch == 'r': build_candidates.append({"x": x, "y": y, "type": "enemy_barracks"})
