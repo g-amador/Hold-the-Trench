@@ -20,9 +20,10 @@ The bullet list below is the beta gate. Work only on items from this list until 
 - [ ] Static images — menus background, in-game background, buildings
 - [ ] Some special effects
 - [ ] Sound
-- [ ] Playable Axis trench warfare
-- [ ] Playable Allies trench warfare
-- [ ] Game pause
+- [x] Playable Axis trench warfare — faction selection + faction-driven art/coins/screens
+- [x] Playable Allies trench warfare — same system, opposite side
+- [x] Game pause
+- [x] Static images — menu/result screens done; the in-game mid-battle background art is still open
 
 # PROJECT ORGANIZATION
 
@@ -35,12 +36,13 @@ hold_the_trench/
 │   ├── entities/                  # units, buildings, projectiles, pickups
 │   │   ├── player.py, friendly_infantry.py, enemy.py, bullet.py, gold_pickup.py
 │   │   ├── artillery.py, barracks.py, bunker.py, mg_nest.py, trench.py
+│   │   ├── (units store `self.nation` at ctor for faction art + coin drops)
 │   ├── graphics/
 │   │   ├── sprite_generator.py    # frame loading/flip/animation helpers
 │   │   ├── render_mode.py         # global sprite/block graphics toggle (G key)
 │   │   └── block_drawer.py        # block-mode/fallback rendering
 │   ├── states/                    # assault_phase.py, main_menu.py, game_over.py, win_state.py
-│   ├── systems/                   # economy_system.py, building_query.py, combat_system.py (stub)
+│   ├── systems/                   # factions.py, economy_system.py, building_query.py, combat_system.py (stub)
 │   ├── ui/hud.py                  # HUD
 │   ├── utils/image_loader.py      # cached image loading — the only place images are loaded
 │   ├── world/                     # tilemap.py, trench_generator.py
@@ -64,7 +66,7 @@ Treat this as a guideline, not a guarantee. Avoid unnecessary abstractions.
 
 1. `Player`, `FriendlyInfantry`, and `EnemyInfantry` duplicate most movement/animation code.
 2. (RESOLVED) `EnemyInfantry` now charges and sieges the player bunker when no friendly units remain: it walks to the bunker, stops on contact, and strikes on a fixed cooldown (`attack_damage`/`attack_cooldown`).
-3. Faction selection is a random placeholder: player/friendlies pick brit/fr, enemies pick ger/aust. Replace with a centralized faction table in the "Playable Axis/Allies" work.
+3. (RESOLVED in `systems/factions.py`) Faction selection was a random placeholder; there is now one central faction table that the menu, both deployment sides, and every entity's art/coin choice consume. Remaining headroom (NOT bugs): faction balance modifiers (all 1.0 — table currently carries no modifier field) and per-faction unit rosters.
 4. `CombatSystem` is an empty stub; combat logic lives inline in `AssaultPhase.update()`.
 5. `TileMap.configure_build_spots()` is a dead compatibility stub for a WaveDirector that does not exist.
 6. (RESOLVED) Key handling: SPACE is the pause key in `AssaultPhase`; player shooting is automatic-only, with no manual fire key.
@@ -117,11 +119,22 @@ For every feature: Goal / Current Behavior / Files Involved (paths + reason) / I
 - Movement limits come from the map itself: `Player._clamp_to_bounds(tilemap)` clamps x/y to the tilemap's pixel extents — there is no window-based or hardcoded bound (the old `max(40, ...)` HUD margin and `max_world_x` are gone). Map edges read as walls; the top row is reachable.
 - HUD (top bar, build prompt, pause overlay, force panel) draws in screen space after the world blit.
 
-## Playable Axis / Allies
-- Replace the random faction placeholders with one central faction table (in `config.py` or `systems/factions.py`): display name, asset prefix, block color, balance modifiers (default 1.0).
-- Both `Player` and all unit spawners consume the table. Side ownership (friendly vs enemy), movement direction, and targeting follow the chosen side.
+## Playable Axis / Allies (IMPLEMENTED as `systems/factions.py`)
+- The central faction table lives in `src/systems/factions.py` — the ONLY place faction/nation rules are defined. New art decisions must derive from it, never hardcode a nation.
+- Table contents: `FACTIONS` (label + `unit_nations` + `building_nations` pools: allies = brit/fr, axis = ger/aust units, ger-only buildings — there are no austrian building assets), `COIN_BY_NATION` (aust shares coin_ger.png), `MENU_BACKGROUND`, `VICTORY_BACKGROUND`/`DEFEAT_BACKGROUND`, helpers `other()`, `unit_prefix()`, `building_filename()`, `coin_texture()`.
+- Selection: `Game.selected_faction` (engine default "allies") is set by the main menu on ENTER; `AssaultPhase` stores `player_faction` and derives `enemy_faction = other(player_faction)`, then passes factions to the player, its buildings, the player bunker, the enemy defenses, and the player.
+- Art rules: soldier textures roll a random nation from the side's unit pool at ctor time (unit remembers `self.nation`); building textures roll from the side's building pool per building (axis is always ger because the pool holds only ger).
+- Coin drops: dying ENEMY units drop their nation's coin (`spawn_gold` passes `texture=self.coin`; missing coin art falls back to the gold square).
+- Screens: main menu = `Menu_2_Start.jpeg`; victory/defeat art keyed by the played faction (victory shows your banner, defeat shows the enemy's).
+- STILL OPEN (post-faction headroom): faction balance modifiers (planned all 1.0, table has no field yet) and per-faction unit rosters/selection (e.g. axis-only vehicle spawners).
+
+## Faction screens & controls
+- Main menu: `Menu_2_Start.jpeg` background; A/1 picks Allies, X/2 picks Axis (picked line bright, the other dimmed); ENTER starts the battle as the picked side; Q quits. The choice is promoted to `Game.selected_faction` only on ENTER.
+- Battle end (win or lose): R = play again with the SAME faction, S = switch to the other faction, Q = quit. Both R and S rebuild a fresh `TileMap` before entering the new `AssaultPhase`, so no buildings or economy carry over.
+- WinState/GameOverState select their own backgrounds from the faction table at construction time — no faction parameters are threaded through `change_state`.
 
 ## Animated sprites / static images / effects / sound
+- Infantry animation contract (Player, FriendlyInfantry, EnemyInfantry — all three must behave identically): the leg run-cycle timer advances on every frame the unit moves (`is_moving`), and the weapon-raised aim pose is a per-volley blip raised inside `_fire()` on the actual pull (0.18 s) and drained by the shared per-frame update afterward — the pose is never pinned for as long as a target stays in cone. (This fixed the bug where the enemy hunt path returned before the animation block ran: frozen legs, permanent aim pose.)
 - Sprite loads: `SpriteGenerator.load_unit_frames(prefix)` returns None when assets are missing → fall back to `graphics/block_drawer.py` block rendering instead of crashing.
 - Buildings and units check `render_mode.is_sprite()` in `draw()`; block mode is always available via the G toggle (HUD shows the current mode).
 - Special effects: keep it simple — small particle/overlay helpers in `graphics/` or `entities/`, no effects engine.
@@ -131,15 +144,9 @@ For every feature: Goal / Current Behavior / Files Involved (paths + reason) / I
 
 These are held as documentation only. No implementation, stubs, or scaffolding yet.
 
-## Distinct win / defeat screens (needs assets later)
-- Replace the current shared `Startmenu.jpeg` background on `WinState` and `GameOverState` with dedicated, different images (one for victory, one for defeat) once suitable assets exist.
-- Load paths must go through `utils/image_loader.py`; missing-asset behavior must fall back to whatever `Startmenu.jpeg`/blocks show today, never crash.
-
-## Faction selection in the main menu (expands the "Playable Axis / Allies" beta item)
-- The main menu replaces the plain "start game" action with a choice: pick **Axis or Allies**, then the battle starts as that side.
-- The chosen faction drives everything downstream: player side, unit appearance, building set, and unit selection (the roster/units available change according to the faction).
-- Post-battle (both victory and defeat): the player can choose to play the **same faction** again or **switch to the other faction** for the next battle; unit selection follows the newly chosen faction.
-- Implementation will consume the centralized faction table planned in Known Issue 3 / the "Playable Axis / Allies" guidelines above.
+## In-game static background (needs assets later)
+- The mid-battle battlefield still draws tiles only; add a proper static background image for the assault state once a suitable asset exists.
+- Load paths must go through `utils/image_loader.py`; keep it below the HUD bar per the render-layout rules, never crash on missing art.
 
 # HISTORICAL STANDARDS
 
@@ -152,9 +159,9 @@ Stabilize systems → combat/AI pass → terrain effects → buildings/defenses 
 # IMMEDIATE ACTION
 
 For each task, verify affected files by reading them, then implement one small patch set in this order:
-1. Game pause (SPACE / ESC, per guidelines).
-2. Central faction table; wire Player and all unit spawners to it (Playable Axis/Allies).
-3. Static backgrounds/menus (main menu, in-game background).
+1. ~~Game pause (SPACE / ESC, per guidelines).~~ DONE.
+2. ~~Central faction table; wire Player and all unit spawners to it (Playable Axis/Allies).~~ DONE — `systems/factions.py` + faction flow (menu selection, coins, screens, post-battle R/S).
+3. Static in-game background (the only static-image item left; menus/result screens are done).
 4. Special effects.
 5. Sound.
 Keep the development checklist current after each step.

@@ -32,7 +32,8 @@ hold_the_trench/
 │   ├── systems/                    # for combat, economy, faction rules, spawning, and wave management.
 │   │   ├── building_query.py
 │   │   ├── combat_system.py
-│   │   └── economy_system.py
+│   │   ├── economy_system.py
+│   │   └── factions.py             # single source of truth for sides: nation pools (units/buildings), coin art by nation, menu/victory/defeat backgrounds, and the other()/roll helpers
 │   ├── ui/                         # for HUD, menus, tooltips, and overlays.
 │   │   └── hud.py
 │   ├── utils/

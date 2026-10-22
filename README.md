@@ -163,8 +163,11 @@ Victory grants you a choice:
 | `WASD` / Arrows | Move player                           |
 | `Left Click`  | Build / Select                          |
 | `G`           | Toggle sprite / block graphics mode     |
-| `ENTER`       | Start battle (main menu)                |
-| `R`           | Restart after victory or defeat         |
+| `A` / `1`     | Main menu: choose the Allies side       |
+| `X` / `2`     | Main menu: choose the Axis side         |
+| `ENTER`       | Start battle as the chosen faction (main menu) |
+| `R`           | Play again with the same faction (after victory or defeat) |
+| `S`           | Switch faction for the next battle (after victory or defeat) |
 | `Q`           | Quit the game                           |
 
 [Back to Table of Contents](#toc)
