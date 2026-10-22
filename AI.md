@@ -54,7 +54,7 @@ Treat this as a guideline, not a guarantee. Avoid unnecessary abstractions.
 
 # SINGLE SOURCES OF TRUTH
 
-- `src/config.py`: screen size, FPS, colors, `BUILD_COSTS`. (`systems/economy_system.py` re-exports `BUILD_COSTS` for import compatibility only — do not define new copies.)
+- `src/config.py`: screen size, FPS, colors, `BUILD_COSTS`, `BULLET_RANGE_PX` (max bullet flight; every engagement range must stay below it — player 300, infantry 200, MG 220, artillery 400). (`systems/economy_system.py` re-exports `BUILD_COSTS` for import compatibility only — do not define new copies.)
 - `src/graphics/render_mode.py`: the only holder of sprite/block toggle state. Query it; never cache its value across frames.
 - `src/utils/image_loader.py`: all image loads go through it; cached surfaces are shared, so never mutate a loaded surface (flip/scale into a new surface).
 - Unit facing: `1` = right, `-1` = left. Infantry frame names: `_a/_b/_c` legs, `_d` upper idle, `_e` upper aim.
@@ -102,6 +102,20 @@ For every feature: Goal / Current Behavior / Files Involved (paths + reason) / I
 - SPACE pauses/resumes (event-based toggle, keydown only); ESC is a secondary key. Player fire is automatic (AssaultPhase.update calls auto_fire) so there is no manual fire key.
 - The HUD shows the SPACE: pause hint at all times; the paused overlay shows resume instructions and the full control reference.
 - While paused: window responsive, rendering continues, simulation stops, overlay + resume instructions visible; stray keydowns while paused trigger nothing.
+
+## Build prompt (near-spot cost ledger)
+- `get_nearby_build_spot` only returns EMPTY player-purchasable spots (mg/barracks/artillery). Standing near enemy defenses, the player bunker, or any placed building shows NO prompt and no cost — the cost ledger (PAID/OWES/HAVE) appears only next to an empty player spot.
+
+## HUD force counts panel
+- Two columns under the top bar: player forces on the left, enemy on the right (right-aligned). One row each: Infantry / Barracks / MG Nest / Artillery.
+- Shown ONLY while paused (rendered over the pause overlay); the live battle view stays clean. The battle state computes all rows (`AssaultPhase._collect_force_rows`); the HUD only renders.
+- Player Infantry = live unit count. Player buildables show X/Y where Y = total build spots of that type on the map and X = spots holding a building (replaces the old mixed `count_buildings` legend).
+- Enemy Infantry = live count; enemy buildings are placed free at battle start, so they show plain counts.
+
+## Render layout (world vs HUD strip)
+- `AssaultPhase.render` draws the world 1:1 onto a pre-allocated `world_surface` sized to the static map strip (`tilemap.width/height * TILE_SIZE`), then scales it to fit between `config.HUD_BAR_HEIGHT` and the screen bottom. The full battlefield is always visible below the HUD bar; no tile/unit is hidden by it.
+- Movement limits come from the map itself: `Player._clamp_to_bounds(tilemap)` clamps x/y to the tilemap's pixel extents — there is no window-based or hardcoded bound (the old `max(40, ...)` HUD margin and `max_world_x` are gone). Map edges read as walls; the top row is reachable.
+- HUD (top bar, build prompt, pause overlay, force panel) draws in screen space after the world blit.
 
 ## Playable Axis / Allies
 - Replace the random faction placeholders with one central faction table (in `config.py` or `systems/factions.py`): display name, asset prefix, block color, balance modifiers (default 1.0).
