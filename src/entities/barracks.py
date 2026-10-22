@@ -14,16 +14,18 @@ from entities.enemy import EnemyInfantry
 from entities.friendly_infantry import FriendlyInfantry
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
+from systems.factions import building_filename
 from utils.image_loader import load_image
 
 
 class Barracks:
 
-    def __init__(self, tile_x, tile_y, is_enemy=False):
+    def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
         # type strings match the map spot_types keys (building_query
         # and TileMap spot bookkeeping read these prefixes).
         self.type = "enemy_barracks" if is_enemy else "barracks"
         self.is_enemy = is_enemy
+        self.faction = faction
 
         self.tile_x = tile_x
         self.tile_y = tile_y
@@ -35,13 +37,10 @@ class Barracks:
         # 1 = right, -1 = left: enemies face the player side.
         self.facing = -1 if is_enemy else 1
 
-        # Art side: allies use Central Powers art, enemies use Entente
-        # art (placeholder faction logic until the faction table lands).
-        prefix = f"building_barraks"
-
-        filename = random.choice([f"{prefix}_fr.png", f"{prefix}_brit.png"]) if is_enemy else random.choice([f"{prefix}_ger.png"])
+        # Art side: random per-building from the faction's pool (axis
+        # buildings are always ger; allies mix brit/fr randomly).
         self.image = load_image(
-            filename,
+            building_filename(faction, "barraks"),
             alpha=True,
             size=(TILE_SIZE, TILE_SIZE),
         )
@@ -72,9 +71,9 @@ class Barracks:
         y = self.tile_y * TILE_SIZE
 
         if self.is_enemy:
-            units.append(EnemyInfantry(x, y))
+            units.append(EnemyInfantry(x, y, faction=self.faction))
         else:
-            units.append(FriendlyInfantry(x, y))
+            units.append(FriendlyInfantry(x, y, faction=self.faction))
 
     def draw(self, screen, camera_x):
         # Block mode: flat block with the facing marker on its leading

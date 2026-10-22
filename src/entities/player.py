@@ -9,13 +9,13 @@ degree cone in front of the facing direction.
 
 import math
 import pygame
-import random
 
 from config import TILE_SIZE, BLUE
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from graphics.sprite_generator import SpriteGenerator
+from systems.factions import unit_prefix
 
 
 # Tile characters that can never be walked through (trench wall, hill).
@@ -32,7 +32,7 @@ SLOW_TILES = {"W"}
 class Player:
     """The player-controlled ally infantry; free float position, tile collision."""
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, faction="allies"):
         # World position as float: sub-pixel movement stays smooth.
         self.x = float(x)
         self.y = float(y)
@@ -42,14 +42,15 @@ class Player:
         self.width = 24
         self.height = 24
 
+        # Side-picked soldier art: random nation from the faction pool
+        # (brit/fr for allies, ger/aust for axis). The faction table
+        # owns the pools (systems/factions.py).
+        prefix, self.nation = unit_prefix(faction)
+
         # Shooting: a cooldown gates auto-fire, and a short timer keeps
         # the aim pose on screen after each shot.
         self.shoot_cooldown = 0.25
         self.shoot_timer = 0
-
-        # Ally asset prefix (placeholder until factions are centralized).
-        faction = random.choice(["brit", "fr"])
-        prefix = f"infantry_unit_{faction}_1"
 
         # Standard infantry frames; None means missing assets (block fallback).
         self.sprite_generator = SpriteGenerator()

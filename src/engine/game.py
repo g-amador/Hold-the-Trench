@@ -13,6 +13,8 @@ import pygame
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, FPS
 from states.main_menu import MainMenu
 from world.tilemap import TileMap
+from systems.factions import MENU_BACKGROUND
+from utils.image_loader import load_image
 
 
 class Game:
@@ -22,6 +24,10 @@ class Game:
 
         # Software window; sizes come from config so tuning lives there.
         self.screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+        # Warm the image cache with the menu art so the first frame
+        # never stalls on disk reads (load path/caching owned by
+        # utils/image_loader).
+        load_image(MENU_BACKGROUND, alpha=False, size=(SCREEN_WIDTH, SCREEN_HEIGHT))
         self.clock = pygame.time.Clock()
 
         # Loop flag. Menu/end states set it False to quit without errors.
@@ -30,6 +36,11 @@ class Game:
         # Shared world. The menu rebuilds a fresh TileMap right before
         # starting a battle, so each fight starts from the same map.
         self.tilemap = TileMap()
+
+        # Selected side, set by the main menu and read by the battle,
+        # the win/lose screens, and every entity's faction lookup
+        # (single source: systems/factions.py).
+        self.selected_faction = "allies"
 
         # First state; every state keeps a reference to this Game so it
         # can switch screens and read the shared tilemap.

@@ -30,6 +30,8 @@ from entities.bunker import Bunker
 from entities.artillery import Artillery
 from entities.barracks import Barracks
 
+from systems.factions import other
+
 from config import (
     SCREEN_WIDTH,
     SCREEN_HEIGHT,
@@ -63,6 +65,11 @@ class AssaultPhase:
         # Shared world: the menu rebuilt this TileMap so the battle
         # always starts from the pristine ASCII layout.
         self.tilemap = game.tilemap
+
+        # Sides come from the menu-selected faction: both spawners and
+        # every entity read these to pick art and coin drops.
+        self.player_faction = getattr(game, "selected_faction", "allies")
+        self.enemy_faction = other(self.player_faction)
 
         self.hud = HUD()
         self.economy = EconomySystem()
@@ -102,10 +109,14 @@ class AssaultPhase:
         else:
             bunker_x, bunker_y = bunker_pos
 
-        # Place the bunker.
+        # Place the bunker (faction-keyed art for both objectives).
         bunker_tile = self.tilemap.get_tile(bunker_x, bunker_y)
         if bunker_tile:
-            bunker_tile.building = Bunker(bunker_x, bunker_y)
+            bunker_tile.building = Bunker(
+                bunker_x,
+                bunker_y,
+                faction=self.player_faction,
+            )
 
         # Friendly boundary.
         boundary = self.tilemap.friendly_boundary
@@ -142,7 +153,7 @@ class AssaultPhase:
             spawn_x = spawn_tile[0] * TILE_SIZE
             spawn_y = spawn_tile[1] * TILE_SIZE
 
-        self.player = Player(spawn_x, spawn_y)
+        self.player = Player(spawn_x, spawn_y, faction=self.player_faction)
 
         self.camera_x = 0
 
@@ -197,12 +208,18 @@ class AssaultPhase:
                 continue
 
             if spot_type == "enemy_bunker":
-                tile.building = Bunker(tile_x, tile_y, is_enemy=True)
+                tile.building = Bunker(
+                    tile_x,
+                    tile_y,
+                    is_enemy=True,
+                    faction=self.enemy_faction,
+                )
             else:
                 tile.building = building_class(
                     tile_x,
                     tile_y,
                     is_enemy=True,
+                    faction=self.enemy_faction,
                 )
 
     def auto_place_if_possible(self):
@@ -248,7 +265,11 @@ class AssaultPhase:
 
             # Only construct the building once its full cost is paid.
             if paid >= cost:
-                tile.building = building_class(tile_x, tile_y)
+                tile.building = building_class(
+                    tile_x,
+                    tile_y,
+                    faction=self.player_faction,
+                )
                 # One construction per pass: the next spot waits a frame,
                 # which keeps placement readable.
                 return

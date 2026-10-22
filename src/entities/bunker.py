@@ -7,17 +7,18 @@ that other buildings and the player protect or attack.
 """
 
 import pygame
-import random
 
 from config import TILE_SIZE, GREY
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
+from systems.factions import building_filename
 from utils.image_loader import load_image
 
 
 class Bunker:
-    def __init__(self, tile_x, tile_y, is_enemy=False):
+    def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
         self.is_enemy = is_enemy
+        self.faction = faction
         # type strings match the map spot_types keys.
         self.type = "enemy_bunker" if is_enemy else "bunker"
 
@@ -39,13 +40,10 @@ class Bunker:
         self.x = tile_x * TILE_SIZE
         self.y = tile_y * TILE_SIZE - (self.height - TILE_SIZE)
 
-        # Art side (placeholder faction logic until the faction table
-        # lands), same convention as Barracks.
-        prefix = f"building_bunker"
-
-        filename = random.choice([f"{prefix}_fr.png", f"{prefix}_brit.png"]) if is_enemy else random.choice([f"{prefix}_ger.png"])
+        # Art side: random per-building from the faction's pool, same
+        # rule as the other buildings (axis = ger, allies = brit/fr).
         self.image = load_image(
-            filename,
+            building_filename(faction, "bunker"),
             alpha=True,
             size=(TILE_SIZE, TILE_SIZE),
         )

@@ -8,21 +8,22 @@ and passes the correct side's bullet/unit lists.
 
 import math
 import pygame
-import random
 
 from config import TILE_SIZE, GREY
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
+from systems.factions import building_filename
 from utils.image_loader import load_image
 
 
 class MGNest:
 
-    def __init__(self, tile_x, tile_y, is_enemy=False):
+    def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
         # type strings match the map spot_types keys.
         self.type = "enemy_mg" if is_enemy else "mg"
         self.is_enemy = is_enemy
+        self.faction = faction
 
         self.tile_x = tile_x
         self.tile_y = tile_y
@@ -35,13 +36,10 @@ class MGNest:
         self.fire_rate = 0.2
         self.cooldown = 0
 
-        # Art side (placeholder faction logic until the faction table
-        # lands), same convention as Barracks.
-        prefix = f"building_mg_nest"
-
-        filename = random.choice([f"{prefix}_fr.png", f"{prefix}_brit.png"]) if is_enemy else random.choice([f"{prefix}_ger.png"])
+        # Art side: random per-building from the faction's pool, same
+        # rule as the other buildings (axis = ger, allies = brit/fr).
         self.image = load_image(
-            filename,
+            building_filename(faction, "mg_nest"),
             alpha=True,
             size=(TILE_SIZE, TILE_SIZE),
         )

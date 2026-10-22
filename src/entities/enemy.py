@@ -17,6 +17,7 @@ from entities.gold_pickup import GoldPickup
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from graphics.sprite_generator import SpriteGenerator
+from systems.factions import unit_prefix, coin_texture
 
 
 class EnemyBase:
@@ -39,6 +40,12 @@ class EnemyBase:
         # gold_spawned guarantees a single drop per death.
         self.dead = False
         self.gold_spawned = False
+
+        # Coin art dropped at death. EnemyInfantry rolls its nation and
+        # sets this from the faction table (germans and austrians share
+        # the german coin); subclasses without a nation keep the
+        # german default so every enemy drop has sensible art.
+        self.coin = "coin_ger.png"
 
     def update(self, dt):
         """Generic advance: walk left at constant speed.
@@ -94,13 +101,18 @@ class EnemyBase:
         """
         if self.dead and not self.gold_spawned and self.gold_drop > 0:
             self.gold_spawned = True
-            return GoldPickup(self.x, self.y, self.gold_drop)
+            return GoldPickup(
+                self.x,
+                self.y,
+                self.gold_drop,
+                texture=self.coin,
+            )
         return None
     
 class EnemyInfantry(EnemyBase):
     """Rifle infantry: homes onto the nearest friendly; the clash is mutually lethal."""
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, faction="axis"):
         # Baseline stats: soldier speed, moderate hp, small gold bounty.
         super().__init__(x, y, speed=120, hp=40, gold_drop=5)
         # Match the sprite footprint; the base 24x32 would not fit the art.
@@ -121,9 +133,11 @@ class EnemyInfantry(EnemyBase):
         self.shoot_cooldown = 1.2
         self.shoot_timer = 0.0
 
-        # Axis asset prefix (placeholder until factions are centralized).
-        faction = random.choice(["ger", "aust"])
-        prefix = f"infantry_unit_{faction}_1"
+        # Side-picked soldier art: random nation from the faction pool
+        # (ger/aust for axis, brit/fr for allies — systems/factions.py).
+        # The rolled nation drives the coin drop at death time.
+        prefix, self.nation = unit_prefix(faction)
+        self.coin = coin_texture(self.nation)
 
         # Standard infantry frames; None means missing assets (block fallback).
         self.sprite_generator = SpriteGenerator()
@@ -189,16 +203,31 @@ class EnemyInfantry(EnemyBase):
                 self.x += (dx / dist) * move_amount
                 self.y += (dy / dist) * move_amount
 
-                # Ranged fire (Range 200px, Cone 90 deg): aim pose plus
-                # a real bullet on cooldown into `bullets` (the state's
-                # enemy-bullet loop hits friendlies). With no bullets
-                # list the check stays pose-only.
+                # Ranged fire (Range 200px, Cone 90 deg): a real
+                # bullet on cooldown into `bullets` (the state's
+                # enemy-bullet loop hits friendlies). The aim pose is
+                # raised by _fire on the actual shot and drains after
+                # it, so shooting reads as a blip per volley.
                 if dist < 200:
                     if (dx / dist * self.facing) >= 0.707:
-                        self.shoot_animation_timer = self.shoot_animation_duration
                         self._fire(dx / dist, dy / dist, bullets)
-                else:
-                    self.shoot_animation_timer = 0
+
+            # Animation update (mirrors FriendlyInfantry): the run
+            # cycle advances while moving, and the aim pose drains
+            # after each shot — without this the hunt path returned
+            # with legs frozen on frame 0 and the pose pinned on.
+            if self.is_moving:
+                self.run_timer += dt / 1000
+                while self.run_timer >= self.run_frame_duration:
+                    self.run_timer -= self.run_frame_duration
+                    self.run_frame = (self.run_frame + 1) % len(self.legs_run)
+            else:
+                self.run_frame = 0
+
+            self.shoot_animation_timer = max(
+                0,
+                self.shoot_animation_timer - dt / 1000,
+            )
 
             # Melee contact: mutual destruction. The hit is applied in
             # both HP pools at once (no per-hit rolls), so exactly one
@@ -263,9 +292,18 @@ class EnemyInfantry(EnemyBase):
         """Launch one bullet at the muzzle point, gated by the cooldown.
 
         nx/ny is the normalized aim vector; bullets=None means the
-        caller did not opt into real firing (pose-only behavior).
+        caller did not opt into real firing. The weapon-raised pose
+        plays exactly on the pull (cooldown cleared) and drains after
+        — the shoot animation is per volley, never pinned.
         """
-        if bullets is None or self.shoot_timer > 0:
+        if self.shoot_timer > 0:
+            return
+
+        # Trigger the aim pose on the actual shot; the shared per-frame
+        # drain at the end of update() fades it back to idle.
+        self.shoot_animation_timer = self.shoot_animation_duration
+
+        if bullets is None:
             return
 
         # Muzzle at the unit's body center; direction continues the aim.

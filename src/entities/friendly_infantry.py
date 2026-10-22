@@ -8,18 +8,18 @@ symmetrical with enemy melee (both sides lose one unit per clash).
 
 import math
 import pygame
-import random
 
 from config import BLUE
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from graphics.sprite_generator import SpriteGenerator
+from systems.factions import unit_prefix
 
 class FriendlyInfantry:
     """Ally rifle infantry: one charge, one kill, one death."""
 
-    def __init__(self, x, y):
+    def __init__(self, x, y, faction="allies"):
         # Spawn at the barracks' tile origin in pixel coordinates.
         self.x = x
         self.y = y
@@ -40,9 +40,9 @@ class FriendlyInfantry:
         self.shoot_cooldown = 1.2
         self.shoot_timer = 0.0
 
-        # Ally asset prefix (placeholder until factions are centralized).
-        faction = random.choice(["brit", "fr"])
-        prefix = f"infantry_unit_{faction}_1"
+        # Side-picked soldier art: random nation from the faction pool
+        # (brit/fr for allies, ger/aust for axis — systems/factions.py).
+        prefix, self.nation = unit_prefix(faction)
 
         # Standard infantry frames; None means missing assets (block fallback).
         self.sprite_generator = SpriteGenerator()
@@ -116,15 +116,15 @@ class FriendlyInfantry:
             self.y += (dy / length) * self.speed * dt / 1000
 
             # Shooting Logic (Range: 200px, Cone: 90 deg)
-            # Ranged fire: aim pose plays AND a real bullet launches on
-            # cooldown; the state's friendly-bullet loop resolves the
-            # hit against enemies / enemy bunkers. With no bullets list
-            # the cone check stays pose-only (caller did not opt in).
+            # Ranged fire: a real bullet launches on cooldown into
+            # `bullets`; the state's friendly-bullet loop resolves the
+            # hit against enemies / enemy bunkers. The aim pose is
+            # raised by _fire on the actual shot — per volley, never
+            # pinned — mirroring EnemyInfantry and the player.
             if length < 200:
                 # Normalize and check dot product for 90 degree cone
                 nx, ny = dx / length, dy / length
                 if (nx * self.facing) >= 0.707:
-                    self.shoot_animation_timer = self.shoot_animation_duration
                     self._fire(nx, ny, bullets)
             else:
                 self.shoot_animation_timer = 0
@@ -160,9 +160,18 @@ class FriendlyInfantry:
         """Launch one bullet at the muzzle point, gated by the cooldown.
 
         nx/ny is the normalized aim vector; bullets=None means the
-        caller did not opt into real firing (pose-only behavior).
+        caller did not opt into real firing. The weapon-raised pose
+        plays exactly on the pull (cooldown cleared) and drains after
+        — the shoot animation is per volley, never pinned.
         """
-        if bullets is None or self.shoot_timer > 0:
+        if self.shoot_timer > 0:
+            return
+
+        # Trigger the aim pose on the actual shot; the shared per-frame
+        # drain at the end of update() fades it back to idle.
+        self.shoot_animation_timer = self.shoot_animation_duration
+
+        if bullets is None:
             return
 
         # Muzzle at the unit's body center; direction continues the aim.

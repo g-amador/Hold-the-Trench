@@ -16,10 +16,11 @@ from graphics.block_drawer import draw_unit_block
 
 class Artillery:
 
-    def __init__(self, tile_x, tile_y, is_enemy=False):
+    def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
         # type strings match the map spot_types keys.
         self.type = "enemy_artillery" if is_enemy else "artillery"
         self.is_enemy = is_enemy
+        self.faction = faction
 
         self.tile_x = tile_x
         self.tile_y = tile_y
@@ -79,7 +80,8 @@ class Artillery:
 
         Uses the same full-tile block (facing marker included) as the
         other buildings, so all structures look consistent when the
-        graphics toggle hides textures.
+        graphics toggle hides textures. `faction` is stored for the
+        art pass (building_artillery_* assets do not exist yet).
         """
         px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE
