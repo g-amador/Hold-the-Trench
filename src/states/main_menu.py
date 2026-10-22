@@ -1,7 +1,7 @@
 """
 Main menu state.
 
-Background is Menu_2_Start.jpeg (scaled once to the window, cached by
+Background is Menu_Start.jpeg (scaled once to the window, cached by
 the image loader). The player picks a side with A/1 (Allies) or X/2
 (Axis) and starts with ENTER (Q quits). The chosen side is stored on
 Game.selected_faction and drives every texture decision downstream
@@ -52,11 +52,13 @@ class MainMenu:
         if event.type != pygame.KEYDOWN:
             return
 
-        # Side selection: mnemonic A/X plus number shortcuts. The
-        # labels in FACTIONS render these same keys as hints.
-        if event.key in (pygame.K_a, pygame.K_1):
+        # Side selection: W/UP and S/DOWN move between the two sides
+        # (top line = Allies, bottom line = Axis), with number
+        # shortcuts kept. The labels in FACTIONS render these same
+        # keys as hints.
+        if event.key in (pygame.K_w, pygame.K_UP, pygame.K_1):
             self.selected = "allies"
-        elif event.key in (pygame.K_x, pygame.K_2):
+        elif event.key in (pygame.K_s, pygame.K_DOWN, pygame.K_2):
             self.selected = "axis"
         elif event.key == pygame.K_RETURN:
             # Imported here (not top-level) to avoid a circular

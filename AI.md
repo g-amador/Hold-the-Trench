@@ -125,11 +125,11 @@ For every feature: Goal / Current Behavior / Files Involved (paths + reason) / I
 - Selection: `Game.selected_faction` (engine default "allies") is set by the main menu on ENTER; `AssaultPhase` stores `player_faction` and derives `enemy_faction = other(player_faction)`, then passes factions to the player, its buildings, the player bunker, the enemy defenses, and the player.
 - Art rules: soldier textures roll a random nation from the side's unit pool at ctor time (unit remembers `self.nation`); building textures roll from the side's building pool per building (axis is always ger because the pool holds only ger).
 - Coin drops: dying ENEMY units drop their nation's coin (`spawn_gold` passes `texture=self.coin`; missing coin art falls back to the gold square).
-- Screens: main menu = `Menu_2_Start.jpeg`; victory/defeat art keyed by the played faction (victory shows your banner, defeat shows the enemy's).
+- Screens: main menu = `Menu_Start.jpeg`; victory/defeat art keyed by the played faction (victory shows your banner, defeat shows the enemy's).
 - STILL OPEN (post-faction headroom): faction balance modifiers (planned all 1.0, table has no field yet) and per-faction unit rosters/selection (e.g. axis-only vehicle spawners).
 
 ## Faction screens & controls
-- Main menu: `Menu_2_Start.jpeg` background; A/1 picks Allies, X/2 picks Axis (picked line bright, the other dimmed); ENTER starts the battle as the picked side; Q quits. The choice is promoted to `Game.selected_faction` only on ENTER.
+- Main menu: `Menu_Start.jpeg` background; W/UP selects Allies, S/DOWN selects Axis (number shortcuts 1/2 work too; picked line bright, the other dimmed); ENTER starts the battle as the picked side; Q quits. The choice is promoted to `Game.selected_faction` only on ENTER.
 - Battle end (win or lose): R = play again with the SAME faction, S = switch to the other faction, Q = quit. Both R and S rebuild a fresh `TileMap` before entering the new `AssaultPhase`, so no buildings or economy carry over.
 - WinState/GameOverState select their own backgrounds from the faction table at construction time — no faction parameters are threaded through `change_state`.
 

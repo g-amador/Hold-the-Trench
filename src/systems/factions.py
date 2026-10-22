@@ -18,12 +18,12 @@ import random
 
 FACTIONS = {
     "allies": {
-        "label": "PLAY AS ALLIES (A / 1)",
+        "label": "PLAY AS ALLIES (W)",
         "unit_nations": ["brit", "fr"],
         "building_nations": ["brit", "fr"],
     },
     "axis": {
-        "label": "PLAY AS AXIS  (X / 2)",
+        "label": "PLAY AS AXIS  (S)",
         "unit_nations": ["ger", "aust"],
         "building_nations": ["ger"],
     },
@@ -40,14 +40,14 @@ COIN_BY_NATION = {
 
 # Faction-keyed static screens. Allies victory/defeat show allied /
 # central-powers banners respectively; axis mirrors it.
-MENU_BACKGROUND = "Menu_2_Start.jpeg"
+MENU_BACKGROUND = "Menu_Start.jpeg"
 VICTORY_BACKGROUND = {
-    "allies": "Menu_2_Victory_fr.jpeg",
-    "axis": "Menu_2_Victory_ger.jpeg",
+    "allies": "Menu_Victory_fr.jpeg",
+    "axis": "Menu_Victory_ger.jpeg",
 }
 DEFEAT_BACKGROUND = {
-    "allies": "Menu_2_Victory_ger.jpeg",
-    "axis": "Menu_2_Victory_fr.jpeg",
+    "allies": "Menu_Victory_ger.jpeg",
+    "axis": "Menu_Victory_fr.jpeg",
 }
 
 
