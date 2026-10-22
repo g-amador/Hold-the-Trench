@@ -1,6 +1,7 @@
 """
-HUD drawing: bunker HP, gold balance, building counts, graphics-mode
-label, and reusable text helpers.
+HUD drawing: bunker HP, gold balance, the two-column force counts
+panel (player X/Y buildables + enemy totals), graphics-mode label,
+and reusable text helpers.
 
 The HUD is dumb by design: the battle state computes all values and
 passes them in; the HUD only formats and blits.
@@ -8,7 +9,7 @@ passes them in; the HUD only formats and blits.
 
 import pygame
 
-from config import WHITE, BLACK, SCREEN_WIDTH
+from config import WHITE, BLACK, SCREEN_WIDTH, HUD_BAR_HEIGHT
 
 
 class HUD:
@@ -23,8 +24,9 @@ class HUD:
         graphics_label is the current sprite/block mode name from
         graphics.render_mode; empty hides the indicator.
         """
-        # Full-width dark bar so the numbers read against any terrain.
-        pygame.draw.rect(screen, BLACK, (0, 0, SCREEN_WIDTH, 40))
+        # Full-width bar sized by config: the battle renderer reserves
+        # exactly this strip between HUD and world view.
+        pygame.draw.rect(screen, BLACK, (0, 0, SCREEN_WIDTH, HUD_BAR_HEIGHT))
 
         bunker_text = self.font.render(f"Bunker HP: {bunker_hp}", True, WHITE)
         gold_text = self.font.render(f"Gold: {gold}", True, WHITE)
@@ -46,13 +48,46 @@ class HUD:
             )
 
     def draw_building_counts(self, screen, counts):
-        """List built buildings starting under the status bar, one per row."""
+        """List built buildings starting under the status bar, one per row.
+
+        Legacy simple table; the battle panel now uses draw_force_counts.
+        """
         x = 10
         y = 40
 
         for name, count in counts.items():
             text = self.font.render(f"{name}: {count}", True, WHITE)
             screen.blit(text, (x, y))
+            y += 20
+
+    def draw_force_counts(self, screen, rows):
+        """Two-column force summary under the status bar.
+
+        rows is a list of (name, player_text, enemy_text); the battle
+        state computes every value (X/Y limits included) so the HUD
+        stays a dumb renderer. Player counts anchor at the far LEFT
+        edge; enemy counts right-align at the FAR RIGHT edge so the
+        two sides read as opposite ends of the battlefield. One row
+        per entry.
+        """
+        x_player = 10  # far-left anchor
+        y = 45
+
+        for name, player_text, enemy_text in rows:
+            left = self.font.render(f"{name}: {player_text}", True, WHITE)
+            right = self.font.render(
+                f"Enemy {name}: {enemy_text}",
+                True,
+                WHITE,
+            )
+            screen.blit(left, (x_player, y))
+
+            # Right-aligned: 10px inside the far right edge, mirroring
+            # the left column's margin.
+            screen.blit(
+                right,
+                (SCREEN_WIDTH - right.get_width() - 10, y),
+            )
             y += 20
 
     def draw_text(self, screen, text, x, y):

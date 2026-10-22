@@ -12,7 +12,7 @@ condition is reached. The engine Game delegates handle_event / update
 import pygame
 import math
 
-from collections import deque
+from collections import Counter, deque
 
 from states.game_over import GameOverState
 from states.win_state import WinState
@@ -30,7 +30,13 @@ from entities.bunker import Bunker
 from entities.artillery import Artillery
 from entities.barracks import Barracks
 
-from config import SCREEN_WIDTH, SCREEN_HEIGHT, TILE_SIZE, WHITE
+from config import (
+    SCREEN_WIDTH,
+    SCREEN_HEIGHT,
+    TILE_SIZE,
+    HUD_BAR_HEIGHT,
+    WHITE,
+)
 
 
 # Map spot_type string -> player-purchasable building class
@@ -75,6 +81,13 @@ class AssaultPhase:
             pygame.SRCALPHA,
         )
         self.pause_overlay.fill((0, 0, 0, 140))
+
+        # Offscreen world view sized to the REAL map strip: the tilemap
+        # pixel height (not the window height) is the world's height,
+        # so scaling never maps a black gap into the visible frame.
+        self.world_surface = pygame.Surface(
+            (SCREEN_WIDTH, self.tilemap.height * TILE_SIZE),
+        )
 
         # Find the first bunker build spot.
         bunker_pos = None
@@ -130,9 +143,6 @@ class AssaultPhase:
             spawn_y = spawn_tile[1] * TILE_SIZE
 
         self.player = Player(spawn_x, spawn_y)
-        self.player.max_world_x = (
-            self.tilemap.width * TILE_SIZE - self.player.width
-        )
 
         self.camera_x = 0
 
@@ -519,10 +529,15 @@ class AssaultPhase:
             return
 
     def get_nearby_build_spot(self):
-        """Return the nearest build spot within interaction range.
+        """Return the nearest EMPTY PLAYER build spot within range.
 
-        Range is circular (build_prompt_radius pixels around the
-        player's center); ties break in favor of the first closest spot.
+        Only player-purchasable spot types (mg/barracks/artillery) can
+        prompt: enemy defenses are pre-placed free at battle start, so
+        standing near one shows nothing. Also skipped: any spot that
+        already holds a building (nothing left to buy there — finished
+        player spots included). Range is circular (build_prompt_radius
+        pixels around the player's center); ties break in favor of the
+        first closest spot.
         """
         player_x = self.player.x + self.player.width / 2
         player_y = self.player.y + self.player.height / 2
@@ -531,6 +546,14 @@ class AssaultPhase:
         nearest_distance = float("inf")
 
         for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
+            # Promptable = empty player-purchasable spots only.
+            if spot_type not in BUILDING_CLASSES:
+                continue
+
+            tile = self.tilemap.get_tile(tile_x, tile_y)
+            if tile is None or tile.building is not None:
+                continue
+
             # Spot center in pixel coordinates for the radial compare.
             center_x = tile_x * TILE_SIZE + TILE_SIZE / 2
             center_y = tile_y * TILE_SIZE + TILE_SIZE / 2
@@ -549,29 +572,85 @@ class AssaultPhase:
 
         return nearest_spot
 
+    def _collect_force_rows(self):
+        """Build the HUD force-count rows for both sides.
+
+        Infantry rows count live units (both role lists are dead-
+        filtered every update, so len() is the standing count).
+        Buildable defenses show X/Y: X = build spots already holding a
+        building, Y = total build spots of that type on the map (one
+        building per spot, so X is always <= Y). Enemy buildings are
+        placed free at battle start on their own markers and have no
+        build limit, so they display as plain counts.
+        """
+        # Player buildable spots: per-type totals and occupied counts.
+        totals = {"barracks": 0, "mg": 0, "artillery": 0}
+        placed = {"barracks": 0, "mg": 0, "artillery": 0}
+
+        for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
+            if spot_type not in totals:
+                continue
+
+            totals[spot_type] += 1
+
+            tile = self.tilemap.get_tile(tile_x, tile_y)
+            if tile and tile.building is not None:
+                placed[spot_type] += 1
+
+        # Enemy standing buildings, grouped by class; the class naming
+        # (MGNest) is translated to the display name in the rows below.
+        enemy_placed = Counter()
+        for building in BuildingQuery.get_all_buildings(self.tilemap):
+            if building.is_enemy:
+                enemy_placed[type(building).__name__] += 1
+
+        # One tuple per row: (name, player display, enemy display).
+        return [
+            (
+                "Infantry",
+                str(len(self.friendlies)),
+                str(len(self.enemy_barracks_units)),
+            ),
+            (
+                "Barracks",
+                f"{placed['barracks']}/{totals['barracks']}",
+                str(enemy_placed["Barracks"]),
+            ),
+            (
+                "MG Nest",
+                f"{placed['mg']}/{totals['mg']}",
+                str(enemy_placed["MGNest"]),
+            ),
+            (
+                "Artillery",
+                f"{placed['artillery']}/{totals['artillery']}",
+                str(enemy_placed["Artillery"]),
+            ),
+        ]
+
     def draw_build_prompt(self, screen):
-        """Show building cost, payment, and outstanding debt."""
+        """Show the cost ledger of the nearby EMPTY player spot.
+
+        get_nearby_build_spot already filters to empty player-purchasable
+        spots, so the prompt is always an unpaid or partially paid plot:
+        PAID X / COST | OWES | HAVE gold. Enemy buildings and finished
+        player buildings show nothing at all.
+        """
         nearby = self.get_nearby_build_spot()
         if nearby is None:
             return
 
         tile_x, tile_y, spot_type = nearby
-        tile = self.tilemap.get_tile(tile_x, tile_y)
 
         cost = BUILD_COSTS.get(spot_type, 0)
         paid = self.tilemap.paid_amount.get((tile_x, tile_y), 0)
         gold = self.economy.gold
 
-        if tile and tile.building is not None:
-            # Built spots keep showing the ledger: cheap reassurance
-            # that a finished building owes nothing.
-            message = f"{spot_type.upper()}: BUILT | PAID {paid}/{cost}"
-        else:
-            remaining = max(0, cost - paid)
-            message = (
-                f"{spot_type.upper()}: PAID {paid}/{cost} | "
-                f"OWES {remaining} | HAVE {gold}"
-            )
+        remaining = max(0, cost - paid)
+        message = (
+            f"{spot_type.upper()}: PAID {paid}/{cost} | "
+            f"OWES {remaining} | HAVE {gold}"
+        )
 
         text = self.hud.font.render(
             message,
@@ -611,28 +690,46 @@ class AssaultPhase:
     def render(self, screen):
         """Draw the battle back-to-front: world, swap, entities, HUD.
 
-        Draw order mimics depth: ground first, then ground-level units
-        and pickups, bullets come later so they read over units, the
-        player on top of everything walked over, then the HUD above.
+        The world (map, units, pickups, bullets, player) is drawn 1:1
+        onto the pre-allocated world surface, then that whole frame is
+        scaled to fit between the HUD top bar and the screen bottom:
+        the full battlefield sits below the bar instead of underneath
+        it, so tiles and units at the top of the map stay visible.
+        HUD overlays (bar, prompts, paused panel) draw after, in
+        screen space.
         """
-        self.tilemap.draw(screen, self.camera_x)
+        world = self.world_surface
+
+        self.tilemap.draw(world, self.camera_x)
 
         for enemy_unit in self.enemy_barracks_units:
-            enemy_unit.draw(screen, self.camera_x)
+            enemy_unit.draw(world, self.camera_x)
 
         for gold in self.gold_pickups:
-            gold.draw(screen, self.camera_x)
+            gold.draw(world, self.camera_x)
 
         for bullet in self.bullets:
-            bullet.draw(screen, self.camera_x)
+            bullet.draw(world, self.camera_x)
 
         for bullet in self.enemy_bullets:
-            bullet.draw(screen, self.camera_x)
+            bullet.draw(world, self.camera_x)
 
         for friendly in self.friendlies:
-            friendly.draw(screen, self.camera_x)
+            friendly.draw(world, self.camera_x)
 
-        self.player.draw(screen, self.camera_x)
+        self.player.draw(world, self.camera_x)
+
+        # Fit the world view below the HUD top bar: the source is the
+        # map strip (tilemap-sized), the destination fills the window
+        # below the bar, so the left-to-right battlefield and BOTH map
+        # edges stay visible with no dead band.
+        screen.blit(
+            pygame.transform.scale(
+                world,
+                (SCREEN_WIDTH, SCREEN_HEIGHT - HUD_BAR_HEIGHT),
+            ),
+            (0, HUD_BAR_HEIGHT),
+        )
 
         # Bunker HP bar: the first bunker found is the one tracked.
         buildings = BuildingQuery.get_all_buildings(self.tilemap)
@@ -648,13 +745,11 @@ class AssaultPhase:
 
         self.draw_build_prompt(screen)
 
-        # Building counts table rendered under the main bar.
-        counts = BuildingQuery.count_buildings(self.tilemap)
-        self.hud.draw_building_counts(screen, counts)
-
-        # Pause overlay goes last so it dims everything drawn above.
+        # Force counts panel: paused-only so live play keeps a clean
+        # view; drawn after the dim overlay so the numbers stay crisp.
         if self.paused:
             self._draw_pause_overlay(screen)
+            self.hud.draw_force_counts(screen, self._collect_force_rows())
 
     def _draw_pause_overlay(self, screen):
         """Draw the dim + centered PAUSED panel with resume instructions."""

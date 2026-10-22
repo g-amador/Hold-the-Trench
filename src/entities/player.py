@@ -11,7 +11,7 @@ import math
 import pygame
 import random
 
-from config import SCREEN_HEIGHT, TILE_SIZE, BLUE
+from config import TILE_SIZE, BLUE
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
@@ -46,10 +46,6 @@ class Player:
         # the aim pose on screen after each shot.
         self.shoot_cooldown = 0.25
         self.shoot_timer = 0
-
-        # Right-edge movement bound; the battle state sets this from
-        # the real world width after building the tilemap.
-        self.max_world_x = 2000
 
         # Ally asset prefix (placeholder until factions are centralized).
         faction = random.choice(["brit", "fr"])
@@ -251,14 +247,19 @@ class Player:
         self._move_axis(move_x, "x", tilemap, enemies)
         self._move_axis(move_y, "y", tilemap, enemies)
 
-    def _clamp_to_bounds(self):
-        """Keep the player within the playable area.
+    def _clamp_to_bounds(self, tilemap):
+        """Keep the player inside the static map's boundaries.
 
-        X is bounded by the world width; Y by a top margin below the
-        HUD-ish band and by the bottom screen edge.
+        The map IS the playfield: both axes clamp to the tilemap's real
+        pixel extents (never the window size or any hardcoded margin).
+        The map edge therefore reads exactly like a wall the player can
+        press against, including the very top row.
         """
-        self.x = max(0, min(self.x, self.max_world_x))
-        self.y = max(40, min(self.y, SCREEN_HEIGHT - self.height))
+        world_width = tilemap.width * TILE_SIZE
+        world_height = tilemap.height * TILE_SIZE
+
+        self.x = max(0.0, min(self.x, world_width - self.width))
+        self.y = max(0.0, min(self.y, world_height - self.height))
 
     def update(self, dt, tilemap, enemies=None):
         """Move input -> collisions -> run animation -> shot timers."""
@@ -268,7 +269,7 @@ class Player:
         old_y = self.y
 
         self.handle_input(dt, tilemap, enemies)
-        self._clamp_to_bounds()
+        self._clamp_to_bounds(tilemap)
 
         # is_moving drives both the walk animation and idle reset below;
         # small epsilon avoids flicker from float jitter.

@@ -19,6 +19,11 @@ TILE_SIZE = 32
 # last frame, which is the `dt` unit used across the whole project.
 FPS = 60
 
+# Height of the HUD status bar at the top of the screen. The battle
+# renderer reserves this strip: the world is drawn scaled below it, so
+# the whole battlefield stays visible and no unit can be hidden by it.
+HUD_BAR_HEIGHT = 40
+
 # ---------------- Colors (RGB) ----------------
 # Palette shared by tiles, HUD, texts, pickups, and block-mode rendering.
 WHITE = (255, 255, 255)
@@ -45,3 +50,11 @@ BUILD_COSTS = {
     "enemy_barracks": 0,
     "enemy_artillery": 0,
 }
+
+# ---------------- Combat ----------------
+# Max bullet travel distance in px. Every engagement range must stay
+# below it (player 300, infantry 200, MG nest 220, artillery 400); the
+# +100 margin over artillery guarantees a max-range shell still lands
+# on its target before the bullet expires. Pass: bullets vanish after
+# flying this far instead of streaking across the whole map.
+BULLET_RANGE_PX = 500

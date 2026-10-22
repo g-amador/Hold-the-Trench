@@ -1,14 +1,17 @@
 """
 Bullet projectile: a straight-flying shot fired by the player,
-machine gun nests, and artillery.
+machine gun nests, artillery, and infantry.
 
 A bullet stores its own direction vector, moves on every update, and
 leaves hit detection to the battle state: the state walks its bullet
 lists each frame, checks overlap against targets, and drops dead
-bullets. A bullet that leaves the world self-destructs via `dead`.
+bullets. A bullet dies via `dead` either from impact or after flying
+its configured range (config.BULLET_RANGE_PX).
 """
 
 import pygame
+
+from config import BULLET_RANGE_PX
 
 
 class Bullet:
@@ -29,23 +32,32 @@ class Bullet:
         self.width = 6
         self.height = 3
 
-        # Set True once the bullet leaves the world; the caller's list
-        # filter then removes it.
+        # Set True once the bullet impacts, expires at max range, or
+        # leaves the world; the caller's list filter then removes it.
         self.dead = False
 
         # Normalized direction vector; movement scales it by speed*dt.
         self.dx = dx
         self.dy = dy
 
-    def update(self, dt):
-        """Move along the direction vector; die when far outside the world."""
-        # dt is milliseconds in this project, hence the /1000 to seconds.
-        self.x += self.dx * self.speed * dt / 1000
-        self.y += self.dy * self.speed * dt / 1000
+        # Range flight: distance measured along the actual path so a
+        # diagonal shot expires exactly like a straight one. BULLET_RANGE_PX
+        # sits above every engagement range in config (see there).
+        self.traveled = 0.0
+        self.max_distance = BULLET_RANGE_PX
 
-        # Bounds are generous: bullets die from leaving the playable
-        # area, never from true walls, so long-range artillery shots exist.
-        if self.x > 5000 or self.x < -500 or self.y < -500 or self.y > 5000:
+    def update(self, dt):
+        """Move along the direction vector; die at impact or max range."""
+        # dt is milliseconds in this project, hence the /1000 to seconds.
+        step = self.speed * dt / 1000
+        self.x += self.dx * step
+        self.y += self.dy * step
+        self.traveled += step
+
+        # Range cap: the bullet disappears after flying BULLET_RANGE_PX
+        # — shots never streak across the whole map to fizzle at some
+        # arbitrary far edge.
+        if self.traveled >= self.max_distance:
             self.dead = True
 
     def get_hitbox(self):
