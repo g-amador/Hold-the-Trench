@@ -30,7 +30,7 @@ from entities.bunker import Bunker
 from entities.artillery import Artillery
 from entities.barracks import Barracks
 
-from systems.factions import other
+from systems.factions import other, roll_scene
 
 from config import (
     SCREEN_WIDTH,
@@ -38,6 +38,10 @@ from config import (
     TILE_SIZE,
     HUD_BAR_HEIGHT,
     WHITE,
+    BUILD_FOOTPRINTS,
+    VIEW_FULL,
+    VIEW_CLOSE,
+    CLOSE_VIEW_TILES,
 )
 
 
@@ -71,6 +75,14 @@ class AssaultPhase:
         self.player_faction = getattr(game, "selected_faction", "allies")
         self.enemy_faction = other(self.player_faction)
 
+        # One scene roll per battle. Everything scene-linked then
+        # shares the same letter: the ground texture (map1a/map1c is
+        # rebound below) and every building's art (mg nest, bunker,
+        # barracks load their suffix from the rolled scene). "If _a
+        # then all 3 must be _a" — one roll guarantees it.
+        roll_scene()
+        self.tilemap.reload_ground()
+
         self.hud = HUD()
         self.economy = EconomySystem()
 
@@ -89,41 +101,83 @@ class AssaultPhase:
         )
         self.pause_overlay.fill((0, 0, 0, 140))
 
-        # Offscreen world view sized to the REAL map strip: the tilemap
-        # pixel height (not the window height) is the world's height,
-        # so scaling never maps a black gap into the visible frame.
+        # Offscreen world view sized to the FULL map strip: the whole
+        # battlefield is drawn here 1:1 (world pixels are always
+        # TILE_SIZE px), then uniformly zoomed below the HUD bar in
+        # render(). The zoom fits the map with ONE factor so tiles
+        # always render square (never a per-axis stretch).
+        self.world_w_px = self.tilemap.width * TILE_SIZE
+        self.world_h_px = self.tilemap.height * TILE_SIZE
         self.world_surface = pygame.Surface(
-            (SCREEN_WIDTH, self.tilemap.height * TILE_SIZE),
+            (self.world_w_px, self.world_h_px),
         )
 
-        # Find the first bunker build spot.
+        # UNIFORM zoom state: fit_width vs fit_height, take the min so
+        # nothing is cropped. The survivors afterwards (view size and
+        # side-band offset) precompute every-frame math away; the map
+        # aspect is rarely 1280:728 exactly, so the leftover columns
+        # are centered as dark bands.
+        visible_h = SCREEN_HEIGHT - HUD_BAR_HEIGHT
+        self.world_zoom = min(
+            SCREEN_WIDTH / self.world_w_px,
+            visible_h / self.world_h_px,
+        )
+        self.world_view = (
+            int(round(self.world_w_px * self.world_zoom)),
+            int(round(self.world_h_px * self.world_zoom)),
+        )
+        self.world_offset_x = (SCREEN_WIDTH - self.world_view[0]) // 2
+
+        # CLOSE view geometry ('+'/'-' keys, two views only per user):
+        # a screen-wide 10-tile window around the player scaled at one
+        # uniform factor so it OCCUPIES the full visible strip (no
+        # side bands; 4x at 1280x768 -> 128px screen tiles).
+        self.view_mode = VIEW_FULL
+        self.close_window_w = CLOSE_VIEW_TILES * TILE_SIZE
+        self.close_scale = SCREEN_WIDTH / self.close_window_w
+        self.close_window_h = int(
+            round((SCREEN_HEIGHT - HUD_BAR_HEIGHT) / self.close_scale)
+        )
+        self.close_view = (SCREEN_WIDTH, SCREEN_HEIGHT - HUD_BAR_HEIGHT)
+
+        # Find the first player bunker build spot. A map without one
+        # (e.g. the blank all-'.' canvas) simply has no bunker: the
+        # battle then runs bunkerless — no defeat condition, no siege
+        # target for enemies, and the HUD shows a flat 0 HP. The
+        # bunkerless path also removes the old trench_y-based
+        # fallback, which referenced a TileMap attribute that no
+        # longer exists (latent crash on any markerless map).
         bunker_pos = None
         for (x, y), spot_type in self.tilemap.spot_types.items():
             if spot_type == "bunker":
                 bunker_pos = (x, y)
                 break
 
-        if bunker_pos is None:
-            bunker_x = 2
-            bunker_y = self.tilemap.trench_y + 1
-        else:
+        if bunker_pos is not None:
             bunker_x, bunker_y = bunker_pos
 
-        # Place the bunker (faction-keyed art for both objectives).
-        bunker_tile = self.tilemap.get_tile(bunker_x, bunker_y)
-        if bunker_tile:
-            bunker_tile.building = Bunker(
-                bunker_x,
-                bunker_y,
-                faction=self.player_faction,
-            )
+            # Place the bunker (faction-keyed art for both objectives).
+            bunker_tile = self.tilemap.get_tile(bunker_x, bunker_y)
+            if bunker_tile:
+                bunker_tile.building = Bunker(
+                    bunker_x,
+                    bunker_y,
+                    faction=self.player_faction,
+                )
 
         # Friendly boundary.
         boundary = self.tilemap.friendly_boundary
 
+        # Spawn search anchor: the bunker tile when one exists,
+        # otherwise a middle-row tile on the map's left edge.
+        anchor = bunker_pos if bunker_pos is not None else (
+            0,
+            self.tilemap.height // 2,
+        )
+
         # Find a walkable spawn tile on the friendly side.
-        queue = deque([(bunker_x, bunker_y)])
-        visited = {(bunker_x, bunker_y)}
+        queue = deque([anchor])
+        visited = {anchor}
         spawn_tile = None
 
         while queue:
@@ -148,7 +202,7 @@ class AssaultPhase:
 
         if spawn_tile is None:
             spawn_x = 3 * TILE_SIZE
-            spawn_y = (self.tilemap.trench_y + 1) * TILE_SIZE
+            spawn_y = (self.tilemap.height // 2) * TILE_SIZE
         else:
             spawn_x = spawn_tile[0] * TILE_SIZE
             spawn_y = spawn_tile[1] * TILE_SIZE
@@ -167,7 +221,7 @@ class AssaultPhase:
         self.place_enemy_buildings()
 
     def handle_event(self, event):
-        """Key routing: SPACE (or ESC) pauses/resumes, G toggles graphics.
+        """Key routing: SPACE/ESC pause, G toggles art, +/- switch view.
 
         SPACE is THE pause key, event-based toggle per AI.md. Player
         fire is automatic (update() calls auto_fire), so there is no
@@ -181,6 +235,19 @@ class AssaultPhase:
         # held-key repeat storm.
         if event.key in (pygame.K_SPACE, pygame.K_ESCAPE):
             self.paused = not self.paused
+            return
+
+        # View zoom works live AND paused (it is a viewing aid, not a
+        # sim action): '+' zooms IN to the CLOSE view, '-' zooms OUT
+        # to FULL. Only these two views exist (config), so each key
+        # sets an absolute state (idempotent, no toggle flip-flop on
+        # key autorepeat). K_EQUALS covers laptops where '+' needs
+        # SHIFT (it shares the '=' key).
+        if event.key in (pygame.K_PLUS, pygame.K_EQUALS, pygame.K_KP_PLUS):
+            self.view_mode = VIEW_CLOSE
+            return
+        if event.key in (pygame.K_MINUS, pygame.K_KP_MINUS):
+            self.view_mode = VIEW_FULL
             return
 
         # Paused: only the graphics toggle is honored while frozen;
@@ -237,11 +304,14 @@ class AssaultPhase:
             if tile is None or tile.building is not None:
                 continue
 
+            # Contact against the spot's FULL footprint: touching ANY
+            # tile of the MG's 2x2 pays into it, not only the marker.
+            fw, fh = BUILD_FOOTPRINTS.get(spot_type, (1, 1))
             spot_rect = pygame.Rect(
                 tile_x * TILE_SIZE,
                 tile_y * TILE_SIZE,
-                TILE_SIZE,
-                TILE_SIZE,
+                fw * TILE_SIZE,
+                fh * TILE_SIZE,
             )
 
             if not player_rect.colliderect(spot_rect):
@@ -374,17 +444,10 @@ class AssaultPhase:
         # Automatically build when close to a valid build spot.
         self.auto_place_if_possible()
 
-        # Camera follows the player.
-        world_width = self.tilemap.width * TILE_SIZE
-        max_camera_x = max(0, world_width - SCREEN_WIDTH)
-
-        self.camera_x = max(
-            0,
-            min(
-                self.player.x - SCREEN_WIDTH // 2,
-                max_camera_x,
-            ),
-        )
+        # Camera: pinned to the map origin. The uniform-zoom view fits
+        # the ENTIRE battlefield below the HUD bar, so any pan would
+        # only crop parts the player is already seeing in full.
+        self.camera_x = 0
         
         # Player bullets damage enemy infantry or enemy bunkers.
         # Resolution is a filter loop: every surviving bullet is either
@@ -575,14 +638,21 @@ class AssaultPhase:
             if tile is None or tile.building is not None:
                 continue
 
-            # Spot center in pixel coordinates for the radial compare.
-            center_x = tile_x * TILE_SIZE + TILE_SIZE / 2
-            center_y = tile_y * TILE_SIZE + TILE_SIZE / 2
-
-            distance = math.hypot(
-                center_x - player_x,
-                center_y - player_y,
+            # Distance from the player to the FOOTPRINT RECT (nearest
+            # edge; 0 anywhere on/inside). At 4x4, a center-based
+            # radius left the prompt blind while standing on the far
+            # corner tiles (90px > the 72px radius) — edge distance
+            # keeps "near the spot" true for its whole footprint.
+            fw, fh = BUILD_FOOTPRINTS.get(spot_type, (1, 1))
+            rect = pygame.Rect(
+                tile_x * TILE_SIZE,
+                tile_y * TILE_SIZE,
+                fw * TILE_SIZE,
+                fh * TILE_SIZE,
             )
+            edge_x = max(rect.left, min(player_x, rect.right))
+            edge_y = max(rect.top, min(player_y, rect.bottom))
+            distance = math.hypot(player_x - edge_x, player_y - edge_y)
 
             if (
                 distance <= self.build_prompt_radius
@@ -709,15 +779,15 @@ class AssaultPhase:
         )
 
     def render(self, screen):
-        """Draw the battle back-to-front: world, swap, entities, HUD.
+        """Draw the battle back-to-front: world, zoom, entities, HUD.
 
         The world (map, units, pickups, bullets, player) is drawn 1:1
-        onto the pre-allocated world surface, then that whole frame is
-        scaled to fit between the HUD top bar and the screen bottom:
-        the full battlefield sits below the bar instead of underneath
-        it, so tiles and units at the top of the map stay visible.
-        HUD overlays (bar, prompts, paused panel) draw after, in
-        screen space.
+        onto the pre-allocated FULL-map world surface, then uniformly
+        zoomed below the HUD top bar: ONE factor for both axes so
+        tiles and units stay square (no per-axis squash) while the
+        full battlefield remains visible. If the map aspect differs
+        from 1280:728 the extra horizontal columns become centered
+        dark side bands. HUD overlays draw after, in screen space.
         """
         world = self.world_surface
 
@@ -740,17 +810,38 @@ class AssaultPhase:
 
         self.player.draw(world, self.camera_x)
 
-        # Fit the world view below the HUD top bar: the source is the
-        # map strip (tilemap-sized), the destination fills the window
-        # below the bar, so the left-to-right battlefield and BOTH map
-        # edges stay visible with no dead band.
-        screen.blit(
-            pygame.transform.scale(
-                world,
-                (SCREEN_WIDTH, SCREEN_HEIGHT - HUD_BAR_HEIGHT),
-            ),
-            (0, HUD_BAR_HEIGHT),
-        )
+        # Uniform zoom into the visible strip: single-factor scale
+        # keeps every tile square; smoothscale avoids downscale
+        # aliasing on the photo-like ground texture. Bands: fill the
+        # visible strip first so leftover columns don't accumulate
+        # stale frame pixels.
+        screen.fill((20, 20, 20), (0, HUD_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - HUD_BAR_HEIGHT))
+        if self.view_mode == VIEW_CLOSE:
+            # CLOSE view ('+'): subsample the full-res world in a
+            # screen-wide ~10-tile window centered (and map-clamped)
+            # on the player, upscaled so it occupies the WHOLE visible
+            # strip (no side bands).
+            cx = int(max(0, min(
+                self.player.x - self.close_window_w / 2,
+                self.world_w_px - self.close_window_w,
+            )))
+            cy = int(max(0, min(
+                self.player.y - self.close_window_h / 2,
+                self.world_h_px - self.close_window_h,
+            )))
+            region = world.subsurface(
+                (cx, cy, self.close_window_w, self.close_window_h),
+            )
+            screen.blit(
+                pygame.transform.smoothscale(region, self.close_view),
+                (0, HUD_BAR_HEIGHT),
+            )
+        else:
+            # FULL view (default/'-'): whole battlefield at once.
+            screen.blit(
+                pygame.transform.smoothscale(world, self.world_view),
+                (self.world_offset_x, HUD_BAR_HEIGHT),
+            )
 
         # Bunker HP bar: the first bunker found is the one tracked.
         buildings = BuildingQuery.get_all_buildings(self.tilemap)
@@ -762,6 +853,7 @@ class AssaultPhase:
             bunker_hp,
             self.economy.gold,
             render_mode.label(),
+            self.view_mode,
         )
 
         self.draw_build_prompt(screen)
@@ -800,7 +892,7 @@ class AssaultPhase:
         # Control reference while frozen: the help the user reads
         # whenever the battle is paused.
         controls = self.pause_hint_font.render(
-            "SPACE: pause/resume | G: graphics toggle | WASD: move",
+            "SPACE: pause/resume | +: zoom in | -: zoom out | G: graphics toggle | WASD: move",
             True,
             WHITE,
         )

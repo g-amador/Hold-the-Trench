@@ -47,3 +47,18 @@ def load_image(filename, *, alpha=False, size=None):
         _image_cache[key] = image
 
     return _image_cache[key]
+
+
+def load_first_image(filenames, *, alpha=False, size=None):
+    """Load the first candidate that exists; None when none do.
+
+    Candidates are tried in order, every hit served from the shared
+    cache. Callers that can live without art check for None and draw
+    a block instead (never crash on missing art).
+    """
+    for filename in filenames:
+        try:
+            return load_image(filename, alpha=alpha, size=size)
+        except FileNotFoundError:
+            continue
+    return None

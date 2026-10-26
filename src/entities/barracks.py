@@ -38,17 +38,21 @@ class Barracks:
         self.facing = -1 if is_enemy else 1
 
         # Art side: random per-building from the faction's pool (axis
-        # buildings are always ger; allies mix brit/fr randomly).
-        self.image = load_image(
-            building_filename(faction, "barraks"),
+        # buildings are always ger; allies mix brit/fr randomly) —
+        # scene-variant chain loader (a/b/c/d with summer-day fallback)
+        # per the user's letter mapping: a summer day, b summer night,
+        # c winter day, d winter night.
+        self.image = load_first_image(
+            building_variant_filenames(faction, "barraks"),
             alpha=True,
             size=(TILE_SIZE, TILE_SIZE),
         )
 
         # Mirror enemy art so it faces the battlefield the same way as
         # its units (the shared image cache is never mutated: flip
-        # produces a new surface).
-        if is_enemy:
+        # produces a new surface). A None image (no art at all) is left
+        # flipped-free: draw() falls back to the block mode instead.
+        if is_enemy and self.image is not None:
             self.image = pygame.transform.flip(self.image, True, False)
 
     def update(self, dt, units):
@@ -81,7 +85,10 @@ class Barracks:
         px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE
 
-        if not render_mode.is_sprite():
+        if not render_mode.is_sprite() or self.image is None:
+            # Block mode: flat block with the facing marker on its
+            # leading edge; whole-tile footprint. Also the no-art
+            # fallback (never crash on missing assets).
             draw_unit_block(
                 screen,
                 px,

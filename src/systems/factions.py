@@ -84,3 +84,64 @@ def building_filename(faction, kind):
 def coin_texture(nation):
     """Coin art for a fallen soldier's nation (defaults to german)."""
     return COIN_BY_NATION.get(nation, "coin_ger.png")
+
+
+# ---------------- Battle scene (building art variants) ----------------
+# Every building kind gets (or will get) four scene images that share
+# one base filename and differ by a suffix letter:
+#   a = summer day, b = summer night, c = winter day, d = winter night.
+# One scene is rolled ONCE PER BATTLE (roll_scene, called at
+# AssaultPhase start) and EVERYTHING scene-linked reads it — the
+# ground texture (map1a/map1c) via ground_texture_filename() and every
+# building via building_variant_filenames — so the whole battlefield
+# always shares one scene letter ("If _a then all 3 must be _a").
+# ACTIVE POOL = a (summer day) + c (winter day): the variants with
+# complete map + mg_nest + bunker art. b (summer night) / d (winter
+# night) rejoin the tuple when their art lands.
+# TEST MODE is OFF: set SCENE_VARIANT_TEST to "a" (or "c") to pin the
+# roll while debugging artworks.
+SCENE_VARIANT_TEST = None
+SCENE_VARIANTS = ("a", "c")
+
+# Process-wide scene state: rolled per battle, read everywhere.
+_scene_variant = "a"
+
+
+def roll_scene():
+    """Roll this battle's scene variant; call once per battle start."""
+    global _scene_variant
+    if SCENE_VARIANT_TEST is not None:
+        _scene_variant = SCENE_VARIANT_TEST
+    else:
+        _scene_variant = random.choice(SCENE_VARIANTS)
+    return _scene_variant
+
+
+def scene_variant():
+    """The current battle's scene suffix for building art."""
+    return _scene_variant
+
+
+def ground_texture_filename():
+    """Ground texture for the current scene: map1a -> map1c."""
+    return f"map1{scene_variant()}.jpeg"
+
+
+def building_variant_filenames(faction, kind):
+    """Ordered image candidates for one building, scene-aware.
+
+    kind is the canonical asset stem ("barraks", "mg_nest", "bunker").
+    Trial order: the scene's own suffix file, then the '_a' (summer
+    day) file, then the unsuffixed base art — so a building missing
+    its variant image silently keeps summer-day art instead of
+    crashing. (The pool only rolls art-complete letters: "a"/"c".)
+    """
+    nation = random.choice(FACTIONS[faction]["building_nations"])
+    stem = f"building_{kind}_{nation}"
+    variant = scene_variant()
+
+    candidates = [f"{stem}_{variant}.png"]
+    if variant != "a":
+        candidates.append(f"{stem}_a.png")
+    candidates.append(f"{stem}.png")
+    return candidates

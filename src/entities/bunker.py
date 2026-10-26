@@ -11,8 +11,8 @@ import pygame
 from config import TILE_SIZE, GREY
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
-from systems.factions import building_filename
-from utils.image_loader import load_image
+from systems.factions import building_variant_filenames
+from utils.image_loader import load_first_image
 
 
 class Bunker:
@@ -41,16 +41,21 @@ class Bunker:
         self.y = tile_y * TILE_SIZE - (self.height - TILE_SIZE)
 
         # Art side: random per-building from the faction's pool, same
-        # rule as the other buildings (axis = ger, allies = brit/fr).
-        self.image = load_image(
-            building_filename(faction, "bunker"),
+        # rule as the other buildings (axis = ger, allies = brit/fr) —
+        # scene-variant chain loader (a/b/c/d with summer-day fallback)
+        # per the user's letter mapping: a summer day, b summer night,
+        # c winter day, d winter night.
+        self.image = load_first_image(
+            building_variant_filenames(faction, "bunker"),
             alpha=True,
             size=(TILE_SIZE, TILE_SIZE),
         )
 
         # Mirror enemy art so it faces the battlefield like its units.
         # Flipping copies the cached surface: the cache is never mutated.
-        if is_enemy:
+        # A None image (no art at all) is left flipped-free: draw()
+        # falls back to the block mode instead.
+        if is_enemy and self.image is not None:
             self.image = pygame.transform.flip(self.image, True, False)
 
     def get_hitbox(self):
@@ -82,7 +87,7 @@ class Bunker:
         bunker's full (2x3 tile) footprint so the objective still reads
         as a large structure while every texture is hidden.
         """
-        if not render_mode.is_sprite():
+        if not render_mode.is_sprite() or self.image is None:
             # Anchor on the hitbox so the block lines up with the
             # bunker's real collision area.
             rect = self.get_hitbox()
