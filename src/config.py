@@ -20,15 +20,34 @@ TILE_SIZE = 32
 FPS = 60
 
 # Height of the HUD status bar at the top of the screen. The battle
-# renderer reserves this strip: the world is drawn scaled below it, so
-# the whole battlefield stays visible and no unit can be hidden by it.
-# SQUARE-TILE LOCK: the static map's row count must satisfy
-# rows * TILE_SIZE == SCREEN_HEIGHT - HUD_BAR_HEIGHT
-# (768 - 32 = 736 = 23 rows) so the battle renderer's world->screen
-# scale is exactly 1:1 and tiles stay true 32px squares (the old 40px
-# bar squashed rows into vertical rectangles). Keeping this equation
-# true is part of the render-layout contract; update map + bar together.
-HUD_BAR_HEIGHT = 32
+# renderer reserves this strip: the world is drawn uniformly zoomed
+# below it, so the whole battlefield stays visible and no unit can be
+# hidden by it.
+# UNIFORM-ZOOM LOCK (square tiles on ANY map): render() scales the
+# whole map by ONE factor, min(fit_to_width, fit_to_height) — never a
+# per-axis stretch. With the doubled 80x46 map (world 2560x1472) and
+# this 40px bar the zoom is exactly 728/1472 ≈ 0.4946, so every tile
+# renders as a ~15.8px SQUARE and the leftover horizontal space is
+# drawn as dark side bands. Editing the bar, the window, TILE_SIZE,
+# or the map is fine — the one rule: keep the single-factor zoom.
+HUD_BAR_HEIGHT = 40
+
+# ---------------- View zoom (+ / - keys) ----------------
+# Exactly TWO views (per user; no in-between zoom steps):
+#   VIEW_FULL  = full zoom-out: whole battlefield below the HUD bar
+#     (the uniform-zoom render).
+#   VIEW_CLOSE = zoomed in: the player rides CENTER of a screen-wide
+#     window CLOSE_VIEW_TILES tiles across ("10 tiles back and
+#     forth"), scaled uniformly so it OCCUPIES the full visible
+#     strip — no side bands (scale 4x at 1280x768: one tile spans
+#     128 screen px, ~5.7 tiles fit vertically, still within the
+#     "at most 5 in each direction" cap).
+# '+' zooms IN (CLOSE), '-' zooms OUT (FULL); both keys work live and
+# paused, and the HUD label after the pause info shows the current
+# view. Each new battle starts at VIEW_FULL.
+VIEW_FULL = "FULL"
+VIEW_CLOSE = "CLOSE"
+CLOSE_VIEW_TILES = 10
 
 # ---------------- Colors (RGB) ----------------
 # Palette shared by tiles, HUD, texts, pickups, and block-mode rendering.
@@ -75,11 +94,11 @@ BULLET_RANGE_PX = 500
 # (marker) tile is the TOP-LEFT of the footprint; it extends right and
 # down. Spot kinds can be prefixed ("enemy_mg"): strip the prefix and
 # look up the kind.
-# TEST STEP: only the MG is multi-tile (2x2) for now; the remaining
-# kinds stay 1x1 until that pass is validated, then become 3x3 per the
-# user's target layout.
+# TEST STEP: only the MG is multi-tile (4x4 per the user — it was 2x2
+# before the map-doubling rework); the remaining kinds stay 1x1 until
+# that pass is validated, then become 3x3 per the user's target layout.
 BUILD_FOOTPRINTS = {
-    "mg": (2, 2),
+    "mg": (4, 4),
     # Flip to (3, 3) together when the user signs off on the MG pass:
     "barracks": (1, 1),
     "artillery": (1, 1),

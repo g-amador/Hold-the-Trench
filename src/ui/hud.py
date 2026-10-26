@@ -18,11 +18,13 @@ class HUD:
         # which pygame can handle easily at this text volume.
         self.font = pygame.font.SysFont("arial", 20)
 
-    def draw(self, screen, bunker_hp, gold, graphics_label=""):
+    def draw(self, screen, bunker_hp, gold, graphics_label="", view_label=""):
         """Draw the top status bar: bunker HP, gold, and graphics mode.
 
         graphics_label is the current sprite/block mode name from
-        graphics.render_mode; empty hides the indicator.
+        graphics.render_mode; view_label is the current zoom view
+        (config VIEW_FULL/VIEW_CLOSE) shown after the pause info;
+        empty labels hide their indicator.
         """
         # Full-width bar sized by config: the battle renderer reserves
         # exactly this strip between HUD and world view.
@@ -35,13 +37,14 @@ class HUD:
         screen.blit(gold_text, (250, 5))
 
         # Right-aligned combined hint, permanently visible: the pause
-        # control reference plus the current graphics mode label.
+        # control reference, the +/- zoom view (per user: right after
+        # the pause info), then the current graphics mode label.
         if graphics_label:
-            mode_text = self.font.render(
-                f"SPACE: pause | G: {graphics_label}",
-                True,
-                WHITE,
-            )
+            hint = f"SPACE: pause"
+            if view_label:
+                hint += f" | +/-: view {view_label}"
+            hint += f" | G: {graphics_label}"
+            mode_text = self.font.render(hint, True, WHITE)
             screen.blit(
                 mode_text,
                 (SCREEN_WIDTH - mode_text.get_width() - 10, 5),

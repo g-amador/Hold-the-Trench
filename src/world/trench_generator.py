@@ -7,30 +7,23 @@ Each row is a string representing tiles in that row.
 You edit STATIC_MAP directly.
 
 ASCII Legend (player):
-# = trench wall
+# = trench path
 M = MG
 B = bunker
-R = barracks
+I = barracks
 A = artillery
-H = hill
-P = hill path
 C = crater
 T = tree
 D = dead tree
 W = wire
 ~ = mud
-N = no man's land
 . = empty ground
 
 ASCII Legend (enemy):
 m = enemy MG
-e = enemy bunker
-r = enemy barracks
+b = enemy bunker
+i = enemy barracks
 a = enemy artillery
-h = enemy hill
-p = enemy hill path
-
-'|' is a visual separator (ignored).
 """
 
 # Tile type constants: integers stored on Tile, converted to ASCII
@@ -40,8 +33,6 @@ TILE_TRENCH    = 1
 TILE_CRATER    = 2
 TILE_WIRE      = 3
 TILE_MUD       = 4
-TILE_HILL      = 5
-TILE_HILL_PATH = 6
 
 # ASCII -> tile type. Notably: trees, dead trees, and N collapse into
 # empty ground; friendly AND enemy building markers both become their
@@ -49,60 +40,102 @@ TILE_HILL_PATH = 6
 # tile type).
 ASCII_TO_TILE = {
     '.': TILE_EMPTY,
-    'N': TILE_EMPTY,
     'T': TILE_EMPTY,
     'D': TILE_EMPTY,
 
     '#': TILE_TRENCH,
     'M': TILE_TRENCH,
     'B': TILE_TRENCH,
-    'R': TILE_TRENCH,
+    'I': TILE_TRENCH,
     
-    'H': TILE_HILL,
-    'P': TILE_HILL_PATH,
-    'A': TILE_HILL_PATH,
     'C': TILE_CRATER,
     'W': TILE_WIRE,
     '~': TILE_MUD,
 
     # Enemy
     'm': TILE_TRENCH,
-    'e': TILE_TRENCH,
-    'r': TILE_TRENCH,    
-    'h': TILE_HILL,
-    'p': TILE_HILL_PATH,
-    'a': TILE_HILL_PATH,
-
-    # Visual separator
-    '|': TILE_EMPTY,
+    'b': TILE_TRENCH,
+    'i': TILE_TRENCH
 }
 
 # ------------------------------------------------------------
 # HUMAN‑READABLE STATIC MAP — YOU EDIT THIS
 # ------------------------------------------------------------
+# CURRENT STATE: an 80x46 tile canvas (EXACTLY DOUBLE the old 23x40
+# old 23x40 screen-filling canvas: every marker sits at 2x its old
+# coordinates). TILES STAY SQUARE through render()'s uniform zoom —
+# the map no longer needs to divide the window exactly; AssaultPhase
+# fits the whole map below the 40px HUD bar with ONE scale factor
+# (~0.4946 -> ~15.8px screen squares, thin dark side bands). So you
+# can grow or reshape the map freely; zoom adapts automatically.
+# Consequences while it stays terrain-free: no enemy units spawn (no
+# 'i' barracks markers), there is no enemy bunker ('b') so victory can
+# never trigger, and no player bunker ('B') so defeat never triggers
+# either — HUD shows Bunker HP 0. '|' separators restore a boundary.
+# M = MG (footprint 2x2, marker = top-left)
+# B = bunker
+# I = barracks
+# A = artillery
+# C = crater
+# T = tree
+# D = dead tree
+# W = wire
+# ~ = mud
+
 STATIC_MAP = [
-    ".......#..##..#...#...#...|...N..C...C..~..N..W..N...|..##..#..#..##..###........",
-    ".HHH...#..M.......##..M...|.NW.NN.CNC.NN.WN.N~.NN.WN.|.......m...##..#.....hhhhh.",
-    ".HAP..##..#...##...#..#...|..C..N..NN..NT.~..N..C....|............r........hhap..",
-    ".HPH...#.....#R.......M...|..N~.NN.WN~.NN.WN.NC.NN...|.m..##.....#...####..hhap..",
-    ".............#...#...##...|....C..~.D.N..N..~..C..~..|.#...#..#..#..##..#..hhhh..",
-    "...........###..##..#.....|...N..C...C..~..N..W..N...|.##..#..#....##..##........",
-    "..B..####......##.........|.N~.NN.WN~.NN.WN.NC.NN....|..##..#..##.....###..hhph..",
-    "......#........#......##..|...~..C...N..N..C..~..N...|......m...r##..####..hhahh.",
-    "............#..#...#..#...|...N..C.T.HH.~..N..W..N...|......#..#..##..####..hhh..",
-    "..HPH...#..##..R...####...|.NN.NN.NNHPPN.NN.NN.NN....|.##..#q#............#......",
-    "..PAH..##...#..##.......#.|...C..~..HPH.N..~..C..~...|.m..#...m#.....##..........",
-    "..PAH...R...M...#.......M.|...D.T..NPPPP....N...HH...|.#......#...#...#......e...",
-    "..HHH#..##..##..#...#...#.|..C..~..NHHHN..~..C..~H...|....#...#..#..##..##.......",
-    ".....M.......#..##..##....|.H....N..HH....N..D.N.....|...##.....#...r#...........",
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '..............................................m.................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '...........................M....................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '...............................................m................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '............................M...................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................m...............................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '............................M.....................m.............................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
+    '................................................................................',
 ]
 
 class TrenchGenerator:
     """Parse STATIC_MAP into tile rows plus build candidates."""
 
     def __init__(self):
-        # Keep the raw rows around: TileMap reads row 0 later to find
-        # the '|' friendly boundary marker.
+        # Keep the raw rows around: TileMap reads row 0.
         self.ascii_map = STATIC_MAP
         self.height = len(STATIC_MAP)
         self.width = len(STATIC_MAP[0])
@@ -130,14 +163,14 @@ class TrenchGenerator:
                 # Buildings: player markers create purchasable spots.
                 if ch == 'M': build_candidates.append({"x": x, "y": y, "type": "mg"})
                 if ch == 'B': build_candidates.append({"x": x, "y": y, "type": "bunker"})
-                if ch == 'R': build_candidates.append({"x": x, "y": y, "type": "barracks"})
+                if ch == 'I': build_candidates.append({"x": x, "y": y, "type": "barracks"})
                 if ch == 'A': build_candidates.append({"x": x, "y": y, "type": "artillery"})
 
                 # Enemy buildings: lowercase markers create free
                 # pre-placed enemy defenses (AssaultPhase places them).
                 if ch == 'm': build_candidates.append({"x": x, "y": y, "type": "enemy_mg"})
-                if ch == 'e': build_candidates.append({"x": x, "y": y, "type": "enemy_bunker"})
-                if ch == 'r': build_candidates.append({"x": x, "y": y, "type": "enemy_barracks"})
+                if ch == 'b': build_candidates.append({"x": x, "y": y, "type": "enemy_bunker"})
+                if ch == 'i': build_candidates.append({"x": x, "y": y, "type": "enemy_barracks"})
                 if ch == 'a': build_candidates.append({"x": x, "y": y, "type": "enemy_artillery"})
 
             tiles.append(tile_row)
