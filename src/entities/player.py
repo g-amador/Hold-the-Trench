@@ -127,13 +127,25 @@ class Player:
 
                 spot_type = tilemap.spot_types.get((tile_x, tile_y))
 
-                # An empty build spot is solid until construction.
-                if spot_type in BUILDABLE_SPOTS and tile.building is None:
+                # An EMPTY build spot is solid across its whole
+                # footprint until construction (buildings can't be
+                # walked into existence; the extra tiles around an MG
+                # spot count even when its marker itself isn't under
+                # the player).
+                spot = tilemap.empty_spot_covering(tile_x, tile_y)
+                if spot is not None and spot[0] in BUILDABLE_SPOTS:
                     return True
 
-                building = tile.building
+                # Solid terrain: trench wall, hill face — checked AFTER
+                # spots so multi-tile spot logic stays together.
+                if tile.type_char in BLOCKING_TILES:
+                    return True
 
-                # Constructed buildings are solid obstacles.
+                # Constructed buildings block every tile their
+                # footprint covers (an MG occupies 2x2, not just its
+                # marker tile).
+                building = tilemap.building_covering(tile_x, tile_y)
+
                 if (
                     building is not None
                     and getattr(building, "type", None) in BLOCKING_BUILDINGS
