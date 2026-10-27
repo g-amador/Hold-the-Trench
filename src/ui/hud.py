@@ -18,13 +18,14 @@ class HUD:
         # which pygame can handle easily at this text volume.
         self.font = pygame.font.SysFont("arial", 20)
 
-    def draw(self, screen, bunker_hp, gold, graphics_label="", view_label=""):
-        """Draw the top status bar: bunker HP, gold, and graphics mode.
+    def draw(self, screen, bunker_hp, gold, graphics_label="", view_label="", fps=None):
+        """Draw the top status bar: bunker HP, gold, frames rate, mode.
 
         graphics_label is the current sprite/block mode name from
         graphics.render_mode; view_label is the current zoom view
         (config VIEW_FULL/VIEW_CLOSE) shown after the pause info;
-        empty labels hide their indicator.
+        fps is the battle's smoothed frames-per-second (None hides
+        it); empty labels hide their indicator.
         """
         # Full-width bar sized by config: the battle renderer reserves
         # exactly this strip between HUD and world view.
@@ -35,6 +36,12 @@ class HUD:
 
         screen.blit(bunker_text, (50, 5))
         screen.blit(gold_text, (250, 5))
+
+        # FPS readout (user request): right after the gold balance, so
+        # the performance number is always visible during play.
+        if fps is not None:
+            fps_text = self.font.render(f"FPS: {fps}", True, WHITE)
+            screen.blit(fps_text, (430, 5))
 
         # Right-aligned combined hint, permanently visible: the pause
         # control reference, the +/- zoom view (per user: right after

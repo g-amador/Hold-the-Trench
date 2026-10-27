@@ -29,6 +29,7 @@ from entities.mg_nest import MGNest
 from entities.bunker import Bunker
 from entities.artillery import Artillery
 from entities.barracks import Barracks
+from entities.static_building import AirField, TankFactory
 
 from systems.factions import other, roll_scene
 
@@ -38,6 +39,7 @@ from config import (
     TILE_SIZE,
     HUD_BAR_HEIGHT,
     WHITE,
+    RED,
     BUILD_FOOTPRINTS,
     VIEW_FULL,
     VIEW_CLOSE,
@@ -61,6 +63,19 @@ ENEMY_BUILDING_CLASSES = {
     "enemy_barracks": Barracks,
     "enemy_artillery": Artillery,
 }
+
+# Map spot_type string -> free player-side static classes (F/K
+# markers): placed without cost and never purchasable — NOT in
+# BUILDING_CLASSES, so the build prompt/paying logic ignores them.
+STATIC_BUILDING_CLASSES = {
+    "air_field": AirField,
+    "tank_factory": TankFactory,
+}
+
+# Entity cull margin in world px: entities up to a big sprite's size
+# may poke into the CLOSE window from outside its rect, so draws are
+# kept for anything within one footstep of the visible window.
+CULL_MARGIN = 128
 
 
 class AssaultPhase:
@@ -175,7 +190,17 @@ class AssaultPhase:
             self.tilemap.height // 2,
         )
 
-        # Find a walkable spawn tile on the friendly side.
+        # Spawn safety (user rule: start OUTSIDE the bunker, not on
+        # top of anything): walkable terrain alone is not enough —
+        # the 4x4 bunker footprint, built buildings, and empty/paid
+        # spot footprints (statics included) all block a spawn tile.
+        def spawn_ok(x, y):
+            if not self.tilemap.is_walkable(x, y):
+                return False
+            if self.tilemap.building_covering(x, y) is not None:
+                return False
+            return self.tilemap.empty_spot_covering(x, y) is None
+
         queue = deque([anchor])
         visited = {anchor}
         spawn_tile = None
@@ -183,15 +208,17 @@ class AssaultPhase:
         while queue:
             x, y = queue.popleft()
 
-            if x < boundary and self.tilemap.is_walkable(x, y):
+            if x < boundary and spawn_ok(x, y):
                 spawn_tile = (x, y)
                 break
 
+            # Left first: the friendly side reads as "outside" the
+            # bunker (the bunker grows right/down from its marker).
             for nx, ny in (
-                (x + 1, y),
                 (x - 1, y),
-                (x, y + 1),
                 (x, y - 1),
+                (x, y + 1),
+                (x + 1, y),
             ):
                 if (
                     (nx, ny) not in visited
@@ -219,6 +246,13 @@ class AssaultPhase:
 
         self.build_prompt_radius = 72
         self.place_enemy_buildings()
+        self.place_static_buildings()
+        self.place_zero_cost_buildings()
+
+        # FPS for the HUD: smoothed frames-per-second, measured from
+        # the engine's per-frame dt (ms). Engine calls update() every
+        # frame, so this updates even while paused.
+        self.fps = 0.0
 
     def handle_event(self, event):
         """Key routing: SPACE/ESC pause, G toggles art, +/- switch view.
@@ -288,6 +322,57 @@ class AssaultPhase:
                     is_enemy=True,
                     faction=self.enemy_faction,
                 )
+
+    def place_static_buildings(self):
+        """Place free player-side statics from F/K map markers.
+
+        Same placement as enemy defenses: free at battle start, oben
+        tiles only, no payment. Statics are never purchasable, so the
+        build prompt and payment systems never touch these spots.
+        """
+        for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
+            building_class = STATIC_BUILDING_CLASSES.get(spot_type)
+            if building_class is None:
+                continue
+
+            tile = self.tilemap.get_tile(tile_x, tile_y)
+            if tile is None or tile.building is not None:
+                continue
+
+            tile.building = building_class(
+                tile_x,
+                tile_y,
+                faction=self.player_faction,
+            )
+
+    def place_zero_cost_buildings(self):
+        """Auto-place every purchasable spot whose BUILD_COSTS entry is 0.
+
+        Cost 0 means FREE per the user's tuning: the building is placed
+        at battle start exactly like the statics/enemy markers — NO
+        gold, NO prompt, NO contact needed. Spots with a real price
+        still go through the touch-and-pay path (auto_place_if_possible),
+        so this pass must run BEFORE the player can reach anything.
+        """
+        for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
+            building_class = BUILDING_CLASSES.get(spot_type)
+            if building_class is None:
+                continue
+
+            if BUILD_COSTS.get(spot_type, 10**9) != 0:
+                continue
+
+            tile = self.tilemap.get_tile(tile_x, tile_y)
+            # Same first-marker-wins rule: an occupied tile is skipped
+            # (e.g. a static or enemy defense already placed there).
+            if tile is None or tile.building is not None:
+                continue
+
+            tile.building = building_class(
+                tile_x,
+                tile_y,
+                faction=self.player_faction,
+            )
 
     def auto_place_if_possible(self):
         """Pay toward a building when touching its spot; build when fully paid."""
@@ -391,6 +476,17 @@ class AssaultPhase:
         responsive and the frozen battle keeps being drawn under the
         overlay.
         """
+        # FPS metering happens even while paused (the engine still
+        # calls update every frame): dt IS the last frame's duration
+        # in ms (clock.tick return), so frames-per-second is 1000/dt.
+        # A short exponential smoothing keeps the HUD number stable.
+        if dt > 0:
+            instant = 1000.0 / dt
+            self.fps = (
+                instant if self.fps <= 0
+                else 0.9 * self.fps + 0.1 * instant
+            )
+
         # Paused: freeze the whole simulation (render still runs).
         if self.paused:
             return
@@ -784,29 +880,90 @@ class AssaultPhase:
         The world (map, units, pickups, bullets, player) is drawn 1:1
         onto the pre-allocated FULL-map world surface, then uniformly
         zoomed below the HUD top bar: ONE factor for both axes so
-        tiles and units stay square (no per-axis squash) while the
-        full battlefield remains visible. If the map aspect differs
-        from 1280:728 the extra horizontal columns become centered
-        dark side bands. HUD overlays draw after, in screen space.
+        tiles and units stay square (no per-axis squash). If the map
+        aspect differs from 1280:728 the extra horizontal columns
+        become centered dark side bands (FULL view only; CLOSE fills
+        the whole strip). HUD overlays draw after, in screen space.
+
+        Viewport culling (user rule: don't render what is not on
+        screen — it matters when zoomed in): in CLOSE view only the
+        player-window region of the world is redrawn and only entities
+        near that window get draw() calls; stale pixels elsewhere on
+        the world surface are never read, because the CLOSE zoom
+        subsamples exactly the window. In FULL view everything maps
+        to screen, so nothing is culled (view_rect=None).
         """
         world = self.world_surface
 
-        self.tilemap.draw(world, self.camera_x)
+        # Viewport crop for this frame, computed BEFORE drawing:
+        # FULL view = whole map (None disables culling), CLOSE view =
+        # the clamped player window in world pixels.
+        cx = cy = 0
+        view_rect = None
+        if self.view_mode == VIEW_CLOSE:
+            cx = int(max(0, min(
+                self.player.x - self.close_window_w / 2,
+                self.world_w_px - self.close_window_w,
+            )))
+            cy = int(max(0, min(
+                self.player.y - self.close_window_h / 2,
+                self.world_h_px - self.close_window_h,
+            )))
+            view_rect = pygame.Rect(
+                cx,
+                cy,
+                self.close_window_w,
+                self.close_window_h,
+            )
+
+        # Cull test for entity draws: anything with a world position
+        # near the visible window (CULL_MARGIN covers sprite sizes;
+        # bullets are tiny) is drawn. None view = always visible.
+        def in_view(x, y):
+            return view_rect is None or (
+                view_rect.left - CULL_MARGIN <= x
+                <= view_rect.right + CULL_MARGIN
+                and view_rect.top - CULL_MARGIN <= y
+                <= view_rect.bottom + CULL_MARGIN
+            )
+
+        self.tilemap.draw(world, self.camera_x, view_rect)
+
+        # Artillery impact markers: brief red dots where shells landed.
+        # Drawn as their own pass (culled on the impact's world
+        # position, NOT the gun's) so a dot shows even when the gun
+        # that fired it is off-screen.
+        for building in BuildingQuery.get_all_buildings(self.tilemap):
+            if not isinstance(building, Artillery):
+                continue
+            for ix, iy, _ttl in building.impacts:
+                if in_view(ix, iy):
+                    pygame.draw.circle(
+                        world,
+                        RED,
+                        (int(ix - self.camera_x), int(iy)),
+                        6,
+                    )
 
         for enemy_unit in self.enemy_barracks_units:
-            enemy_unit.draw(world, self.camera_x)
+            if in_view(enemy_unit.x, enemy_unit.y):
+                enemy_unit.draw(world, self.camera_x)
 
         for gold in self.gold_pickups:
-            gold.draw(world, self.camera_x)
+            if in_view(gold.x, gold.y):
+                gold.draw(world, self.camera_x)
 
         for bullet in self.bullets:
-            bullet.draw(world, self.camera_x)
+            if in_view(bullet.x, bullet.y):
+                bullet.draw(world, self.camera_x)
 
         for bullet in self.enemy_bullets:
-            bullet.draw(world, self.camera_x)
+            if in_view(bullet.x, bullet.y):
+                bullet.draw(world, self.camera_x)
 
         for friendly in self.friendlies:
-            friendly.draw(world, self.camera_x)
+            if in_view(friendly.x, friendly.y):
+                friendly.draw(world, self.camera_x)
 
         self.player.draw(world, self.camera_x)
 
@@ -820,15 +977,8 @@ class AssaultPhase:
             # CLOSE view ('+'): subsample the full-res world in a
             # screen-wide ~10-tile window centered (and map-clamped)
             # on the player, upscaled so it occupies the WHOLE visible
-            # strip (no side bands).
-            cx = int(max(0, min(
-                self.player.x - self.close_window_w / 2,
-                self.world_w_px - self.close_window_w,
-            )))
-            cy = int(max(0, min(
-                self.player.y - self.close_window_h / 2,
-                self.world_h_px - self.close_window_h,
-            )))
+            # strip (no side bands). cx/cy were computed before the
+            # crop pass above (culling and zoom share one window).
             region = world.subsurface(
                 (cx, cy, self.close_window_w, self.close_window_h),
             )
@@ -854,6 +1004,7 @@ class AssaultPhase:
             self.economy.gold,
             render_mode.label(),
             self.view_mode,
+            fps=round(self.fps),
         )
 
         self.draw_build_prompt(screen)
@@ -888,6 +1039,23 @@ class AssaultPhase:
             y=screen_h // 3 + 60,
         )
         screen.blit(hint, hint_rect)
+
+        # Live player tile position while frozen, 1-BASED per tile
+        # (floor divide; the NW-most tile is X=1, Y=1 since world x
+        # in [0, TILE_SIZE) belongs to tile 1). Enables distance
+        # reading against the hand-edited map markers.
+        tile_x = int(self.player.x // TILE_SIZE) + 1
+        tile_y = int(self.player.y // TILE_SIZE) + 1
+        pos = self.pause_hint_font.render(
+            f"Player tile: X {tile_x} | Y {tile_y}",
+            True,
+            WHITE,
+        )
+        pos_rect = pos.get_rect(
+            centerx=screen_w // 2,
+            y=screen_h // 3 + 96,
+        )
+        screen.blit(pos, pos_rect)
 
         # Control reference while frozen: the help the user reads
         # whenever the battle is paused.

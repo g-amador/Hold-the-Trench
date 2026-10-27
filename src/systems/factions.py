@@ -127,6 +127,20 @@ def ground_texture_filename():
     return f"map1{scene_variant()}.jpeg"
 
 
+# Artillery art keyed by FACTION (not nation), per the user: both
+# allied nations share the french cannon; axis artillery is the heavy
+# howitzer. (No scene-variant suffixes exist for these unit images.)
+ARTILLERY_IMAGE = {
+    "allies": "unit_cannon_fr.png",
+    "axis": "unit_heavy_howitzer_ger.png",
+}
+
+
+def artillery_filename(faction):
+    """Artillery art file for a battlefield side."""
+    return ARTILLERY_IMAGE.get(faction, "unit_cannon_fr.png")
+
+
 def building_variant_filenames(faction, kind):
     """Ordered image candidates for one building, scene-aware.
 

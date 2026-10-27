@@ -256,16 +256,34 @@ class TileMap:
                 )
         return None
 
-    def _draw_buildings(self, screen, camera_x):
+    def _draw_buildings(self, screen, camera_x, view_rect=None):
         """Draw every anchored building once (grid scan); shared by
         both graphics modes so buildings always sit on top of the
-        ground, never under neighboring tiles."""
+        ground, never under neighboring tiles. A building is skipped
+        when its footprint lies fully outside the culled viewport."""
         for row in self.tiles:
             for tile in row:
                 if tile.building:
-                    tile.building.draw(screen, camera_x)
+                    build = tile.building
+                    if view_rect is not None:
+                        # Culled: build the footprint rect from the
+                        # building's own table-driven footprint sizes
+                        # (all building classes set footprint_tiles).
+                        fw_px, fh_px = (
+                            TILE_SIZE * n
+                            for n in getattr(build, "footprint_tiles", (1, 1))
+                        )
+                        footprint = pygame.Rect(
+                            build.tile_x * TILE_SIZE,
+                            build.tile_y * TILE_SIZE,
+                            fw_px,
+                            fh_px,
+                        )
+                        if not footprint.colliderect(view_rect):
+                            continue
+                    build.draw(screen, camera_x)
 
-    def draw(self, screen, camera_x):
+    def draw(self, screen, camera_x, view_rect=None):
         """Draw the battlefield, then outline build spots for the player.
 
         SPRITES mode: the ground is the scaled map.png floor texture —
@@ -276,29 +294,59 @@ class TileMap:
 
         The mode is queried EVERY frame (single source: render_mode;
         never cached), so G flips textured floor <-> tile palette live.
+
+        view_rect (world px, optional) = viewport culling: when given
+        (CLOSE zoom), only the ground region, tiles, buildings, and
+        spot outlines intersecting the rect are drawn; pixels outside
+        stay stale on the offscreen surface, which is invisible
+        because the CLOSE zoom subsamples exactly this window.
         """
         if self.ground_texture and render_mode.is_sprite():
-            screen.blit(self.ground_texture, (-camera_x, 0))
+            if view_rect is None:
+                screen.blit(self.ground_texture, (-camera_x, 0))
+            else:
+                # Culled ground: blit ONLY the visible world region —
+                # the clipped blit area is the window's intersection
+                # with the texture, placed at its own world coords.
+                clip = view_rect.clip(
+                    pygame.Rect(0, 0, self.width * TILE_SIZE, self.height * TILE_SIZE),
+                )
+                if clip.width > 0 and clip.height > 0:
+                    screen.blit(
+                        self.ground_texture,
+                        (clip.x - camera_x, clip.y),
+                        clip,
+                    )
 
             # Buildings ride on tiles, so draw them here over the
             # texture (units/bullets/pickups are drawn later, on top
             # of the whole tilemap, by the battle state).
-            self._draw_buildings(screen, camera_x)
+            self._draw_buildings(screen, camera_x, view_rect)
         else:
             # Tile grid first, buildings second: a multi-tile building
             # (2x2 MG) must never have its right/bottom footprint
-            # overpainted by the fill of its neighbor tiles.
-            for y in range(self.height):
-                for x in range(self.width):
+            # overpainted by the fill of its neighbor tiles. The row/
+            # column range is sliced to the visible window when culled.
+            if view_rect is None:
+                x_lo, x_hi, y_lo, y_hi = 0, self.width, 0, self.height
+            else:
+                x_lo = max(0, view_rect.left // TILE_SIZE)
+                x_hi = min(self.width, view_rect.right // TILE_SIZE + 1)
+                y_lo = max(0, view_rect.top // TILE_SIZE)
+                y_hi = min(self.height, view_rect.bottom // TILE_SIZE + 1)
+
+            for y in range(y_lo, y_hi):
+                for x in range(x_lo, x_hi):
                     self.tiles[y][x].draw(screen, camera_x)
 
-            self._draw_buildings(screen, camera_x)
+            self._draw_buildings(screen, camera_x, view_rect)
 
         # Debug/assist overlay: ONE green outline spanning each EMPTY
         # build spot's FULL footprint (the MG's 2x2 reads as a single
         # square to place into, in both graphics modes). Placed spots
         # draw nothing: once the building exists the guide line is
-        # removed and the occupied space speaks for itself.
+        # removed and the occupied space speaks for itself. Culled to
+        # the viewport like everything else.
         for (x, y), spot_kind in self.spot_types.items():
             tile = self.tiles[y][x]
             if tile.building is not None:
@@ -313,6 +361,14 @@ class TileMap:
 
             px = x * TILE_SIZE - camera_x
             py = y * TILE_SIZE
+            if (
+                view_rect is not None
+                and not pygame.Rect(
+                    px + camera_x, py, fw * TILE_SIZE, fh * TILE_SIZE,
+                ).colliderect(view_rect)
+            ):
+                continue
+
             pygame.draw.rect(
                 screen,
                 (0, 255, 0),

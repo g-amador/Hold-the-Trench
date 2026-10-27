@@ -69,15 +69,19 @@ START_GOLD = 500
 # constructs the building only when the full cost is covered.
 # Enemy variants cost 0 because they are placed free from map markers.
 BUILD_COSTS = {
-    "mg": 20,
-    "bunker": 40,
-    "barracks": 60,
-    "artillery": 100,
+    "mg": 0,
+    "bunker": 0,
+    "barracks": 0,
+    "artillery": 0,
+    "air_field": 0,
+    "tank_factory": 0,
 
     "enemy_mg": 0,
     "enemy_bunker": 0,
     "enemy_barracks": 0,
     "enemy_artillery": 0,
+    "enemy_air_field": 100,
+    "enemy_tank_factory": 100,
 }
 
 # ---------------- Combat ----------------
@@ -94,13 +98,17 @@ BULLET_RANGE_PX = 500
 # (marker) tile is the TOP-LEFT of the footprint; it extends right and
 # down. Spot kinds can be prefixed ("enemy_mg"): strip the prefix and
 # look up the kind.
-# TEST STEP: only the MG is multi-tile (4x4 per the user — it was 2x2
-# before the map-doubling rework); the remaining kinds stay 1x1 until
-# that pass is validated, then become 3x3 per the user's target layout.
+# USER SIZES: MG 4x4, artillery 4x2, barracks 4x4, bunker 6x6,
+# statics (air field / tank factory) 7x7.
 BUILD_FOOTPRINTS = {
     "mg": (4, 4),
-    # Flip to (3, 3) together when the user signs off on the MG pass:
-    "barracks": (1, 1),
-    "artillery": (1, 1),
-    "bunker": (1, 1),
+    # Barracks 4x4, bunker 6x6; artillery 4x2 — wide emplacement
+    # (4 across, 2 deep), anchored at its marker's top-left.
+    "barracks": (4, 4),
+    "artillery": (4, 2),
+    "bunker": (6, 6),
+    # Static markers placed FREE at battle start (F = air field,
+    # K = tank factory): 7x7 per the user; no cost, no firing yet.
+    "air_field": (7, 7),
+    "tank_factory": (7, 7),
 }

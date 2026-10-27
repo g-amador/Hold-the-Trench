@@ -10,7 +10,7 @@ hold_the_trench/
 │   ├── engine/
 │   │   └── game.py
 │   ├── entities/                   # for units, buildings, projectiles, and pickups
-│   │   ├── artillery.py
+│   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies unit_cannon_fr / axis unit_heavy_howitzer_ger), GREY block fallback
 │   │   ├── barracks.py
 │   │   ├── bullet.py
 │   │   ├── bunker.py
@@ -19,6 +19,7 @@ hold_the_trench/
 │   │   ├── gold_pickup.py
 │   │   ├── mg_nest.py
 │   │   ├── player.py
+│   │   ├── static_building.py      # free player-side statics: AirField (map 'F') / TankFactory (map 'K') — scene-variant art, 3x3, no combat yet
 │   │   └── trench.py
 │   ├── graphics/                   # for sprite generation, animation helpers, rendering utilities, and the graphics toggle.
 │   │   ├── sprite_generator.py                  # unit frame loading/animation/flipping
@@ -39,8 +40,8 @@ hold_the_trench/
 │   ├── utils/
 │   │   └── image_loader.py
 │   ├── world/                      # for map generation, tiles, terrain, and battlefield configuration.
-│   │   ├── tilemap.py
-│   │   └── trench_generator.py
+│   │   ├── tilemap.py              # tile grid + ground texture; draw(..., view_rect=None) culls ground/tiles/buildings/outlines to the CLOSE viewport
+│   │   └── trench_generator.py     # ASCII battlefield; F = air field, K = tank factory (free statics), spots + build candidates
 │   ├── config.py                   # for shared constants and carefully chosen global settings.
 │   └── main.py
 ├── AI.md                           # Prompts for expanding the game
