@@ -8,9 +8,8 @@ that other buildings and the player protect or attack.
 
 import pygame
 
-from config import TILE_SIZE, GREY
+from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS
 from graphics import render_mode
-from graphics.block_drawer import draw_unit_block
 from systems.factions import building_variant_filenames
 from utils.image_loader import load_first_image
 
@@ -29,26 +28,31 @@ class Bunker:
         self.hp = 200
         self.dead = False
 
-        # Footprint is bigger than one tile so the bunker is a real
-        # obstacle behind the trench line.
-        self.width = TILE_SIZE * 2
-        self.height = TILE_SIZE * 3
+        # Footprint/table-driven like the MG (user set the config to
+        # 6x6): the drawn sprite/block, the collision rect, and the
+        # spot outline all read BUILD_FOOTPRINTS — one anchor, growing
+        # right + down from the marker tile. No more legacy 2x3
+        # up-sticking hitbox: block == collision == drawn footprint.
+        self.footprint_tiles = BUILD_FOOTPRINTS.get("bunker", (1, 1))
+        self.width, self.height = (
+            TILE_SIZE * n for n in self.footprint_tiles
+        )
 
-        # World coordinates used for targeting and collision: the
-        # bunker sticks UP from its anchor tile (y offset), which keeps
-        # the hitbox aligned with the drawn fortification.
+        # World coordinates used for targeting and collision: anchored
+        # at the marker tile like every other multi-tile building.
         self.x = tile_x * TILE_SIZE
-        self.y = tile_y * TILE_SIZE - (self.height - TILE_SIZE)
+        self.y = tile_y * TILE_SIZE
 
         # Art side: random per-building from the faction's pool, same
         # rule as the other buildings (axis = ger, allies = brit/fr) —
         # scene-variant chain loader (a/b/c/d with summer-day fallback)
         # per the user's letter mapping: a summer day, b summer night,
-        # c winter day, d winter night.
+        # c winter day, d winter night. Scaled across the footprint.
+        fw_px, fh_px = self.width, self.height
         self.image = load_first_image(
             building_variant_filenames(faction, "bunker"),
             alpha=True,
-            size=(TILE_SIZE, TILE_SIZE),
+            size=(fw_px, fh_px),
         )
 
         # Mirror enemy art so it faces the battlefield like its units.
@@ -81,26 +85,20 @@ class Bunker:
         return self.hp <= 0
 
     def draw(self, screen, camera_x):
-        """Sprite in SPRITES mode; flat grey block in BLOCK mode.
+        """Sprite in SPRITES mode; uniform flat grey block in BLOCK mode.
 
-        Block mode must show no textures at all: the block covers the
-        bunker's full (2x3 tile) footprint so the objective still reads
-        as a large structure while every texture is hidden.
+        The MG draw rules apply (user request): SPRITES blits the art
+        straight over the battlefield floor (no underlay), BLOCK mode
+        paints ONE plain solid rect over the whole footprint — no
+        facing marker, no textures — but keeps the bunker's GREY
+        color (the MG uses BROWN; the bunker stays grey).
         """
         if not render_mode.is_sprite() or self.image is None:
             # Anchor on the hitbox so the block lines up with the
             # bunker's real collision area.
             rect = self.get_hitbox()
             rect.x -= round(camera_x)
-            draw_unit_block(
-                screen,
-                rect.x,
-                rect.y,
-                rect.width,
-                rect.height,
-                -1 if self.is_enemy else 1,
-                GREY,
-            )
+            pygame.draw.rect(screen, GREY, rect)
             return
 
         px = self.tile_x * TILE_SIZE - camera_x

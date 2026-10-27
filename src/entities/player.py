@@ -20,8 +20,10 @@ from systems.factions import unit_prefix
 
 # Tile characters that can never be walked through (trench wall, hill).
 BLOCKING_TILES = {"#", "H"}
-# Building type strings that are solid obstacles once constructed.
-BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery"}
+# Building type strings that are solid obstacles once constructed
+# (the free-placed statics are solid 4x4s too).
+BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery",
+                      "air_field", "tank_factory"}
 # Build spot types the player collides with while still unbuilt:
 # empty spots are solid so buildings can't be walked into existence.
 BUILDABLE_SPOTS = {"mg", "barracks", "artillery"}

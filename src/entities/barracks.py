@@ -9,13 +9,13 @@ frequency is shared (spawn_cooldown).
 import pygame
 import random
 
-from config import TILE_SIZE, GREY
+from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS
 from entities.enemy import EnemyInfantry
 from entities.friendly_infantry import FriendlyInfantry
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
-from systems.factions import building_filename
-from utils.image_loader import load_image
+from systems.factions import building_variant_filenames
+from utils.image_loader import load_first_image
 
 
 class Barracks:
@@ -30,6 +30,15 @@ class Barracks:
         self.tile_x = tile_x
         self.tile_y = tile_y
 
+        # Footprint/table-driven like the other buildings (user set
+        # barracks to 6x6): the drawn sprite/block, and TileMap's
+        # viewport culling, all read footprint_tiles. Collision comes
+        # from the same table via tilemap._footprint_covered.
+        self.footprint_tiles = BUILD_FOOTPRINTS.get("barracks", (1, 1))
+        self.width, self.height = (
+            TILE_SIZE * n for n in self.footprint_tiles
+        )
+
         # Spawn clock: infantry deploy every spawn_cooldown milliseconds.
         self.spawn_cooldown = 5.0
         self.timer = 0
@@ -41,11 +50,11 @@ class Barracks:
         # buildings are always ger; allies mix brit/fr randomly) —
         # scene-variant chain loader (a/b/c/d with summer-day fallback)
         # per the user's letter mapping: a summer day, b summer night,
-        # c winter day, d winter night.
+        # c winter day, d winter night. Scaled across the footprint.
         self.image = load_first_image(
             building_variant_filenames(faction, "barraks"),
             alpha=True,
-            size=(TILE_SIZE, TILE_SIZE),
+            size=(self.width, self.height),
         )
 
         # Mirror enemy art so it faces the battlefield the same way as
@@ -80,21 +89,20 @@ class Barracks:
             units.append(FriendlyInfantry(x, y, faction=self.faction))
 
     def draw(self, screen, camera_x):
-        # Block mode: flat block with the facing marker on its leading
-        # edge; whole-tile footprint.
         px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE
+        fw_px, fh_px = self.width, self.height
 
         if not render_mode.is_sprite() or self.image is None:
-            # Block mode: flat block with the facing marker on its
-            # leading edge; whole-tile footprint. Also the no-art
-            # fallback (never crash on missing assets).
+            # Block mode: flat grey block over the FULL 6x6 footprint
+            # with the facing marker on its leading edge (infantry side
+            # hint). Also the no-art fallback (never crash).
             draw_unit_block(
                 screen,
                 px,
                 py,
-                TILE_SIZE,
-                TILE_SIZE,
+                fw_px,
+                fh_px,
                 self.facing,
                 GREY,
             )
