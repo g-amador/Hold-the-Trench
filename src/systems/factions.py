@@ -124,7 +124,7 @@ def scene_variant():
 
 def ground_texture_filename():
     """Ground texture for the current scene: map1a -> map1c."""
-    return f"map1{scene_variant()}.jpeg"
+    return f"map1{scene_variant()}.jpg"
 
 
 # Artillery art keyed by FACTION (not nation), per the user: both
@@ -139,6 +139,49 @@ ARTILLERY_IMAGE = {
 def artillery_filename(faction):
     """Artillery art file for a battlefield side."""
     return ARTILLERY_IMAGE.get(faction, "unit_cannon_fr.png")
+
+
+# ---------------- Armor (tank factory units) ----------------
+# Per COUNTRY (user spec), not faction: tanks and cars key off the
+# nation that factory rolled. British factories may also produce
+# cars (mobile MG nests); the French and Germans only field tanks.
+# Each image file exists in assets/images (sizes: 176x80, the
+# german tank 256x116 — ArmorUnit scales everything to one box).
+TANK_UNIT_TABLE = {
+    "fr": [
+        ("tank", "tank_unit_fr_tank1.png"),
+        ("tank", "tank_unit_fr_tank2.png"),
+        ("tank", "tank_unit_fr_tank3.png"),
+    ],
+    "ger": [
+        ("tank", "tank_unit_ger_tank.png"),
+    ],
+    "brit": [
+        ("tank", "tank_unit_brit_tank1.png"),
+        ("tank", "tank_unit_brit_tank2.png"),
+        ("car", "car_unit_brit_car1.png"),
+        ("car", "car_unit_brit_car2.png"),
+    ],
+}
+
+
+def armor_factory_nation(faction):
+    """Roll the COUNTRY one tank factory produces for.
+
+    Matches the building-art rule: allies factories mix brit/fr
+    randomly, axis factories are always german (no austrian armor
+    is in the table).
+    """
+    return random.choice(FACTIONS[faction]["building_nations"])
+
+
+def armor_unit_options(nation):
+    """(kind, filename) variants one factory of `nation` rolls from.
+
+    Unknown nations yield no units (the factory simply stands
+    empty) — never crash.
+    """
+    return TANK_UNIT_TABLE.get(nation, [])
 
 
 def building_variant_filenames(faction, kind):

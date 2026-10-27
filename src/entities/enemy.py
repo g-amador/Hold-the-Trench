@@ -12,6 +12,7 @@ import pygame
 import random
 
 from config import RED
+from entities.armor import ArmorUnit
 from entities.bullet import Bullet
 from entities.gold_pickup import GoldPickup
 from graphics import render_mode
@@ -186,7 +187,13 @@ class EnemyInfantry(EnemyBase):
         self.is_moving = True
 
         # Compare only living targets so dying units stop dragging fire.
-        living_friendlies = [f for f in friendlies if not f.dead]
+        # Armored units are excluded entirely: infantry can neither
+        # shoot nor melee armor through, so they ignore it (the hull
+        # MGs and artillery do the anti-tank work).
+        living_friendlies = [
+            f for f in friendlies
+            if not f.dead and not isinstance(f, ArmorUnit)
+        ]
 
         if living_friendlies:
             # Nearest living friendly is the single target priority

@@ -10,6 +10,7 @@ import math
 import pygame
 
 from config import BLUE
+from entities.armor import ArmorUnit
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
@@ -90,6 +91,11 @@ class FriendlyInfantry:
 
         for enemy in enemies:
             if enemy.dead:
+                continue
+            # Armored targets are ignored: infantry can never scratch
+            # armor (only artillery splash and tank shells can), so
+            # they don't charge tanks either.
+            if isinstance(enemy, ArmorUnit):
                 continue
             dist = math.hypot(enemy.x - self.x, enemy.y - self.y)
             if best_dist is None or dist < best_dist:

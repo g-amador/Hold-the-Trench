@@ -4,8 +4,9 @@ Static, marker-placed buildings: air field and tank factory.
 Placed FREE from uppercase map markers (F = air field, K = tank
 factory) at battle start — the player never pays for them and the
 build prompt never touches them (they are not in BUILDING_CLASSES).
-No combat behavior yet: update() is a deliberate no-op; their game
-role (spawning tanks/planes) comes later.
+Air fields stay inert; the tank factory rolls out armored vehicles
+on a fixed cadence (one vehicle per 3 infantry on the shared
+timeline), producing per its rolled COUNTRY.
 
 Art follows the battle scene like every other building: the variant
 chain (scene _a/_c file -> _a file -> base) picks summer/winter art
@@ -19,9 +20,10 @@ so the whole footprint blocks the player through the config table.
 
 import pygame
 
-from config import TILE_SIZE, BROWN, BUILD_FOOTPRINTS
+from config import TILE_SIZE, BROWN, BUILD_FOOTPRINTS, FACTORY_UNIT_INTERVAL
+from entities.armor import roll_armor_unit
 from graphics import render_mode
-from systems.factions import building_variant_filenames
+from systems.factions import building_variant_filenames, armor_factory_nation
 from utils.image_loader import load_first_image
 
 
@@ -82,6 +84,40 @@ class AirField(StaticBuilding):
 
 
 class TankFactory(StaticBuilding):
-    """Free-placed tank factory (map marker 'K'); production later."""
+    """Free-placed tank factory (map marker 'K'): rolls out armored
+    vehicles — tanks for every country; British factories also mix
+    in the machine-gun car ("a random of available units")."""
 
     STEM = "tank_factory"
+
+    def __init__(self, tile_x, tile_y, faction="allies"):
+        super().__init__(tile_x, tile_y, faction)
+
+        # The factory produces per COUNTRY (user rule): allies
+        # factories roll brit or fr once at placement (same 50/50 as
+        # building art); axis factories are always german.
+        self.nation = armor_factory_nation(faction)
+
+        # Production clock: one vehicle every FACTORY_UNIT_INTERVAL
+        # seconds (user ratio "1 tank per 3 infantry" on the shared
+        # timeline: infantry deploys every 5 s, a vehicle every 15).
+        self.spawn_timer = 0.0
+
+    def update(self, dt, units):
+        """Roll out a random vehicle of this factory's country into
+        `units` (the side's unit list owned by the battle state)."""
+        self.spawn_timer += dt / 1000
+        if self.spawn_timer < FACTORY_UNIT_INTERVAL:
+            return
+
+        # Subtract (rather than zero) so slow frames never lose time.
+        self.spawn_timer -= FACTORY_UNIT_INTERVAL
+
+        unit = roll_armor_unit(
+            self.nation,
+            self.is_enemy,
+            self.tile_x * TILE_SIZE,
+            self.tile_y * TILE_SIZE,
+        )
+        if unit is not None:
+            units.append(unit)

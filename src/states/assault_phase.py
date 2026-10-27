@@ -28,6 +28,7 @@ from entities.player import Player
 from entities.mg_nest import MGNest
 from entities.bunker import Bunker
 from entities.artillery import Artillery
+from entities.armor import ArmorUnit
 from entities.barracks import Barracks
 from entities.static_building import AirField, TankFactory
 
@@ -40,6 +41,7 @@ from config import (
     HUD_BAR_HEIGHT,
     WHITE,
     RED,
+    YELLOW,
     BUILD_FOOTPRINTS,
     VIEW_FULL,
     VIEW_CLOSE,
@@ -563,6 +565,14 @@ class AssaultPhase:
                 if enemy.dead:
                     continue
 
+                # ARMOR RULE: infantry/player/MG shots can never hurt
+                # armored units — they pass through (only artillery
+                # splash and tank shells damage armor). Bullets keep
+                # flying on armor contact so they can still hit an
+                # infantry unit behind the tank.
+                if isinstance(enemy, ArmorUnit) and not bullet.armor_damage:
+                    continue
+
                 if bullet.get_hitbox().colliderect(enemy.get_hitbox()):
                     enemy.take_damage(bullet.damage)
                     hit = True
@@ -618,25 +628,48 @@ class AssaultPhase:
             if not friendly.dead
         ]
 
-        # Update machine guns and artillery.
-        # Both sides share the same classes; only the lists swapped in
-        # differ, so which side shoots at whom is the state's choice
-        # (buildings aim at the opposing unit list).
+        # Update production and combat buildings. Barracks spawn
+        # infantry on their cadence and the tank factory rolls out
+        # armor; machine guns and artillery share the same classes
+        # on both sides — only the lists swapped in differ, so which
+        # side shoots at whom is the state's choice (buildings aim
+        # at the opposing unit list).
         for building in buildings:
-            if not isinstance(building, (MGNest, Artillery)):
+            if not isinstance(building, (Barracks, TankFactory, MGNest, Artillery)):
                 continue
 
             if building.is_enemy:
-                building.update(
-                    dt,
-                    self.friendlies,
-                    self.enemy_bullets,
-                )
+                if isinstance(building, Barracks):
+                    building.update(dt, self.enemy_barracks_units)
+                elif isinstance(building, TankFactory):
+                    building.update(dt, self.enemy_barracks_units)
+                else:
+                    building.update(dt, self.friendlies, self.enemy_bullets)
             else:
-                building.update(
-                    dt,
-                    self.enemy_barracks_units,
-                    self.bullets,
+                if isinstance(building, Barracks):
+                    building.update(dt, self.friendlies)
+                elif isinstance(building, TankFactory):
+                    building.update(dt, self.friendlies)
+                else:
+                    building.update(dt, self.enemy_barracks_units, self.bullets)
+
+        # Factory armor: vehicles drive toward the enemy base and
+        # hunt with their hull MG. Player tanks/cars stop and shell
+        # the first enemy bunker when one is on the map (cars drive
+        # on past it: they can never damage a bunker).
+        enemy_bunker_for_armor = enemy_bunkers[0] if enemy_bunkers else None
+
+        for vehicle in list(self.friendlies):
+            if isinstance(vehicle, ArmorUnit):
+                vehicle.update(
+                    dt, self.enemy_barracks_units, self.bullets,
+                    enemy_bunker_for_armor,
+                )
+
+        for vehicle in list(self.enemy_barracks_units):
+            if isinstance(vehicle, ArmorUnit):
+                vehicle.update(
+                    dt, self.friendlies, self.enemy_bullets, player_bunkers[0] if player_bunkers else None,
                 )
 
         # Enemy bullets can damage friendly infantry only.
@@ -652,6 +685,12 @@ class AssaultPhase:
 
             for friendly in self.friendlies:
                 if friendly.dead:
+                    continue
+
+                # ARMOR RULE (mirrored): plain enemy bullets pass
+                # through friendly armor; only tank shots/artillery
+                # hurt armored units on this side too.
+                if isinstance(friendly, ArmorUnit) and not bullet.armor_damage:
                     continue
 
                 if bullet.get_hitbox().colliderect(
@@ -792,11 +831,24 @@ class AssaultPhase:
                 enemy_placed[type(building).__name__] += 1
 
         # One tuple per row: (name, player display, enemy display).
+        # Infantry counts exclude factory armor; armored vehicles
+        # (tanks + cars) get their own row.
+        infantry_player = sum(
+            1 for u in self.friendlies if not isinstance(u, ArmorUnit)
+        )
+        infantry_enemy = sum(
+            1 for u in self.enemy_barracks_units if not isinstance(u, ArmorUnit)
+        )
         return [
             (
                 "Infantry",
-                str(len(self.friendlies)),
-                str(len(self.enemy_barracks_units)),
+                str(infantry_player),
+                str(infantry_enemy),
+            ),
+            (
+                "Armor",
+                str(len(self.friendlies) - infantry_player),
+                str(len(self.enemy_barracks_units) - infantry_enemy),
             ),
             (
                 "Barracks",
@@ -929,20 +981,31 @@ class AssaultPhase:
 
         self.tilemap.draw(world, self.camera_x, view_rect)
 
-        # Artillery impact markers: brief red dots where shells landed.
-        # Drawn as their own pass (culled on the impact's world
-        # position, NOT the gun's) so a dot shows even when the gun
-        # that fired it is off-screen.
+        # Artillery firing/impact markers, measured on the marker's
+        # world position (NOT the gun's) so they show even when the
+        # gun that fired them is culled:
+        # - muzzle: SMALL yellow flash just in front of the gun while
+        #   the shell flies (user: "a little yellow", not a square);
+        # - blast: red flash where the shell landed.
         for building in BuildingQuery.get_all_buildings(self.tilemap):
             if not isinstance(building, Artillery):
                 continue
+            for mx, my, _ttl in building.muzzles:
+                if in_view(mx, my):
+                    pygame.draw.circle(
+                        world,
+                        YELLOW,
+                        (int(mx + TILE_SIZE / 2 - self.camera_x),
+                         int(my + TILE_SIZE / 2)),
+                        7,
+                    )
             for ix, iy, _ttl in building.impacts:
                 if in_view(ix, iy):
                     pygame.draw.circle(
                         world,
                         RED,
                         (int(ix - self.camera_x), int(iy)),
-                        6,
+                        8,
                     )
 
         for enemy_unit in self.enemy_barracks_units:

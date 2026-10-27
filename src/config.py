@@ -58,6 +58,7 @@ GREY = (150, 150, 150)   # neutral buildings (e.g. artillery block)
 GOLD = (255, 215, 0)     # gold pickups
 RED = (200, 50, 50)      # enemy side (units, bullets, block fallback)
 BLUE = (0, 200, 255)     # ally side (units, block fallback)
+YELLOW = (255, 255, 0)   # artillery muzzle flash (shell-flight marker)
 
 # Starting balance, tuned to let the player afford one building
 # or a few partial payments early on.
@@ -91,6 +92,35 @@ BUILD_COSTS = {
 # on its target before the bullet expires. Pass: bullets vanish after
 # flying this far instead of streaking across the whole map.
 BULLET_RANGE_PX = 500
+
+# ---------------- Armor (tank factory units) ----------------
+# User spec: factories produce armored vehicles; tanks have 100 hp,
+# the British machine-gun car 80. ONLY artillery splash and other
+# tanks' shots can damage armor (infantry/MG/car fire can't); tanks
+# hurt infantry AND other tanks, cars hurt infantry only.
+TANK_HP = 100
+CAR_HP = 80
+
+# Advance speeds (px/s) toward the enemy base / enemy bunker; the
+# car is faster (it is a light vehicle), tanks crawl.
+TANK_SPEED = 30
+CAR_SPEED = 60
+
+# Production cadence: 1 tank per 3 infantry created (user rule). The
+# infantry timeline is one deployment every 5 s (Barracks), so a
+# factory rolls out a vehicle every 3 x 5 s.
+FACTORY_UNIT_INTERVAL = 15.0
+
+# On-board machine guns ("shoot as machine guns"): the tank's gun
+# matches the MG-nest range; damage is bigger per hit, fired slower.
+TANK_MG_RANGE = 220
+TANK_MG_DAMAGE = 20
+TANK_MG_FIRE_RATE = 0.6
+
+# The British car is literally an MG nest on wheels: MG-nest stats.
+CAR_MG_RANGE = 220
+CAR_MG_DAMAGE = 8
+CAR_MG_FIRE_RATE = 0.2
 
 # ---------------- Building footprints (tiles) ----------------
 # How many tiles each building kind covers: the drawn sprite/block, the

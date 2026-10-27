@@ -15,7 +15,7 @@ from config import BULLET_RANGE_PX
 
 
 class Bullet:
-    def __init__(self, x, y, dx, dy):
+    def __init__(self, x, y, dx, dy, armor_damage=False):
         # Spawn position in world coordinates (usually the shooter's
         # muzzle/center point).
         self.x = x
@@ -25,6 +25,13 @@ class Bullet:
         # subtracted from a target's hp in one hit.
         self.speed = 400
         self.damage = 20
+
+        # Armor rule (user spec): only artillery splash and tank shots
+        # can hurt armored units. Bullets default to False (infantry,
+        # player, MG-nest and car shots pass through armor harmlessly
+        # — the hit loop skips armored targets they reach); only tank
+        # shots set this True.
+        self.armor_damage = armor_damage
 
         # Small rectangular hit box. Every shooter passes a NORMALIZED
         # direction vector (unit length), so direction values are
