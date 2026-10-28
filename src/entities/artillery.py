@@ -2,12 +2,16 @@
 Artillery building.
 
 No-man's-land bombardment (user design): shells do NOT target units.
-Each shot lands on a random UNUSED tile in a strip 14-18 tiles AHEAD
-of the gun (player guns fire east, enemy guns west) spread over the
-gun's row +- 5. Each impact leaves a brief red dot and damages any
-standing unit on the tile + its 8 neighbours for 20 (half of an
-infantry unit's 40 hp). A gun never hits the same tile twice; when
-its band is exhausted it stands down.
+Each shot lands on a random UNUSED tile in no-man's-land — strictly
+between the row-0 '|' markers (full-height wall in STATIC_MAP) when the
+map has the pair, so impacts stay solely between the two MG nest lines;
+maps without the pair fall back to a 14-18-tiles-ahead strip. Columns
+are center-weighted near the field's middle; rows swing UNIFORMLY over
+the strip's full height ("not always center — sometimes more up, more
+down"). Each impact leaves a brief red dot and damages any standing
+unit on the tile + its 8 neighbours for 20 (half of an infantry unit's
+40 hp). A gun never hits the same tile twice; when the band is
+exhausted it stands down.
 
 Art by FACTION (factions.ARTILLERY_IMAGE: allies = unit_cannon_fr,
 axis = unit_heavy_howitzer_ger), drawn across the footprint; missing
@@ -32,17 +36,20 @@ class Artillery:
     # strip between the row-0 '|' markers when a map HAS the pair
     # (" Solely between my and the enemy MG nests"); without the
     # markers the fallback band spans 14-18 tiles toward the front.
-    # Vertical peak is the field's CENTER (see CENTER_ROW), never the
-    # gun's own row. 20 damage = half of an infantry unit (hp 40).
+    # Columns are center-weighted (the window's own middle); rows span
+    # the strip's FULL height uniformly (see CENTER_ROW). 20 damage =
+    # half of an infantry unit (hp 40).
     AHEAD_MIN = 14
     AHEAD_MAX = 18
     ROW_SPREAD = 5
     SPLASH_DAMAGE = 20
     DOT_TIME = 0.5      # seconds the red blast stays visible
     SHELL_DELAY = 1.0   # seconds the shell takes to land (quick-dirty)
-    MUZZLE_TIME = 1.0   # seconds the yellow muzzle square stays visible
-    # Vertical peak of the band, in tiles: None = auto (the map's
-    # vertical middle); set a number to pin the field's center row.
+    MUZZLE_TIME = 1.0   # seconds the yellow muzzle flash stays visible
+    # Vertical pin of the impact rows, in tiles: None (DEFAULT) = no
+    # pin — rows UNIFORM over the strip's full height (user: shells
+    # should swing up AND down the field, not cluster mid-field).
+    # Set a number to confine rows to that row +- ROW_SPREAD instead.
     CENTER_ROW = None
 
     def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
@@ -72,7 +79,7 @@ class Artillery:
         # and remember live red-dot impact markers.
         self.used_tiles = set()  # impact tiles already committed
         self.impacts = []        # [x_px, y_px, ttl_seconds] live blasts
-        self.muzzles = []        # [x_px, y_px, ttl_seconds] yellow squares
+        self.muzzles = []        # [x_px, y_px, ttl_seconds] yellow flashes
         # Pending shells: [col, row, ttl_seconds] — fired, not landed.
         self.pending = []
 
@@ -90,7 +97,7 @@ class Artillery:
         """Shell one random unused tile in the no-man's-land band.
 
         Sequence (user quick-dirty illustration): the shot lights a
-        YELLOW muzzle square in front of the gun; the shell flies for
+        small YELLOW muzzle flash in front of the gun; the shell flies for
         `SHELL_DELAY` seconds; then the red blast pops on the impact
         tile and the splash applies. `enemies` is the opposing unit
         list passed by the battle state; anything standing on the
@@ -137,16 +144,20 @@ class Artillery:
         self.used_tiles.add((col, row))
 
         # Muzzle flash marker (USER: "a little yellow in front of the
-        # artillery", not a square): the marker sits on the tile
-        # directly in front of the footprint's leading edge,
-        # centered on the gun's middle row; the render pass draws it
-        # as a SMALL yellow circle visible while the shell flies.
+        # artillery", not a square; user choice: flash on the TOP ROW,
+        # beside the barrel tip). The marker sits on the tile directly
+        # in front of the footprint's leading edge on the FIRST
+        # footprint row — the old version offset down half a tile,
+        # which straddled the 2-row boundary and read as sitting on
+        # the y+1 cell (user report: "yellow dot on the x=4 and y=1
+        # cell"); the render pass draws it as a SMALL yellow circle
+        # fully inside that top-row tile. Enemies mirror to the west.
         dir_x = -1 if self.is_enemy else 1
         if dir_x > 0:
             mx = (self.tile_x + self.footprint_tiles[0]) * TILE_SIZE
         else:
             mx = (self.tile_x - 1) * TILE_SIZE
-        my = self.tile_y * TILE_SIZE + (self.height - TILE_SIZE) // 2
+        my = self.tile_y * TILE_SIZE
         self.muzzles.append([mx, my, self.MUZZLE_TIME])
 
         # The shell is in flight: the blast lands after SHELL_DELAY.
@@ -177,15 +188,14 @@ class Artillery:
         Front/bounds: when the map carries the row-0 '|' pair both
         sides sample strictly between the markers (solely the field);
         otherwise the band is center column +14..+18 toward the
-        enemy side. Rows = the CENTER of no-man's-land
-        +- ROW_SPREAD (the map's vertical middle by default — see
-        CENTER_ROW), clipped to the map. The random pick is
-        CENTER-WEIGHTED on both axes (user rule: random, but closer
-        to the middle of the field): a triangular distribution whose
-        peak sits on the band's exact middle.
-
-        Returns None when every band tile has already been shelled
-        (the gun stands down rather than repeating ground).
+        enemy side. COLUMNS are CENTER-WEIGHTED (triangular, peaked
+        on the field window's middle); ROWS span the field's FULL
+        height UNIFORMLY (user: "not always center — sometimes more
+        up, more down") unless CENTER_ROW pins them to a
+        +-ROW_SPREAD band. The random pick never repeats a tile and
+        stands down (None) when every band tile is already shelled;
+        the exhausted band = window interior x full map height
+        (e.g. 9 cols x 46 rows = 414 tiles for the wall map).
         """
         cx_tile = round(self.tile_x + self.footprint_tiles[0] / 2)
         dir_x = -1 if self.is_enemy else 1
@@ -215,36 +225,39 @@ class Artillery:
         mid_col = (col_low + col_high) / 2
         col_half = (col_high - col_low) / 2
 
-        # Vertical peak: the center of NO-MAN'S-LAND (the field's
-        # own middle, NOT the gun's row — user tuning so shells stop
-        # crowding the top of the map where the guns sit).
-        row_center = self.CENTER_ROW if self.CENTER_ROW is not None \
-            else map_h // 2
+        # Impact rows (user tuning v3: "not ALWAYS center — sometimes
+        # more up, more down"): UNIFORM over the no-man's-land strip's
+        # FULL height. The old triangular peak on the field's center
+        # row made nearly every shell land mid-field. An explicit
+        # CENTER_ROW pin (subclass/testing override) keeps a
+        # +-ROW_SPREAD uniform band instead.
+        if self.CENTER_ROW is not None:
+            row_lo = max(0, self.CENTER_ROW - self.ROW_SPREAD)
+            row_hi = min(map_h - 1, self.CENTER_ROW + self.ROW_SPREAD)
+        else:
+            row_lo, row_hi = 0, map_h - 1
 
         def triangular():
             # Sum of two uniforms: peaks at 0, thins out toward +-1.
             return random.random() - random.random()
 
-        # Biased sampling: most shots land near the band's center,
-        # fewer near its edges. Retries land on unused tiles.
+        # Sampling: columns CENTER-WEIGHTED (triangular on the window's
+        # middle), rows UNIFORM across the strip. Retries land on
+        # unused tiles.
         for _ in range(12):
             col = round(mid_col + triangular() * col_half)
             col = max(col_low, min(col_high, col))
-            row = row_center + round(triangular() * self.ROW_SPREAD)
-            row = max(row_center - self.ROW_SPREAD,
-                      min(row_center + self.ROW_SPREAD, row))
-            if 0 <= row < map_h and (col, row) not in self.used_tiles:
+            row = random.randint(row_lo, row_hi)
+            if (col, row) not in self.used_tiles:
                 return col, row
 
-        # Fallback: uniform over all remaining unused band tiles so
+        # Fallback: uniform over all remaining unused field tiles so
         # the gun still exhausts its band exactly like before.
         candidates = [
             (col, row)
             for col in range(col_low, col_high + 1)
-            for row in range(row_center - self.ROW_SPREAD,
-                             row_center + self.ROW_SPREAD + 1)
-            if 0 <= row < map_h
-            and (col, row) not in self.used_tiles
+            for row in range(row_lo, row_hi + 1)
+            if (col, row) not in self.used_tiles
         ]
         if not candidates:
             return None
