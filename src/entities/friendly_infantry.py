@@ -191,6 +191,15 @@ class FriendlyInfantry:
         )
         self.shoot_timer = self.shoot_cooldown
 
+    def take_damage(self, damage):
+        """Apply damage and mark the unit dead when its health reaches zero."""
+        if self.dead:
+            return
+
+        self.hp = max(0, self.hp - damage)
+        if self.hp == 0:
+            self.dead = True
+
     def get_hitbox(self):
         """Return the unit's collision rectangle in world coordinates."""
         return pygame.Rect(round(self.x), round(self.y), self.width, self.height)

@@ -65,28 +65,32 @@ ASCII_TO_TILE = {
 # ------------------------------------------------------------
 # HUMAN‑READABLE STATIC MAP — YOU EDIT THIS
 # ------------------------------------------------------------
-# CURRENT STATE: an 80x46 tile canvas (EXACTLY DOUBLE the old 23x40
-# old 23x40 screen-filling canvas: every marker sits at 2x its old
-# coordinates). TILES STAY SQUARE through render()'s uniform zoom —
+# CURRENT STATE: a 78x46 tile canvas (EXACTLY DOUBLE the old 23x40
+# screen-filling canvas: every marker sits at 2x its old coordinates;
+# the '|' wall edition trimmed the width 80 -> 78). TILES STAY SQUARE
+# through render()'s uniform zoom —
 # the map no longer needs to divide the window exactly; AssaultPhase
 # fits the whole map below the 40px HUD bar with ONE scale factor
 # (~0.4946 -> ~15.8px screen squares, thin dark side bands). So you
 # can grow or reshape the map freely; zoom adapts automatically.
 # Consequences while it stays terrain-free: no enemy units spawn (no
-# 'i' barracks markers), there is no enemy bunker ('b') so victory can
-# never trigger, and no player bunker ('B') so defeat never triggers
-# either — HUD shows Bunker HP 0. '|' separators restore a boundary.
+# 'i' barracks markers). The user's map now carries a player 'B'
+# (bunker), enemy 'b' bunker, 'm' MG nests and 'a' artillery, so the
+# terminal conditions CAN fire. '|' separators restore a boundary.
 # M = MG (footprint 2x2, marker = top-left)
 # B = bunker
 # I = barracks
 # A = artillery
 # C = crater
 # ASCII Legend (player):
-# | = battle separator (row 0): first | = friendly boundary AND the
-#     WEST edge of no-man's-land; a second | = its east edge. Trains
-#     the artillery to shell strictly BETWEEN the markers; the two
-#     markers belong to YOUR enemy-MG line placement — move them with
-#     the M/m markers when the front shifts.
+# | = no-man's-land boundary column, a FULL-HEIGHT wall of '|'
+#     characters in EVERY row (not just row 0): the first '|' COLUMN
+#     = the friendly boundary AND the WEST edge of no-man's-land, the
+#     second '|' COLUMN = its east edge. The artillery shells strictly
+#     BETWEEN the two columns (bounds are parsed from ROW 0 only, so
+#     keep both markers on row 0 too; the rest of the wall is what you
+#     SEE: the visual battle line). Move the wall with the M/m markers
+#     when the front shifts.
 # # = trench path
 # M = MG
 # B = bunker
@@ -104,15 +108,15 @@ STATIC_MAP = [
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
-    '..........A..........A.........|.........|.........a........a.................',
-    '...............A...............|.........|.............a......................',
+    '..........A..........A.........|.........|.........a...a......................',
+    '...............A...............|.........|..................a.................',
     '...............................|.........|....................................',
     '...............................|.........|..m.................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '......K....................M...|.........|....................................',
-    '...............................|.........|....................................',
+    '...............................|.........|.............i......................',
     '...................I...........|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
@@ -122,24 +126,24 @@ STATIC_MAP = [
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
-    '...................I........M..|.........|....................................',
+    '...................I........M..|.........|...............i....................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....m...............................',
     '...............................|.........|....................................',
-    '...............................|.........|................b...................',
+    '...............................|.........|....................................',
     '...............................|.........|....................................',
     '.................B.............|.........|....................................',
-    '...............................|.........|....................................',
+    '...............................|.........|..............a.....................',
     '............................M..|.........|......m.............................',
+    '...............................|.........|..................b.................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
-    '...............................|.........|....................................',
-    '...............................|.........|....................................',
+    '...............................|.........|...............a....................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
     '...............................|.........|....................................',
@@ -150,7 +154,15 @@ STATIC_MAP = [
 ]
 
 def no_mans_land_bounds():
-    """Return the columns of the first two row-0 '|' markers, or None."""
+    """(west_col, east_col) of no-man's-land from row 0, or None.
+
+    The user draws the boundary as a FULL-HEIGHT wall of '|' characters
+    (STATIC_MAP). Parsing scans ROW 0: the first '|' column = the
+    friendly boundary (TileMap's S1 rule) AND the field's west edge;
+    the second '|' column = the east edge. Artillery lands strictly
+    BETWEEN the two columns. Fewer than two markers on row 0 -> None:
+    maps without the pair keep the legacy 14-18-tiles-ahead band.
+    """
     if not STATIC_MAP:
         return None
 
