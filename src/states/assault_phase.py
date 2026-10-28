@@ -72,6 +72,8 @@ ENEMY_BUILDING_CLASSES = {
 STATIC_BUILDING_CLASSES = {
     "air_field": AirField,
     "tank_factory": TankFactory,
+    "enemy_air_field": AirField,
+    "enemy_tank_factory": TankFactory,
 }
 
 # Entity cull margin in world px: entities up to a big sprite's size
