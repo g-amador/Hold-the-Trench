@@ -123,10 +123,17 @@ class AssaultPhase:
         # TILE_SIZE px), then uniformly zoomed below the HUD bar in
         # render(). The zoom fits the map with ONE factor so tiles
         # always render square (never a per-axis stretch).
+        # SRCALPHA: in CLOSE view the ground is NOT baked into this
+        # surface (it is drawn straight from the native 4K image at
+        # screen resolution), so the zoom can blit this surface's
+        # leftover content (buildings, units, bullets) as a transparent
+        # ENTITY layer on top of that hi-res ground. Undrawn pixels
+        # must stay fully transparent instead of black.
         self.world_w_px = self.tilemap.width * TILE_SIZE
         self.world_h_px = self.tilemap.height * TILE_SIZE
         self.world_surface = pygame.Surface(
             (self.world_w_px, self.world_h_px),
+            pygame.SRCALPHA,
         )
 
         # UNIFORM zoom state: fit_width vs fit_height, take the min so
@@ -979,7 +986,35 @@ class AssaultPhase:
                 <= view_rect.bottom + CULL_MARGIN
             )
 
-        self.tilemap.draw(world, self.camera_x, view_rect)
+        # Ground layering decision for this frame: in CLOSE view, when
+        # the native-resolution ground is available AND we are in
+        # SPRITES mode, the ground is rendered straight from native
+        # 4K detail at screen resolution (no ground on the world
+        # surface — see the zoom block below). Everything else keeps
+        # the classic ground-on-world-surface path.
+        close_native_ground = (
+            self.view_mode == VIEW_CLOSE
+            and self.tilemap.ground_texture_native is not None
+            and render_mode.is_sprite()
+        )
+
+        # No-ground frames no longer overwrite the window region with
+        # the JPEG every frame, so the ENTITIES' canvas must be cleared
+        # here — stale pixels (unit trails, ghost sprites, stale block
+        # tiles after a live G toggle) would otherwise persist forever
+        # under the native ground.
+        if close_native_ground:
+            world.fill(
+                (0, 0, 0, 0),
+                (cx, cy, self.close_window_w, self.close_window_h),
+            )
+
+        self.tilemap.draw(
+            world,
+            self.camera_x,
+            view_rect,
+            skip_ground=close_native_ground,
+        )
 
         # Artillery firing/impact markers, measured on the marker's
         # world position (NOT the gun's) so they show even when the
@@ -1042,6 +1077,27 @@ class AssaultPhase:
             # on the player, upscaled so it occupies the WHOLE visible
             # strip (no side bands). cx/cy were computed before the
             # crop pass above (culling and zoom share one window).
+            #
+            # ground pass (SPRITES mode + native 4K asset): the
+            # user's 5504x3072 map art holds ~2.15x more pixels per
+            # world px than the world strip — sampling THIS window
+            # from the native image means one true source pixel per
+            # screen pixel at 4x zoom (the old path upscaled the
+            # pre-downscaled 2560x1472 texture 4x, the "blurry when
+            # zoomed" complaint). The entity layer (buildings, units,
+            # bullets, markers) rides on top from the SRCALPHA world
+            # surface, whose ground was skipped this frame.
+            native = self.tilemap.ground_texture_native
+            if close_native_ground:
+                src_rect = self.tilemap.native_ground_rect(view_rect)
+                if src_rect is not None:
+                    screen.blit(
+                        pygame.transform.smoothscale(
+                            native.subsurface(src_rect),
+                            self.close_view,
+                        ),
+                        (0, HUD_BAR_HEIGHT),
+                    )
             region = world.subsurface(
                 (cx, cy, self.close_window_w, self.close_window_h),
             )
