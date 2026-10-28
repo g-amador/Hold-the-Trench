@@ -285,7 +285,7 @@ Because Hold the Trench is a fully offline single-player game, it can easily be 
 Create an isolated Python environment:
 
 ```bash
-py -3.11 -m venv venv
+py -3.15 -m venv venv
 ```
 
 Activate the environment:
