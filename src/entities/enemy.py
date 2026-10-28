@@ -350,15 +350,6 @@ class EnemyInfantry(EnemyBase):
         self.sprite_generator.draw(screen, legs, pos, self.facing)
         self.sprite_generator.draw(screen, upper, pos, self.facing)
     
-class Cavalry(EnemyBase):
-    """Faster, tankier placeholder unit; still uses the base block draw."""
-
-    def __init__(self, x, y):
-        # Mounts trade hp for speed; larger bounty than infantry.
-        super().__init__(x, y, speed=120, hp=80, gold_drop=10)
-        self.width = 32
-        self.height = 32
-
 class Tank(EnemyBase):
     """Slow assault placeholder: heavy hp, biggest bounty."""
 
