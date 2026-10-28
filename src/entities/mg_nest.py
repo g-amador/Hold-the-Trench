@@ -121,7 +121,7 @@ class MGNest:
             return
 
         # Sprites blit WITHOUT an underlay: PNG transparency reveals the
-        # real battlefield ground (map1a/map1c), same as the bunker.
+        # real battlefield ground (map1_a/map1_c), same as the bunker.
         # An opaque grey square here was painting the "background" the
         # user saw through the art.
         screen.blit(self.image, (px, py))

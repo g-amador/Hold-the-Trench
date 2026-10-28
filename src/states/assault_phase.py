@@ -93,7 +93,7 @@ class AssaultPhase:
         self.enemy_faction = other(self.player_faction)
 
         # One scene roll per battle. Everything scene-linked then
-        # shares the same letter: the ground texture (map1a/map1c is
+        # shares the same letter: the ground texture (map1_a/map1_c is
         # rebound below) and every building's art (mg nest, bunker,
         # barracks load their suffix from the rolled scene). "If _a
         # then all 3 must be _a" — one roll guarantees it.

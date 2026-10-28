@@ -94,11 +94,11 @@ class TileMap:
             for y in range(self.height)
         ]
 
-        # Ground floor texture for SPRITES mode: map1<scene>.jpg
+        # Ground floor texture for SPRITES mode: map1_a<scene>.jpg
         # scaled ONCE to the whole battlefield strip (tiles are then
         # skipped at draw time — the texture IS the ground). The scene
         # letter comes from the shared battle roll, so ground and
-        # buildings always match (map1a summer / map1c winter).
+        # buildings always match (map1_a summer / map1_c winter).
         # ground_texture_native keeps the file's own resolution for
         # the CLOSE view to sample 4K detail from (see reload_ground).
         self.ground_texture = None
@@ -126,7 +126,7 @@ class TileMap:
         """Bind the ground texture to the CURRENT scene variant.
 
         Two resolution caches, BOTH from the same file (the user's
-        5504x3072 map1a/map1c 4K art):
+        5504x3072 map1_a/map1_c 4K art):
 
         - ground_texture: pre-scaled down to the world strip
           (width*TILE_SIZE x height*TILE_SIZE) for the FULL view,
@@ -141,7 +141,7 @@ class TileMap:
         The map tilemap is built before the battle (the menu creates
         it), i.e. before roll_scene() — so AssaultPhase calls this
         right after rolling to re-pick the ground alongside the
-        buildings (map1a.jpg summer day / map1c.jpg winter day).
+        buildings (map1_a.jpg summer day / map1_c.jpg winter day).
         Loaded through utils/image_loader (cached per size);
         a missing file keeps both None and draw() falls back to tile
         rendering instead of crashing.

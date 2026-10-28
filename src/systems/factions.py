@@ -92,7 +92,7 @@ def coin_texture(nation):
 #   a = summer day, b = summer night, c = winter day, d = winter night.
 # One scene is rolled ONCE PER BATTLE (roll_scene, called at
 # AssaultPhase start) and EVERYTHING scene-linked reads it — the
-# ground texture (map1a/map1c) via ground_texture_filename() and every
+# ground texture (map1_a/map1_c) via ground_texture_filename() and every
 # building via building_variant_filenames — so the whole battlefield
 # always shares one scene letter ("If _a then all 3 must be _a").
 # ACTIVE POOL = a (summer day) + c (winter day): the variants with
@@ -123,8 +123,8 @@ def scene_variant():
 
 
 def ground_texture_filename():
-    """Ground texture for the current scene: map1a -> map1c."""
-    return f"map1{scene_variant()}.jpg"
+    """Ground texture for the current scene: map1_a -> map1_c."""
+    return f"map1_{scene_variant()}.jpg"
 
 
 # Artillery art keyed by FACTION (not nation), per the user: both
