@@ -72,7 +72,7 @@ START_GOLD = 500
 BUILD_COSTS = {
     "mg": 0,
     "bunker": 0,
-    "barracks": 0,
+    "barracks": 60,
     "artillery": 0,
     "air_field": 0,
     "tank_factory": 0,
@@ -80,9 +80,9 @@ BUILD_COSTS = {
     "enemy_mg": 0,
     "enemy_bunker": 0,
     "enemy_barracks": 0,
-    "enemy_artillery": 0,
-    "enemy_air_field": 0,
-    "enemy_tank_factory": 0,
+    "enemy_artillery": 80,
+    "enemy_air_field": 100,
+    "enemy_tank_factory": 100,
 }
 
 # ---------------- Combat ----------------
@@ -92,6 +92,78 @@ BUILD_COSTS = {
 # on its target before the bullet expires. Pass: bullets vanish after
 # flying this far instead of streaking across the whole map.
 BULLET_RANGE_PX = 500
+
+# ---------------- Unit stats (speed px/s, hp, gold drops) ----------------
+# USER RULE: every unit's speed, hp/armor and gold_drop lives HERE (no
+# more stat literals inside entity classes). The per-nation handicap
+# multipliers live in systems/factions.py and scale hp at spawn and
+# bullet damage at fire time.
+INFANTRY_HP = 40
+INFANTRY_SPEED = 120
+INFANTRY_GOLD_DROP = 5
+
+# Infantry ranged/siege gear (mirrored both sides):
+INFANTRY_SHOOT_COOLDOWN = 1.2
+INFANTRY_SHOOT_RANGE_PX = 200
+ENEMY_SIEGE_DAMAGE = 10
+ENEMY_SIEGE_COOLDOWN = 1.0
+# Per-shot rifle damage (matches Bullet's default 20).
+INFANTRY_BULLET_DAMAGE = 20
+
+# Legacy warehouse heavy (EnemyBase subclass "Tank"): slow, tanky, big
+# bounty. Not factory armor — never had one.
+LEGACY_TANK_HP = 300
+LEGACY_TANK_SPEED = 30
+LEGACY_TANK_GOLD_DROP = 20
+
+# ---------------- Planes (air field production) ----------------
+# USER SPEC: air fields spawn planes at the SAME cadence as tank
+# factories (FACTORY_UNIT_INTERVAL). Planes fly, ignore ground
+# collision, machine-gun enemy PLANES in range (like infantry vs
+# infantry), and drop bombs on whatever enemy ground target (tank,
+# car, building) they are OVER — nearest first, proximity only.
+PLANE_HP = 30
+PLANE_SPEED = 140
+PLANE_SIZE = (96, 44)      # world px box (art scales to it)
+PLANE_MG_RANGE = 200
+PLANE_MG_DAMAGE = 10
+PLANE_MG_FIRE_RATE = 0.4
+PLANE_BOMB_DAMAGE = 35
+PLANE_BOMB_COOLDOWN = 3.0
+# "Over them" = the plane's center is this close to the target's
+# center when the bomb is released (proximity only, no aim).
+PLANE_BOMB_TRIGGER_PX = 40
+
+# ---------------- Building hp ----------------
+# Buildings are destructible now (tanks shell them, planes bomb them).
+# Bunker keeps its objective stats from this table too; MG nests,
+# barracks, artillery, and the free statics share the rest. Enemies
+# look up the same numbers: key maps via the "enemy_" prefix strip.
+BUILDING_HP = {
+    "mg": 120,
+    "barracks": 150,
+    "artillery": 100,
+    "bunker": 200,
+    "air_field": 150,
+    "tank_factory": 150,
+}
+
+# ---------------- Faction footprints (tiles) ----------------
+# Per-side overrides on BUILD_FOOTPRINTS: the axis artillery is the
+# german heavy howitzer on a 3x2 plot (user rule "German artillery
+# should only be 3x2"); the allies keep the wide 4x2 cannon line.
+FACTION_FOOTPRINT_OVERRIDES = {
+    ("artillery", "axis"): (3, 2),
+}
+
+
+def footprint_for(kind, faction):
+    """(fw, fh) in tiles for a building kind on a battlefield side."""
+    override = FACTION_FOOTPRINT_OVERRIDES.get((kind, faction))
+    if override is not None:
+        return override
+    return BUILD_FOOTPRINTS.get(kind, (1, 1))
+
 
 # ---------------- Armor (tank factory units) ----------------
 # User spec: factories produce armored vehicles; tanks have 100 hp,
@@ -121,6 +193,11 @@ TANK_MG_FIRE_RATE = 0.6
 CAR_MG_RANGE = 220
 CAR_MG_DAMAGE = 8
 CAR_MG_FIRE_RATE = 0.2
+
+# Static MG nest building: range/damage/cadence match the car's gun.
+MG_NEST_RANGE = 220
+MG_NEST_DAMAGE = 8
+MG_NEST_FIRE_RATE = 0.2
 
 # ---------------- Building footprints (tiles) ----------------
 # How many tiles each building kind covers: the drawn sprite/block, the
