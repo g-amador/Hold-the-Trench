@@ -95,13 +95,14 @@ def coin_texture(nation):
 # ground texture (map1_a/map1_c) via ground_texture_filename() and every
 # building via building_variant_filenames — so the whole battlefield
 # always shares one scene letter ("If _a then all 3 must be _a").
-# ACTIVE POOL = a (summer day) + c (winter day): the variants with
-# complete map + mg_nest + bunker art. b (summer night) / d (winter
-# night) rejoin the tuple when their art lands.
-# TEST MODE is OFF: set SCENE_VARIANT_TEST to "a" (or "c") to pin the
+# ACTIVE POOL = ALL FOUR variants (user: "can use all 4 variations" —
+# the scene art landed for every letter): a summer day, b summer
+# night, c winter day, d winter night. The building chain still falls
+# back to _a/base art for a kind missing its variant file.
+# TEST MODE is OFF: set SCENE_VARIANT_TEST to "a".."d" to pin the
 # roll while debugging artworks.
 SCENE_VARIANT_TEST = None
-SCENE_VARIANTS = ("a", "c")
+SCENE_VARIANTS = ("a", "b", "c", "d")
 
 # Process-wide scene state: rolled per battle, read everywhere.
 _scene_variant = "a"
@@ -123,7 +124,7 @@ def scene_variant():
 
 
 def ground_texture_filename():
-    """Ground texture for the current scene: map1_a -> map1_c."""
+    """Ground texture for the current battle scene: map1_a/b/c/d."""
     return f"map1_{scene_variant()}.jpg"
 
 
@@ -139,6 +140,77 @@ ARTILLERY_IMAGE = {
 def artillery_filename(faction):
     """Artillery art file for a battlefield side."""
     return ARTILLERY_IMAGE.get(faction, "unit_cannon_fr.png")
+
+
+def artillery_nation_for_side(faction):
+    """Nation whose artillery stats a battlefield side fires with.
+
+    Modifiers are keyed by NATION (user handicaps per Ger/Brit/Fr/
+    Aust), but artillery buildings roll by SIDE: allied guns read as
+    the french 75s, axis guns as the german heavy howitzers.
+    """
+    return "fr" if faction == "allies" else "ger"
+
+
+# ---------------- WWI balance modifiers (user handicaps) ----------------
+# USER SPEC: each nation gets an edge in some units' damage and
+# resistance, historically flavored, balanced in 0.9-1.1 so no side
+# overwhelms another. Keys are the UNIT kind; values (damage, hp)
+# multipliers applied at fire/spawn time.
+#   fr:   quick-firing 75mm guns + SPAD fighters, reliable FT light tank
+#   brit: first tanks + creeping barrage doctrine, solid all-round
+#   ger:  stormtroopers + heavy howitzers + early air aces; clumsy A7V
+#   aust: polyglot conscript army, weak planes/company armor; Skoda guns
+FACTION_MODIFIERS = {
+    "fr":   {"infantry": (1.00, 1.00), "plane": (1.10, 1.00),
+             "tank": (1.00, 1.05), "artillery": (1.10, 1.00)},
+    "brit": {"infantry": (1.00, 1.00), "plane": (1.05, 1.00),
+             "tank": (1.10, 1.10), "artillery": (1.05, 1.00)},
+    "ger":  {"infantry": (1.05, 1.05), "plane": (1.05, 1.05),
+             "tank": (0.90, 0.90), "artillery": (1.10, 1.05)},
+    "aust": {"infantry": (0.90, 0.90), "plane": (0.95, 0.90),
+             "tank": (0.90, 0.90), "artillery": (1.00, 0.95)},
+}
+
+
+def unit_modifiers(nation, kind):
+    """(damage, resistance) multipliers for a nation's unit kind.
+
+    Unknown nations/kinds read (1.0, 1.0) — never crash.
+    """
+    return FACTION_MODIFIERS.get(nation, {}).get(kind, (1.0, 1.0))
+
+
+def scaled_damage(nation, kind, damage):
+    """Outgoing damage of `damage` scaled by the nation's handicap."""
+    return round(damage * unit_modifiers(nation, kind)[0])
+
+
+def scaled_hp(nation, kind, hp):
+    """Spawn hp of `hp` scaled by the nation's resistance handicap."""
+    return round(hp * unit_modifiers(nation, kind)[1])
+
+
+# ---------------- Planes (air field production) ----------------
+# Per COUNTRY art; the french SPAD drops nothing to france alone —
+# airfields roll their producing COUNTRY like factories do. Austria
+# flew german-built Albatros types: no dedicated austrian plane asset
+# exists, so austrian fields hand out german planes.
+PLANE_IMAGE = {
+    "ger": "airplane_unit_ger_plane.png",
+    "brit": "airplane_unit_brit_plane.png",
+    "fr": "airplane_unit_fr_plane.png",
+}
+
+
+def plane_filename(nation):
+    """Plane art file for a producing nation (aust falls back to ger)."""
+    return PLANE_IMAGE.get(nation, PLANE_IMAGE["ger"])
+
+
+def spawn_plane_nation(faction):
+    """Roll the COUNTRY one air field produces for (factory rule)."""
+    return random.choice(FACTIONS[faction]["building_nations"])
 
 
 # ---------------- Armor (tank factory units) ----------------
