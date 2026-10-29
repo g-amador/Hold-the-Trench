@@ -22,11 +22,15 @@ import random
 
 import pygame
 
-from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS
+from config import TILE_SIZE, GREY, BUILDING_HP, footprint_for
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
-from systems.factions import artillery_filename
-from utils.image_loader import load_first_image
+from systems.factions import (
+    artillery_filename,
+    artillery_nation_for_side,
+    scaled_damage,
+)
+from utils.image_loader import load_image, load_first_image_named
 from world.trench_generator import STATIC_MAP, no_mans_land_bounds
 
 
@@ -61,14 +65,24 @@ class Artillery:
         self.tile_x = tile_x
         self.tile_y = tile_y
 
-        # Footprint/table-driven (user set artillery to 4x2): the
-        # drawn sprite/block, fire origin, and TileMap viewport
-        # culling all read footprint_tiles (collision comes from the
-        # same table via tilemap._footprint_covered).
-        self.footprint_tiles = BUILD_FOOTPRINTS.get("artillery", (1, 1))
+        # Footprint: faction-aware (user rule — the GERMAN howitzer is
+        # a 3x2 plot, the allied cannon line stays 4x2; config's
+        # FACTION_FOOTPRINT_OVERRIDES via footprint_for). The drawn
+        # sprite/block, fire origin, and TileMap viewport culling all
+        # read footprint_tiles (collision comes from the same call
+        # through tilemap._footprint_covered).
+        self.footprint_tiles = footprint_for("artillery", faction)
         self.width, self.height = (
             TILE_SIZE * n for n in self.footprint_tiles
         )
+
+        # Nation whose ARTILLERY handicap this gun fires with (allies
+        # read as french 75s, axis as german howitzers).
+        self.nation = artillery_nation_for_side(faction)
+
+        # Objective hp (destructible building, config table).
+        self.hp = BUILDING_HP["artillery"]
+        self.dead = False
 
         # Firing stats: steady barrage cadence; cooldown is subtracted
         # in update, hence starts at 0.
@@ -84,13 +98,50 @@ class Artillery:
         self.pending = []
 
         # Art by FACTION (allies = french cannon, axis = heavy
-        # howitzer), scaled across the footprint (4x2 = 128x64).
-        # Missing file -> None: draw() falls back to the grey block
-        # instead of crashing.
-        self.image = load_first_image(
+        # howitzer), scaled across the footprint. Enemy art flips so
+        # the gun barrel points WEST into no-man's-land (user: "enemy
+        # artillery should be pointing to the west and image
+        # flipped"). Missing file -> None: draw() falls back to the
+        # grey block instead of crashing.
+        self.image, image_file = load_first_image_named(
             [artillery_filename(faction)],
             alpha=True,
             size=(self.width, self.height),
+        )
+        if self.is_enemy and self.image is not None:
+            self.image = pygame.transform.flip(self.image, True, False)
+
+        # Native-resolution copy of the SAME art file for the CLOSE
+        # view's hires blit (flipped for enemies, like the world art).
+        self.image_native = None
+        if image_file is not None:
+            try:
+                self.image_native = load_image(image_file, alpha=True)
+            except FileNotFoundError:
+                self.image_native = None
+            if self.image_native is not None and self.is_enemy:
+                self.image_native = pygame.transform.flip(
+                    self.image_native,
+                    True,
+                    False,
+                )
+
+    def take_damage(self, dmg):
+        """Apply damage; hp floors at 0 so `is_destroyed` reads true once."""
+        if self.dead:
+            return
+        self.hp = max(0, self.hp - dmg)
+        self.dead = self.hp <= 0
+
+    def is_destroyed(self):
+        return self.hp <= 0
+
+    def get_hitbox(self):
+        return pygame.Rect(
+            self.tile_x * TILE_SIZE,
+            self.tile_y * TILE_SIZE,
+            self.width,
+            self.height,
         )
 
     def update(self, dt, enemies, bullets):
@@ -104,8 +155,12 @@ class Artillery:
         impact tile or its 8 neighbours takes the splash damage at
         LANDING time (the live list — never a stale snapshot).
         `bullets` is kept for signature compatibility (shells are
-        instant, none are flown).
+        instant, none are flown). A destroyed gun stands down
+        entirely.
         """
+        if self.dead:
+            return
+
         # Red blast markers tick down; expired ones are dropped.
         if self.impacts:
             for imp in self.impacts:
@@ -172,6 +227,11 @@ class Artillery:
         iy = row * TILE_SIZE + TILE_SIZE / 2
         self.impacts.append([ix, iy, self.DOT_TIME])
 
+        # Damage per shell, scaled by this gun's nation's ARTILLERY
+        # handicap (fr 1.1 / ger 1.1 / brit 1.05 / aust 1.0 — factions
+        # table).
+        damage = scaled_damage(self.nation, "artillery", self.SPLASH_DAMAGE)
+
         # Splash: hit tile + its 8 neighbours; damage any standing
         # unit regardless of side ("any unit", user choice).
         for unit in enemies:
@@ -180,7 +240,7 @@ class Artillery:
             uc = int(unit.x // TILE_SIZE)
             ur = int(unit.y // TILE_SIZE)
             if abs(uc - col) <= 1 and abs(ur - row) <= 1:
-                unit.take_damage(self.SPLASH_DAMAGE)
+                unit.take_damage(damage)
 
     def _pick_impact_tile(self):
         """Pick a random UNUSED (col, row) in this gun's barrage band.
