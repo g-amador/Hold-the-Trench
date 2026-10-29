@@ -10,7 +10,7 @@ degree cone in front of the facing direction.
 import math
 import pygame
 
-from config import TILE_SIZE, BLUE
+from config import TILE_SIZE, BLUE, INFANTRY_SPEED
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
@@ -21,7 +21,10 @@ from systems.factions import unit_prefix
 # Tile characters that can never be walked through (trench wall, hill).
 BLOCKING_TILES = {"#", "H"}
 # Building type strings that are solid obstacles once constructed
-# (the free-placed statics are solid 4x4s too).
+# (the free-placed statics are solid 4x4s too). ENEMY buildings block
+# the player as well (user: "my controlled unit should collide with
+# enemy buildings and artillery"): the check below matches the bare
+# player-side kind OR any "enemy_"-prefixed kind.
 BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery",
                       "air_field", "tank_factory"}
 # Build spot types the player collides with while still unbuilt:
@@ -39,8 +42,9 @@ class Player:
         self.x = float(x)
         self.y = float(y)
 
-        # Speed in px/s; footprint matches the sprite frames' body box.
-        self.speed = 120
+        # Speed in px/s (config single source, same soldier pace as
+        # the barracks infantry); footprint matches the sprite frames.
+        self.speed = INFANTRY_SPEED
         self.width = 24
         self.height = 24
 
@@ -144,13 +148,22 @@ class Player:
                     return True
 
                 # Constructed buildings block every tile their
-                # footprint covers (an MG occupies 2x2, not just its
-                # marker tile).
+                # footprint covers (an MG occupies 4x4, not just its
+                # marker tile). Enemy-pre-fixed kinds are solid too:
+                # the player cannot walk into an enemy MG nest,
+                # artillery, bunker, barracks, or static.
                 building = tilemap.building_covering(tile_x, tile_y)
 
-                if (
+                covered_type = getattr(building, "type", None) if (
                     building is not None
-                    and getattr(building, "type", None) in BLOCKING_BUILDINGS
+                ) else None
+
+                if (
+                    covered_type in BLOCKING_BUILDINGS
+                    or (
+                        covered_type is not None
+                        and covered_type.startswith("enemy_")
+                    )
                 ):
                     return True
 
