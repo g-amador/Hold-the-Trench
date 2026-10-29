@@ -9,13 +9,13 @@ frequency is shared (spawn_cooldown).
 import pygame
 import random
 
-from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS
+from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS, BUILDING_HP
 from entities.enemy import EnemyInfantry
 from entities.friendly_infantry import FriendlyInfantry
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from systems.factions import building_variant_filenames
-from utils.image_loader import load_first_image
+from utils.image_loader import load_image, load_first_image_named
 
 
 class Barracks:
@@ -39,6 +39,12 @@ class Barracks:
             TILE_SIZE * n for n in self.footprint_tiles
         )
 
+        # Objective hp (destructible building, config table).
+        self.hp = BUILDING_HP["barracks"]
+        self.dead = False
+        self.x = self.tile_x * TILE_SIZE
+        self.y = self.tile_y * TILE_SIZE
+
         # Spawn clock: infantry deploy every spawn_cooldown milliseconds.
         self.spawn_cooldown = 5.0
         self.timer = 0
@@ -51,11 +57,20 @@ class Barracks:
         # scene-variant chain loader (a/b/c/d with summer-day fallback)
         # per the user's letter mapping: a summer day, b summer night,
         # c winter day, d winter night. Scaled across the footprint.
-        self.image = load_first_image(
+        self.image, image_file = load_first_image_named(
             building_variant_filenames(faction, "barraks"),
             alpha=True,
             size=(self.width, self.height),
         )
+
+        # Native-resolution copy of the SAME art file for the CLOSE
+        # view's hires blit (None when nothing loaded).
+        self.image_native = None
+        if image_file is not None:
+            try:
+                self.image_native = load_image(image_file, alpha=True)
+            except FileNotFoundError:
+                self.image_native = None
 
         # Mirror enemy art so it faces the battlefield the same way as
         # its units (the shared image cache is never mutated: flip
@@ -64,12 +79,30 @@ class Barracks:
         if is_enemy and self.image is not None:
             self.image = pygame.transform.flip(self.image, True, False)
 
+    def take_damage(self, dmg):
+        """Apply damage; hp floors at 0 so `is_destroyed` reads true once."""
+        if self.dead:
+            return
+        self.hp = max(0, self.hp - dmg)
+        self.dead = self.hp <= 0
+
+    def is_destroyed(self):
+        return self.hp <= 0
+
+    def get_hitbox(self):
+        """Return the barracks' collision rectangle in world coordinates."""
+        return pygame.Rect(self.x, self.y, self.width, self.height)
+
     def update(self, dt, units):
         """Count down the spawn clock; deploy a unit into `units`.
 
         `units` is the side's unit list owned by the battle state
-        (friendlies or enemy_barracks_units there).
+        (friendlies or enemy_barracks_units there). Destroyed
+        barracks stop spawning.
         """
+        if self.dead:
+            return
+
         self.timer += dt / 1000
 
         if self.timer < self.spawn_cooldown:

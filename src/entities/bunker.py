@@ -8,10 +8,10 @@ that other buildings and the player protect or attack.
 
 import pygame
 
-from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS
+from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS, BUILDING_HP
 from graphics import render_mode
 from systems.factions import building_variant_filenames
-from utils.image_loader import load_first_image
+from utils.image_loader import load_image, load_first_image_named
 
 
 class Bunker:
@@ -25,7 +25,9 @@ class Bunker:
         self.tile_y = tile_y
 
         # Bunkers are the tankiest entity; hp only ever decreases here.
-        self.hp = 200
+        # (config.BUILDING_HP table — the objective entry — user rule:
+        # every stat centralized in config.py.)
+        self.hp = BUILDING_HP["bunker"]
         self.dead = False
 
         # Footprint/table-driven like the MG (user set the config to
@@ -49,11 +51,20 @@ class Bunker:
         # per the user's letter mapping: a summer day, b summer night,
         # c winter day, d winter night. Scaled across the footprint.
         fw_px, fh_px = self.width, self.height
-        self.image = load_first_image(
+        self.image, image_file = load_first_image_named(
             building_variant_filenames(faction, "bunker"),
             alpha=True,
             size=(fw_px, fh_px),
         )
+
+        # Native-resolution copy of the SAME art file for the CLOSE
+        # view's hires blit (None when nothing loaded).
+        self.image_native = None
+        if image_file is not None:
+            try:
+                self.image_native = load_image(image_file, alpha=True)
+            except FileNotFoundError:
+                self.image_native = None
 
         # Mirror enemy art so it faces the battlefield like its units.
         # Flipping copies the cached surface: the cache is never mutated.

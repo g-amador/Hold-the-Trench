@@ -10,7 +10,7 @@ locations.
 
 import pygame
 
-from config import TILE_SIZE, BUILD_FOOTPRINTS
+from config import TILE_SIZE, BUILD_FOOTPRINTS, footprint_for
 from graphics import render_mode
 from utils.image_loader import load_image
 from systems.factions import ground_texture_filename
@@ -93,6 +93,13 @@ class TileMap:
             [Tile(x, y, layout[y][x]) for x in range(self.width)]
             for y in range(self.height)
         ]
+
+        # Faction context for EMPTY-spot footprint resolution (axis
+        # artillery 3x2 override etc.). Placed buildings carry their
+        # own footprint_tiles; these defaults are what a pre-battle
+        # grid (no set_factions call yet) resolves with.
+        self.player_faction = "allies"
+        self.enemy_faction = "axis"
 
         # Ground floor texture for SPRITES mode: map1_a<scene>.jpg
         # scaled ONCE to the whole battlefield strip (tiles are then
@@ -190,6 +197,39 @@ class TileMap:
         # Only '.' counts as empty for spawning (Option B)
         return tile.type_char == "."
 
+    def set_factions(self, player_faction, enemy_faction):
+        """Bind the battle's sides for FOOTPRINT resolution.
+
+        Footprints can differ per SIDE (axis artillery is 3x2, allies
+        4x2 — config.FACTION_FOOTPRINT_OVERRIDES), but this grid is
+        built before the menu rolls the factions. Placed buildings
+        carry their own footprint_tiles, so only EMPTY-spot probes and
+        outline drawing need the side context: "enemy_"-prefixed spot
+        kinds resolve against the ENEMY faction, the rest against the
+        player's. Defaults (allies/axis) keep pre-battle usage sane.
+        """
+        self.player_faction = player_faction
+        self.enemy_faction = enemy_faction
+
+    def _footprint_for_spot(self, spot_kind):
+        """Spot kind -> (fw, fh), honoring the faction overrides.
+
+        build_kind strips the "enemy_" prefix; the faction looked up
+        is the side that owns the spot (set_factions above; defaults
+        allies/axis when no battle has started).
+        """
+        build_kind = (
+            spot_kind[len("enemy_"):]
+            if spot_kind.startswith("enemy_")
+            else spot_kind
+        )
+        faction = (
+            self.enemy_faction
+            if spot_kind.startswith("enemy_")
+            else self.player_faction
+        )
+        return footprint_for(build_kind, faction)
+
     def _footprint_covered(self, tile_x, tile_y):
         """Yield (anchor_x, anchor_y, fw, fh) for every anchor whose
         footprint could reach (tile_x, tile_y).
@@ -213,14 +253,10 @@ class TileMap:
 
                 kind = self.spot_types.get((tile_x - dx, tile_y - dy))
                 if kind is not None:
-                    # Spot-marker footprints come from the config table
-                    # (enemy kinds lose their prefix).
-                    build_kind = (
-                        kind[len("enemy_"):]
-                        if kind.startswith("enemy_")
-                        else kind
-                    )
-                    fw, fh = BUILD_FOOTPRINTS.get(build_kind, (1, 1))
+                    # Spot-marker footprints come from the config
+                    # table through the faction-aware lookup (enemy
+                    # kinds resolve the ENEMY side's override).
+                    fw, fh = self._footprint_for_spot(kind)
                 else:
                     fw, fh = 1, 1
 
@@ -309,15 +345,33 @@ class TileMap:
         ))
         return pygame.Rect(left, top, right - left, bottom - top)
 
-    def _draw_buildings(self, screen, camera_x, view_rect=None):
+    def _draw_buildings(
+        self,
+        screen,
+        camera_x,
+        view_rect=None,
+        skip_native_hires=False,
+    ):
         """Draw every anchored building once (grid scan); shared by
         both graphics modes so buildings always sit on top of the
         ground, never under neighboring tiles. A building is skipped
-        when its footprint lies fully outside the culled viewport."""
+        when its footprint lies fully outside the culled viewport.
+
+        skip_native_hires (CLOSE view + scene art): buildings with a
+        native-resolution image (image_native) are NOT drawn here —
+        AssaultPhase blits their 4x-screen-resolution hires art
+        directly onto the screen after the zoom, so drawing them here
+        would leave the old low-res copy underneath.
+        """
         for row in self.tiles:
             for tile in row:
                 if tile.building:
                     build = tile.building
+                    if skip_native_hires and getattr(
+                        build, "image_native", None,
+                    ) is not None:
+                        continue
+
                     if view_rect is not None:
                         # Culled: build the footprint rect from the
                         # building's own table-driven footprint sizes
@@ -336,7 +390,8 @@ class TileMap:
                             continue
                     build.draw(screen, camera_x)
 
-    def draw(self, screen, camera_x, view_rect=None, skip_ground=False):
+    def draw(self, screen, camera_x, view_rect=None, skip_ground=False,
+             skip_native_hires=False):
         """Draw the battlefield, then outline build spots for the player.
 
         SPRITES mode: the ground is the scaled map floor texture —
@@ -352,6 +407,11 @@ class TileMap:
         world-resolution strip contains), so the caller then blits
         only this surface's ENTITY content over that ground; ground
         must not be baked in underneath. Ignored in BLOCKS mode.
+
+        skip_native_hires (CLOSE view + SPRITES): buildings that
+        carry a native-resolution image are skipped on the world
+        surface (AssaultPhase draws them at true screen resolution
+        over the CLOSE ground straight after the zoom).
 
         The mode is queried EVERY frame (single source: render_mode;
         never cached), so G flips textured floor <-> tile palette live.
@@ -387,7 +447,9 @@ class TileMap:
             # Buildings ride on tiles, so draw them here over the
             # texture (units/bullets/pickups are drawn later, on top
             # of the whole tilemap, by the battle state).
-            self._draw_buildings(screen, camera_x, view_rect)
+            self._draw_buildings(
+                screen, camera_x, view_rect, skip_native_hires,
+            )
         else:
             # Tile grid first, buildings second: a multi-tile building
             # (2x2 MG) must never have its right/bottom footprint
@@ -405,7 +467,9 @@ class TileMap:
                 for x in range(x_lo, x_hi):
                     self.tiles[y][x].draw(screen, camera_x)
 
-            self._draw_buildings(screen, camera_x, view_rect)
+            self._draw_buildings(
+                screen, camera_x, view_rect, skip_native_hires,
+            )
 
         # Debug/assist overlay: ONE green outline spanning each EMPTY
         # build spot's FULL footprint (the MG's 2x2 reads as a single
@@ -418,12 +482,8 @@ class TileMap:
             if tile.building is not None:
                 continue
 
-            build_kind = (
-                spot_kind[len("enemy_"):]
-                if spot_kind.startswith("enemy_")
-                else spot_kind
-            )
-            fw, fh = BUILD_FOOTPRINTS.get(build_kind, (1, 1))
+            # Faction-aware (axis artillery spots outline as 3x2).
+            fw, fh = self._footprint_for_spot(spot_kind)
 
             px = x * TILE_SIZE - camera_x
             py = y * TILE_SIZE
