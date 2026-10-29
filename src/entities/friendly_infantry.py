@@ -9,13 +9,20 @@ symmetrical with enemy melee (both sides lose one unit per clash).
 import math
 import pygame
 
-from config import BLUE
+from config import (
+    BLUE,
+    INFANTRY_SPEED,
+    INFANTRY_HP,
+    INFANTRY_SHOOT_COOLDOWN,
+    INFANTRY_SHOOT_RANGE_PX,
+    INFANTRY_BULLET_DAMAGE,
+)
 from entities.armor import ArmorUnit
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from graphics.sprite_generator import SpriteGenerator
-from systems.factions import unit_prefix
+from systems.factions import unit_prefix, scaled_damage, scaled_hp
 
 class FriendlyInfantry:
     """Ally rifle infantry: one charge, one kill, one death."""
@@ -25,9 +32,16 @@ class FriendlyInfantry:
         self.x = x
         self.y = y
 
-        # Baseline stats mirror EnemyInfantry so melee is a fair trade.
-        self.speed = 120
-        self.hp = 40
+        # Side-picked soldier art: random nation from the faction pool
+        # (brit/fr for allies, ger/aust for axis — systems/factions.py).
+        # Rolled FIRST so the WWI balance handicaps scale this unit's
+        # stats at spawn.
+        prefix, self.nation = unit_prefix(faction)
+
+        # Baseline stats mirror EnemyInfantry so melee is a fair trade
+        # (all from config; hp carries the nation's resistance handicap).
+        self.speed = INFANTRY_SPEED
+        self.hp = scaled_hp(self.nation, "infantry", INFANTRY_HP)
         self.width = 24
         self.height = 24
         self.dead = False
@@ -38,12 +52,8 @@ class FriendlyInfantry:
 
         # Ranged fire: cooldown gates shots; the aim-pose timer plays
         # on every pull (see update).
-        self.shoot_cooldown = 1.2
+        self.shoot_cooldown = INFANTRY_SHOOT_COOLDOWN
         self.shoot_timer = 0.0
-
-        # Side-picked soldier art: random nation from the faction pool
-        # (brit/fr for allies, ger/aust for axis — systems/factions.py).
-        prefix, self.nation = unit_prefix(faction)
 
         # Standard infantry frames; None means missing assets (block fallback).
         self.sprite_generator = SpriteGenerator()
@@ -127,7 +137,7 @@ class FriendlyInfantry:
             # hit against enemies / enemy bunkers. The aim pose is
             # raised by _fire on the actual shot — per volley, never
             # pinned — mirroring EnemyInfantry and the player.
-            if length < 200:
+            if length < INFANTRY_SHOOT_RANGE_PX:
                 # Normalize and check dot product for 90 degree cone
                 nx, ny = dx / length, dy / length
                 if (nx * self.facing) >= 0.707:
@@ -180,15 +190,18 @@ class FriendlyInfantry:
         if bullets is None:
             return
 
-        # Muzzle at the unit's body center; direction continues the aim.
-        bullets.append(
-            Bullet(
-                self.x + self.width / 2,
-                self.y + self.height / 2,
-                nx,
-                ny,
-            )
+        # Muzzle at the unit's body center; direction continues the
+        # aim. Damage carries this soldier nation's infantry handicap.
+        bullet = Bullet(
+            self.x + self.width / 2,
+            self.y + self.height / 2,
+            nx,
+            ny,
         )
+        bullet.damage = scaled_damage(
+            self.nation, "infantry", INFANTRY_BULLET_DAMAGE,
+        )
+        bullets.append(bullet)
         self.shoot_timer = self.shoot_cooldown
 
     def take_damage(self, damage):

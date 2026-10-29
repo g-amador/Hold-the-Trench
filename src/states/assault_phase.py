@@ -29,6 +29,7 @@ from entities.mg_nest import MGNest
 from entities.bunker import Bunker
 from entities.artillery import Artillery
 from entities.armor import ArmorUnit
+from entities.airplane import AirplaneUnit
 from entities.barracks import Barracks
 from entities.static_building import AirField, TankFactory
 
@@ -43,6 +44,7 @@ from config import (
     RED,
     YELLOW,
     BUILD_FOOTPRINTS,
+    footprint_for,
     VIEW_FULL,
     VIEW_CLOSE,
     CLOSE_VIEW_TILES,
@@ -93,6 +95,11 @@ class AssaultPhase:
         # every entity read these to pick art and coin drops.
         self.player_faction = getattr(game, "selected_faction", "allies")
         self.enemy_faction = other(self.player_faction)
+
+        # Faction-aware EMPTY-spot footprints: the axis artillery spot
+        # is a 3x2 plot while the allies' stays 4x2 (config overrides;
+        # placed buildings carry their own footprint either way).
+        self.tilemap.set_factions(self.player_faction, self.enemy_faction)
 
         # One scene roll per battle. Everything scene-linked then
         # shares the same letter: the ground texture (map1_a/map1_c is
@@ -254,6 +261,11 @@ class AssaultPhase:
         self.enemy_bullets = []
         self.friendlies = []
         self.enemy_barracks_units = []
+        # Planes fly in their OWN per-side lists (not mixed into the
+        # infantry lists): their update signature, damage rules, and
+        # air-vs-ground targeting differ too much to share the loops.
+        self.friendly_planes = []
+        self.enemy_planes = []
 
         self.build_prompt_radius = 72
         self.place_enemy_buildings()
@@ -335,11 +347,14 @@ class AssaultPhase:
                 )
 
     def place_static_buildings(self):
-        """Place free player-side statics from F/K map markers.
+        """Place free statics from F/K (player) / f/k (enemy) markers.
 
-        Same placement as enemy defenses: free at battle start, oben
+        Same placement as enemy defenses: free at battle start, open
         tiles only, no payment. Statics are never purchasable, so the
         build prompt and payment systems never touch these spots.
+        Enemy-side statics get the enemy faction for art behavior
+        (german buildings/planes) and spawn into the enemy's lists
+        via their own is_enemy flag.
         """
         for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
             building_class = STATIC_BUILDING_CLASSES.get(spot_type)
@@ -350,10 +365,14 @@ class AssaultPhase:
             if tile is None or tile.building is not None:
                 continue
 
+            is_enemy = spot_type.startswith("enemy_")
             tile.building = building_class(
                 tile_x,
                 tile_y,
-                faction=self.player_faction,
+                faction=(
+                    self.enemy_faction if is_enemy else self.player_faction
+                ),
+                is_enemy=is_enemy,
             )
 
     def place_zero_cost_buildings(self):
@@ -401,8 +420,10 @@ class AssaultPhase:
                 continue
 
             # Contact against the spot's FULL footprint: touching ANY
-            # tile of the MG's 2x2 pays into it, not only the marker.
-            fw, fh = BUILD_FOOTPRINTS.get(spot_type, (1, 1))
+            # tile of the MG's 4x4 pays into it, not only the marker.
+            # Faction-aware: the allies/axis artillery spot differs
+            # (axis 3x2; player spots use the player's side).
+            fw, fh = footprint_for(spot_type, self.player_faction)
             spot_rect = pygame.Rect(
                 tile_x * TILE_SIZE,
                 tile_y * TILE_SIZE,
@@ -505,6 +526,19 @@ class AssaultPhase:
         # Retrieve all buildings from the tilemap.
         buildings = BuildingQuery.get_all_buildings(self.tilemap)
 
+        # Split the building roster by side, ALIVE only: destructible
+        # buildings (all of them, since BUILDING_HP) take damage from
+        # tank shells, plane bombs, and bunker-bound bullets; the dead
+        # ones stop firing, spawning, and being targeted.
+        enemy_buildings = [
+            b for b in buildings
+            if b.is_enemy and not b.is_destroyed()
+        ]
+        player_buildings = [
+            b for b in buildings
+            if not b.is_enemy and not b.is_destroyed()
+        ]
+
         player_bunkers = [
             b for b in buildings
             if isinstance(b, Bunker) and not b.is_enemy
@@ -587,9 +621,20 @@ class AssaultPhase:
                     hit = True
                     break
 
-            # Fallback to objectives when no unit was hit: shooting
-            # bunkers is a core win route.
-            if not hit:
+            # Fallback to objectives when no unit was hit. Buildings
+            # are destructible: armor_damage bullets (tank shells)
+            # hurt ANY enemy building; plane MG bullets never touch
+            # buildings (bombs only); other shots keep the old
+            # bunker-only rule (shooting bunkers is a core win route).
+            if not hit and bullet.armor_damage:
+                for building in enemy_buildings:
+                    if bullet.get_hitbox().colliderect(
+                        building.get_hitbox()
+                    ):
+                        building.take_damage(bullet.damage)
+                        hit = True
+                        break
+            elif not hit and getattr(bullet, "can_damage_buildings", True):
                 for bunker in enemy_bunkers:
                     if bunker.dead:
                         continue
@@ -598,6 +643,22 @@ class AssaultPhase:
                         bunker.get_hitbox()
                     ):
                         bunker.take_damage(bullet.damage)
+                        hit = True
+                        break
+
+            # Enemy planes: player-side bullets (and plane MG fire)
+            # reach the opposing planes in the air (bullets with no
+            # armor damage chip planes like infantry; plane bullets
+            # are armorless by design, dogfights stay infantry-like).
+            if not hit:
+                for plane in self.enemy_planes:
+                    if plane.dead:
+                        continue
+
+                    if bullet.get_hitbox().colliderect(
+                        plane.get_hitbox()
+                    ):
+                        plane.take_damage(bullet.damage)
                         hit = True
                         break
 
@@ -612,6 +673,11 @@ class AssaultPhase:
         player_bunker = player_bunkers[0] if player_bunkers else None
 
         for enemy in self.enemy_barracks_units:
+            # ArmorUnit is updated in its OWN loop below (stop-at-
+            # building rule): the infantry call signature would feed
+            # it the player bunker as a BUILDINGS list. Skip here.
+            if isinstance(enemy, ArmorUnit):
+                continue
             enemy.update(dt, self.friendlies, self.enemy_bullets, player_bunker)
 
         # Spawn gold before removing dead enemy infantry: spawn_gold
@@ -638,50 +704,92 @@ class AssaultPhase:
         ]
 
         # Update production and combat buildings. Barracks spawn
-        # infantry on their cadence and the tank factory rolls out
-        # armor; machine guns and artillery share the same classes
-        # on both sides — only the lists swapped in differ, so which
-        # side shoots at whom is the state's choice (buildings aim
-        # at the opposing unit list).
+        # infantry on their cadence, the tank factory rolls out
+        # armor, AIR FIELDS roll out planes; machine guns and
+        # artillery share the same classes on both sides — only the
+        # lists swapped in differ, so which side shoots at whom is
+        # the state's choice (buildings aim at the opposing unit
+        # list). Destroyed buildings stand down entirely.
         for building in buildings:
-            if not isinstance(building, (Barracks, TankFactory, MGNest, Artillery)):
+            if getattr(building, "is_destroyed", lambda: False)():
+                continue
+
+            if not isinstance(
+                building,
+                (Barracks, TankFactory, MGNest, Artillery, AirField),
+            ):
                 continue
 
             if building.is_enemy:
-                if isinstance(building, Barracks):
+                if isinstance(building, (Barracks, TankFactory)):
                     building.update(dt, self.enemy_barracks_units)
-                elif isinstance(building, TankFactory):
-                    building.update(dt, self.enemy_barracks_units)
+                elif isinstance(building, AirField):
+                    building.update(dt, self.enemy_planes)
                 else:
                     building.update(dt, self.friendlies, self.enemy_bullets)
             else:
-                if isinstance(building, Barracks):
+                if isinstance(building, (Barracks, TankFactory)):
                     building.update(dt, self.friendlies)
-                elif isinstance(building, TankFactory):
-                    building.update(dt, self.friendlies)
+                elif isinstance(building, AirField):
+                    building.update(dt, self.friendly_planes)
                 else:
                     building.update(dt, self.enemy_barracks_units, self.bullets)
 
         # Factory armor: vehicles drive toward the enemy base and
-        # hunt with their hull MG. Player tanks/cars stop and shell
-        # the first enemy bunker when one is on the map (cars drive
-        # on past it: they can never damage a bunker).
-        enemy_bunker_for_armor = enemy_bunkers[0] if enemy_bunkers else None
-
+        # hunt with their hull MG. Both stop when an enemy building
+        # is inside shooting range (user rule); tanks shell it, cars
+        # park (their MG never hits buildings).
         for vehicle in list(self.friendlies):
             if isinstance(vehicle, ArmorUnit):
                 vehicle.update(
                     dt, self.enemy_barracks_units, self.bullets,
-                    enemy_bunker_for_armor,
+                    enemy_buildings,
                 )
 
         for vehicle in list(self.enemy_barracks_units):
             if isinstance(vehicle, ArmorUnit):
                 vehicle.update(
-                    dt, self.friendlies, self.enemy_bullets, player_bunkers[0] if player_bunkers else None,
+                    dt, self.friendlies, self.enemy_bullets,
+                    player_buildings,
                 )
 
-        # Enemy bullets can damage friendly infantry only.
+        # Planes fly (no ground logic): friendly planes hunt the
+        # enemy's armor + buildings + planes; enemy planes mirror.
+        # Ground target list = enemy armor (tanks/cars) + enemy
+        # buildings, nearest-first inside the plane itself.
+        enemy_ground = [
+            unit for unit in self.enemy_barracks_units
+            if isinstance(unit, ArmorUnit) and not unit.dead
+        ] + enemy_buildings
+        friendly_ground = [
+            unit for unit in self.friendlies
+            if isinstance(unit, ArmorUnit) and not unit.dead
+        ] + player_buildings
+
+        for plane in list(self.friendly_planes):
+            plane.update(
+                dt, enemy_ground, self.enemy_planes, self.bullets,
+            )
+
+        for plane in list(self.enemy_planes):
+            plane.update(
+                dt, friendly_ground, self.friendly_planes,
+                self.enemy_bullets,
+            )
+
+        # Dead planes out this frame (no gold drops: gold_spawned is
+        # True on planes, so the gold loop below skips them too).
+        self.friendly_planes = [
+            plane for plane in self.friendly_planes if not plane.dead
+        ]
+        self.enemy_planes = [
+            plane for plane in self.enemy_planes if not plane.dead
+        ]
+
+        # Enemy bullets can damage friendly infantry; armor passes
+        # through; friendly BUILDINGS rule mirrors the bullets above
+        # (tank shells hit any building, others only bunkers); and
+        # friendly PLANES get hit by anything in the air.
         remaining_enemy_bullets = []
 
         for bullet in self.enemy_bullets:
@@ -715,6 +823,38 @@ class AssaultPhase:
 
                     hit = True
                     break
+
+            if not hit and bullet.armor_damage:
+                for building in player_buildings:
+                    if bullet.get_hitbox().colliderect(
+                        building.get_hitbox()
+                    ):
+                        building.take_damage(bullet.damage)
+                        hit = True
+                        break
+            elif not hit and getattr(bullet, "can_damage_buildings", True):
+                for bunker in player_bunkers:
+                    if bunker.dead:
+                        continue
+
+                    if bullet.get_hitbox().colliderect(
+                        bunker.get_hitbox()
+                    ):
+                        bunker.take_damage(bullet.damage)
+                        hit = True
+                        break
+
+            if not hit:
+                for plane in self.friendly_planes:
+                    if plane.dead:
+                        continue
+
+                    if bullet.get_hitbox().colliderect(
+                        plane.get_hitbox()
+                    ):
+                        plane.take_damage(bullet.damage)
+                        hit = True
+                        break
 
             if not hit:
                 remaining_enemy_bullets.append(bullet)
@@ -787,7 +927,8 @@ class AssaultPhase:
             # radius left the prompt blind while standing on the far
             # corner tiles (90px > the 72px radius) — edge distance
             # keeps "near the spot" true for its whole footprint.
-            fw, fh = BUILD_FOOTPRINTS.get(spot_type, (1, 1))
+            # Faction-aware (axis artillery 3x2 override etc.).
+            fw, fh = footprint_for(spot_type, self.player_faction)
             rect = pygame.Rect(
                 tile_x * TILE_SIZE,
                 tile_y * TILE_SIZE,
@@ -840,13 +981,20 @@ class AssaultPhase:
                 enemy_placed[type(building).__name__] += 1
 
         # One tuple per row: (name, player display, enemy display).
-        # Infantry counts exclude factory armor; armored vehicles
-        # (tanks + cars) get their own row.
+        # Infantry counts exclude factory armor (planes live in their
+        # OWN lists); armored vehicles (tanks + cars) get their own
+        # row and the air forces another.
         infantry_player = sum(
             1 for u in self.friendlies if not isinstance(u, ArmorUnit)
         )
         infantry_enemy = sum(
             1 for u in self.enemy_barracks_units if not isinstance(u, ArmorUnit)
+        )
+        armor_player = sum(
+            1 for u in self.friendlies if isinstance(u, ArmorUnit)
+        )
+        armor_enemy = sum(
+            1 for u in self.enemy_barracks_units if isinstance(u, ArmorUnit)
         )
         return [
             (
@@ -856,8 +1004,13 @@ class AssaultPhase:
             ),
             (
                 "Armor",
-                str(len(self.friendlies) - infantry_player),
-                str(len(self.enemy_barracks_units) - infantry_enemy),
+                str(armor_player),
+                str(armor_enemy),
+            ),
+            (
+                "Planes",
+                str(len(self.friendly_planes)),
+                str(len(self.enemy_planes)),
             ),
             (
                 "Barracks",
@@ -1016,6 +1169,7 @@ class AssaultPhase:
             self.camera_x,
             view_rect,
             skip_ground=close_native_ground,
+            skip_native_hires=close_native_ground,
         )
 
         # Artillery firing/impact markers, measured on the marker's
@@ -1065,6 +1219,16 @@ class AssaultPhase:
             if in_view(friendly.x, friendly.y):
                 friendly.draw(world, self.camera_x)
 
+        # Planes fly ABOVE everything on the world layer (their own
+        # draw already offsets them up for the flight illusion).
+        for plane in self.enemy_planes:
+            if in_view(plane.x, plane.y):
+                plane.draw(world, self.camera_x)
+
+        for plane in self.friendly_planes:
+            if in_view(plane.x, plane.y):
+                plane.draw(world, self.camera_x)
+
         self.player.draw(world, self.camera_x)
 
         # Uniform zoom into the visible strip: single-factor scale
@@ -1107,6 +1271,16 @@ class AssaultPhase:
                 pygame.transform.smoothscale(region, self.close_view),
                 (0, HUD_BAR_HEIGHT),
             )
+
+            # Building hires pass (user: "images zoom in or zoom out
+            # should have the same high quality"): static buildings
+            # usually ship native art much bigger than the world box,
+            # so those with image_native blit straight here at SCREEN
+            # resolution (4x sharper than the world surface could
+            # ever show). Buildings without native art keep their
+            # normal low-res draw under the entity layer above.
+            if close_native_ground:
+                self._blit_building_hires(screen, cx, cy, view_rect)
         else:
             # FULL view (default/'-'): whole battlefield at once.
             screen.blit(
@@ -1135,6 +1309,54 @@ class AssaultPhase:
         if self.paused:
             self._draw_pause_overlay(screen)
             self.hud.draw_force_counts(screen, self._collect_force_rows())
+
+    def _blit_building_hires(self, screen, cx, cy, view_rect):
+        """CLOSE view: buildings blit straight to screen from native art.
+
+        For every building with an image_native surface (the SAME art
+        file at its true resolution, sized per instance in the entity
+        constructors), the battle caches ONE smoothscaled copy at the
+        CLOSE zoom (native -> footprint * close_scale world px, i.e.
+        ~4x) and blits it at its window-relative screen position.
+        Buildings whose art would upscale beyond its source or missing
+        files (image_native None) stay on the low-res world path —
+        nothing disappears, quality only stays where it can improve.
+        """
+        scale = self.close_scale
+        for building in BuildingQuery.get_all_buildings(self.tilemap):
+            native = getattr(building, "image_native", None)
+            if native is None:
+                continue
+
+            fw, fh = (
+                TILE_SIZE * n for n in building.footprint_tiles
+            )
+            target = (
+                int(round(fw * scale)),
+                int(round(fh * scale)),
+            )
+
+            cache = building.__dict__.get("_hires_cache")
+            if cache is None or cache.get_size() != target:
+                cache = pygame.transform.smoothscale(native, target)
+                building._hires_cache = cache
+
+            screen_x = (building.tile_x * TILE_SIZE - cx) * scale
+            screen_y = HUD_BAR_HEIGHT + (
+                building.tile_y * TILE_SIZE - cy
+            ) * scale
+
+            # Cull: footprint fully outside the CLOSE window is skipped.
+            world_rect = pygame.Rect(
+                building.tile_x * TILE_SIZE,
+                building.tile_y * TILE_SIZE,
+                fw,
+                fh,
+            )
+            if not world_rect.colliderect(view_rect):
+                continue
+
+            screen.blit(cache, (int(round(screen_x)), int(round(screen_y))))
 
     def _draw_pause_overlay(self, screen):
         """Draw the dim + centered PAUSED panel with resume instructions."""

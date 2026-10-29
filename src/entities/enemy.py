@@ -11,14 +11,27 @@ import math
 import pygame
 import random
 
-from config import RED
+from config import (
+    RED,
+    INFANTRY_SPEED,
+    INFANTRY_HP,
+    INFANTRY_GOLD_DROP,
+    INFANTRY_SHOOT_COOLDOWN,
+    INFANTRY_SHOOT_RANGE_PX,
+    INFANTRY_BULLET_DAMAGE,
+    ENEMY_SIEGE_DAMAGE,
+    ENEMY_SIEGE_COOLDOWN,
+    LEGACY_TANK_SPEED,
+    LEGACY_TANK_HP,
+    LEGACY_TANK_GOLD_DROP,
+)
 from entities.armor import ArmorUnit
 from entities.bullet import Bullet
 from entities.gold_pickup import GoldPickup
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from graphics.sprite_generator import SpriteGenerator
-from systems.factions import unit_prefix, coin_texture
+from systems.factions import unit_prefix, coin_texture, scaled_damage, scaled_hp
 
 
 class EnemyBase:
@@ -114,8 +127,22 @@ class EnemyInfantry(EnemyBase):
     """Rifle infantry: homes onto the nearest friendly; the clash is mutually lethal."""
 
     def __init__(self, x, y, faction="axis"):
-        # Baseline stats: soldier speed, moderate hp, small gold bounty.
-        super().__init__(x, y, speed=120, hp=40, gold_drop=5)
+        # Side-picked soldier art: random nation from the faction pool
+        # (ger/aust for axis, brit/fr for allies — systems/factions.py).
+        # Rolled FIRST so the WWI balance handicaps can scale this
+        # unit's stats at spawn (resistance -> hp).
+        prefix, self.nation = unit_prefix(faction)
+        self.coin = coin_texture(self.nation)
+
+        # Baseline stats: soldier speed, moderate hp, small gold bounty
+        # (all from config; hp carries the nation's resistance handicap).
+        super().__init__(
+            x,
+            y,
+            speed=INFANTRY_SPEED,
+            hp=scaled_hp(self.nation, "infantry", INFANTRY_HP),
+            gold_drop=INFANTRY_GOLD_DROP,
+        )
         # Match the sprite footprint; the base 24x32 would not fit the art.
         self.width = 24
         self.height = 24
@@ -125,20 +152,14 @@ class EnemyInfantry(EnemyBase):
         # Siege stats (used when no friendly units remain): swing on a
         # fixed cadence against the assault objective. Timer starts at
         # 0 so the first contact strike lands immediately.
-        self.attack_damage = 10
-        self.attack_cooldown = 1.0
+        self.attack_damage = ENEMY_SIEGE_DAMAGE
+        self.attack_cooldown = ENEMY_SIEGE_COOLDOWN
         self.attack_timer = 0.0
 
         # Ranged fire against friendlies in range, on cooldown; mirrors
         # FriendlyInfantry so ranged fights resolve the same both ways.
-        self.shoot_cooldown = 1.2
+        self.shoot_cooldown = INFANTRY_SHOOT_COOLDOWN
         self.shoot_timer = 0.0
-
-        # Side-picked soldier art: random nation from the faction pool
-        # (ger/aust for axis, brit/fr for allies — systems/factions.py).
-        # The rolled nation drives the coin drop at death time.
-        prefix, self.nation = unit_prefix(faction)
-        self.coin = coin_texture(self.nation)
 
         # Standard infantry frames; None means missing assets (block fallback).
         self.sprite_generator = SpriteGenerator()
@@ -313,15 +334,14 @@ class EnemyInfantry(EnemyBase):
         if bullets is None:
             return
 
-        # Muzzle at the unit's body center; direction continues the aim.
-        bullets.append(
-            Bullet(
-                self.x + self.width / 2,
-                self.y + self.height / 2,
-                nx,
-                ny,
-            )
+        # Muzzle at the unit's body center; direction continues the
+        # aim. Damage carries this soldier nation's infantry handicap
+        # (ger stormtroopers 1.05x etc.).
+        bullet = Bullet(self.x + self.width / 2, self.y + self.height / 2, nx, ny)
+        bullet.damage = scaled_damage(
+            self.nation, "infantry", INFANTRY_BULLET_DAMAGE,
         )
+        bullets.append(bullet)
         self.shoot_timer = self.shoot_cooldown
 
     def draw(self, screen, camera_x):
@@ -349,13 +369,20 @@ class EnemyInfantry(EnemyBase):
         pos = (screen_x, screen_y)
         self.sprite_generator.draw(screen, legs, pos, self.facing)
         self.sprite_generator.draw(screen, upper, pos, self.facing)
-    
+
 class Tank(EnemyBase):
     """Slow assault placeholder: heavy hp, biggest bounty."""
 
     def __init__(self, x, y):
         # Armor removes the usual speed advantage: deliberate contrast
-        # with cavalry, same gold-driven economy pressure.
-        super().__init__(x, y, speed=30, hp=300, gold_drop=20)
+        # with cavalry, same gold-driven economy pressure. Stats from
+        # the config table (user rule: every stat centralized).
+        super().__init__(
+            x,
+            y,
+            speed=LEGACY_TANK_SPEED,
+            hp=LEGACY_TANK_HP,
+            gold_drop=LEGACY_TANK_GOLD_DROP,
+        )
         self.width = 48
         self.height = 32
