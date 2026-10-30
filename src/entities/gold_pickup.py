@@ -6,11 +6,13 @@ battle state polls update() every frame and, when it returns True,
 credits the amount to EconomySystem.gold and drops the pickup from
 its list.
 
-Art: defeated AXIS soldiers (ger/aust) drop coin_ger.png; defeated
-ALLIES soldiers drop coin_brit.png / coin_fr.png. The dying unit
-passes the filename; missing files fall back to the plain gold square
-(the gold square is also the whole look in block mode terms — a coin
-that cannot load must never crash the game).
+Art: the coin side follows the player's choice (user rule): playing
+ALLIES, axis soldiers (ger/aust) drop coin_ger.png; playing AXIS,
+every allied soldier (fr units AND brit units) drops coin_fr.png
+(factions.side_coin). The dying unit passes the filename; missing
+files fall back to the plain gold square (the gold square is also the
+whole look in block mode terms — a coin that cannot load must never
+crash the game).
 """
 
 import math
@@ -18,7 +20,15 @@ import pygame
 
 from utils.image_loader import load_image
 
-# Draw size for coin art; scaled copy, the cache is never mutated.
+# Draw size for coin art in the world layer; scaled copy, the cache is
+# never mutated. The OPEN quality comes from three places (user:
+# "coin images with good quality"):
+#   1. the world copy uses smoothscale — the 256x256 source art is
+#      NOT nearest-squeezed into 12x12 anymore,
+#   2. the FULL view's uniform zoom then downscales that smoothly,
+#   3. in the CLOSE view the coin skips the 4x-upscaled world layer
+#      entirely and AssaultPhase._blit_coin_hires smoothscales the
+#      NATIVE art straight to screen (4x more pixels per world px).
 COIN_SIZE = (12, 12)
 
 
@@ -47,16 +57,22 @@ class GoldPickup:
         self.height = 12
 
         # Nation coin art: loaded once here (image cache holds the
-        # scaled copy separately from the raw asset). None means the
-        # art is missing and draw() falls back to the gold square.
+        # raw source, never mutated). None means the art is missing
+        # and draw() falls back to the gold square.
         self.texture = None
+        self.image_native = None   # CLOSE hires source (256x256)
 
         if texture is not None:
             try:
-                image = load_image(texture, alpha=True)
-                self.texture = pygame.transform.scale(image, COIN_SIZE)
+                native = load_image(texture, alpha=True)
+                self.texture = pygame.transform.smoothscale(
+                    native,
+                    COIN_SIZE,
+                )
+                self.image_native = native
             except FileNotFoundError:
                 self.texture = None
+                self.image_native = None
 
     def update(self, dt, player):
         """Advance the bob animation; collect when the player is near.

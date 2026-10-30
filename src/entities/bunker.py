@@ -8,10 +8,23 @@ that other buildings and the player protect or attack.
 
 import pygame
 
-from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS, BUILDING_HP
+from config import (
+    TILE_SIZE,
+    GREY,
+    BUILD_FOOTPRINTS,
+    BUILDING_HP,
+    BUNKER_FOOTPRINTS_BY_NATION,
+)
 from graphics import render_mode
-from systems.factions import building_variant_filenames
-from utils.image_loader import load_image, load_first_image_named
+from systems.factions import (
+    building_variant_filenames,
+    nation_from_building_filename,
+)
+from utils.image_loader import (
+    aspect_fit_contain,
+    load_image,
+    opaque_bbox,
+)
 
 
 class Bunker:
@@ -30,48 +43,101 @@ class Bunker:
         self.hp = BUILDING_HP["bunker"]
         self.dead = False
 
-        # Footprint/table-driven like the MG (user set the config to
-        # 6x6): the drawn sprite/block, the collision rect, and the
-        # spot outline all read BUILD_FOOTPRINTS — one anchor, growing
-        # right + down from the marker tile. No more legacy 2x3
-        # up-sticking hitbox: block == collision == drawn footprint.
+        # Default footprint before the art resolves (missing-art
+        # fallback): the kind's table entry, 6x6 today.
         self.footprint_tiles = BUILD_FOOTPRINTS.get("bunker", (1, 1))
-        self.width, self.height = (
-            TILE_SIZE * n for n in self.footprint_tiles
-        )
 
         # World coordinates used for targeting and collision: anchored
         # at the marker tile like every other multi-tile building.
         self.x = tile_x * TILE_SIZE
         self.y = tile_y * TILE_SIZE
 
-        # Art side: random per-building from the faction's pool, same
-        # rule as the other buildings (axis = ger, allies = brit/fr) —
-        # scene-variant chain loader (a/b/c/d with summer-day fallback)
-        # per the user's letter mapping: a summer day, b summer night,
-        # c winter day, d winter night. Scaled across the footprint.
-        fw_px, fh_px = self.width, self.height
-        self.image, image_file = load_first_image_named(
-            building_variant_filenames(faction, "bunker"),
-            alpha=True,
-            size=(fw_px, fh_px),
-        )
+        # Per-nation footprint (user: "brit and ger bunkers can be
+        # only 6x4 tiles"): the rolled art file decides the footprint
+        # for THIS instance — brit/ger art sits in the squat 6x4 box,
+        # fr (and the no-art fallback) keeps the 6x6 table default.
+        # Handled per instance because the allies bunker rolls brit OR
+        # fr art per battle.
+        self.art_nation = None
 
-        # Native-resolution copy of the SAME art file for the CLOSE
-        # view's hires blit (None when nothing loaded).
+        # ---- art: PROPORTIONAL DRAW (user fix) ----
+        # The bunker art is now:
+        #   1. cropped to its OPAQUE content (native bbox, cached per
+        #      file — applies to every scene variant a/b/c/d),
+        #   2. fitted CONTAIN into the footprint box aspect-true
+        #      (never stretched), BOTTOM-CENTER anchored (a cutaway
+        #      building stands on its ground line).
+        # `draw_size`/`draw_offset` are honored by the CLOSE-hires
+        # pass and the world blit; collision uses the per-nation
+        # footprint above.
+        self.draw_size = None
+        self.draw_offset = (0, 0)
         self.image_native = None
-        if image_file is not None:
+        self.image = None
+        for filename in building_variant_filenames(faction, "bunker"):
             try:
-                self.image_native = load_image(image_file, alpha=True)
+                bbox = opaque_bbox(filename)
+                native_full = load_image(filename, alpha=True)
             except FileNotFoundError:
-                self.image_native = None
+                continue
 
-        # Mirror enemy art so it faces the battlefield like its units.
-        # Flipping copies the cached surface: the cache is never mutated.
-        # A None image (no art at all) is left flipped-free: draw()
-        # falls back to the block mode instead.
-        if is_enemy and self.image is not None:
-            self.image = pygame.transform.flip(self.image, True, False)
+            bbox_w = bbox[2] - bbox[0]
+            bbox_h = bbox[3] - bbox[1]
+            if bbox_w <= 0 or bbox_h <= 0:
+                continue
+
+            # NOTE: opaque_bbox returns (left, top, RIGHT, BOTTOM)
+            # edges — build the rect with explicit w/h, never
+            # Rect(box) (that would read them as width/height and
+            # overshoot the canvas).
+            crop = native_full.subsurface(
+                pygame.Rect(bbox[0], bbox[1], bbox_w, bbox_h),
+            )
+
+            self.art_nation = nation_from_building_filename(filename)
+            self.footprint_tiles = BUNKER_FOOTPRINTS_BY_NATION.get(
+                self.art_nation,
+                BUILD_FOOTPRINTS.get("bunker", (1, 1)),
+            )
+            self.width, self.height = (
+                TILE_SIZE * n for n in self.footprint_tiles
+            )
+
+            draw_w, draw_h = aspect_fit_contain(
+                bbox_w, bbox_h, self.width, self.height,
+            )
+            self.draw_size = (draw_w, draw_h)
+            self.draw_offset = (
+                (self.width - draw_w) // 2,    # centered horizontally
+                self.height - draw_h,          # on the ground line
+            )
+
+            # Native copy = the opaque CROP (CLOSE hires scales THIS);
+            # world copy = the crop aspect-fit into the footprint box
+            # (smoothscale — the user wants quality, not nearest).
+            self.image_native = crop
+            self.image = pygame.transform.smoothscale(
+                crop,
+                (draw_w, draw_h),
+            )
+
+            # Mirror enemy art so it faces the battlefield like its
+            # units. Flipping makes a copy: the cache is never mutated.
+            if is_enemy:
+                self.image = pygame.transform.flip(self.image, True, False)
+                self.image_native = pygame.transform.flip(
+                    crop, True, False,
+                )
+            break
+
+        # No art anywhere (missing files): full default footprint and
+        # full-footprint draw defaults; draw() shows the block mode.
+        if self.image is None:
+            self.footprint_tiles = BUILD_FOOTPRINTS.get("bunker", (1, 1))
+            self.width, self.height = (
+                TILE_SIZE * n for n in self.footprint_tiles
+            )
+            self.draw_size = (self.width, self.height)
 
     def get_hitbox(self):
         """Return the bunker's collision rectangle in world coordinates."""
@@ -102,7 +168,10 @@ class Bunker:
         straight over the battlefield floor (no underlay), BLOCK mode
         paints ONE plain solid rect over the whole footprint — no
         facing marker, no textures — but keeps the bunker's GREY
-        color (the MG uses BROWN; the bunker stays grey).
+        color (the MG uses BROWN; the bunker stays grey). The sprite
+        is blitted at draw_offset so the aspect-true art sits
+        bottom-center inside its footprint (transparent footprint
+        edges reveal the ground, like every other building).
         """
         if not render_mode.is_sprite() or self.image is None:
             # Anchor on the hitbox so the block lines up with the
@@ -112,6 +181,6 @@ class Bunker:
             pygame.draw.rect(screen, GREY, rect)
             return
 
-        px = self.tile_x * TILE_SIZE - camera_x
-        py = self.tile_y * TILE_SIZE
+        px = self.tile_x * TILE_SIZE - camera_x + self.draw_offset[0]
+        py = self.tile_y * TILE_SIZE + self.draw_offset[1]
         screen.blit(self.image, (px, py))
