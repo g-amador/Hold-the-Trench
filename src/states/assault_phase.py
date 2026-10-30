@@ -1301,10 +1301,6 @@ class AssaultPhase:
                 src_rect = self.tilemap.native_ground_rect(view_rect)
                 if src_rect is not None:
                     screen.blit(
-                        # Native was already edge-sharpened once at
-                        # load (graphics/ground_sharpen.py via
-                        # tilemap.reload_ground) — the zoom just
-                        # resamples that crisp source per frame.
                         pygame.transform.smoothscale(
                             native.subsurface(src_rect),
                             self.close_view,
