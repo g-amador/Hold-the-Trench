@@ -29,7 +29,12 @@ BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery",
                       "air_field", "tank_factory"}
 # Build spot types the player collides with while still unbuilt:
 # empty spots are solid so buildings can't be walked into existence.
-BUILDABLE_SPOTS = {"mg", "barracks", "artillery"}
+# Statics join too (user: touching any tile of an unplaced F/K spot
+# must pay & place it) — the touch-and-pay contact covers the FULL
+# 7x7 footprint either way, but solidity keeps the spot walk-proof
+# exactly like the smaller build spots.
+BUILDABLE_SPOTS = {"mg", "barracks", "artillery",
+                   "air_field", "tank_factory"}
 # Wire characters slow movement to a fraction of base speed.
 SLOW_TILES = {"W"}
 
