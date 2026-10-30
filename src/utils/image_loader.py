@@ -84,6 +84,54 @@ def load_first_image_named(filenames, *, alpha=False, size=None):
     return None, None
 
 
+_OPQ_BBOX_CACHE = {}
+
+
+def opaque_bbox(filename, *, alpha_min=20, step=2, pad=8):
+    """(minx, miny, maxx, maxy) opaque-content box of an art file.
+
+    USER RULE (proportional bunker art): some building art canvases
+    carry large transparent margins, so scaling the FULL canvas into
+    a footprint box distorts the building. This finds the opaque
+    content box (alpha >= alpha_min, sampled every `step` px for
+    speed, widened by `pad`, clamped to the canvas). Cached per
+    filename — the per-pixel python scan costs a few seconds once per
+    file per process. Empty canvases fall back to the full canvas.
+    """
+    if filename not in _OPQ_BBOX_CACHE:
+        img = load_image(filename, alpha=True)
+        w, h = img.get_size()
+        minx, miny, maxx, maxy = w, h, -1, -1
+        for y in range(0, h, step):
+            for x in range(0, w, step):
+                if img.get_at((x, y)).a >= alpha_min:
+                    if x < minx: minx = x
+                    if x > maxx: maxx = x
+                    if y < miny: miny = y
+                    if y > maxy: maxy = y
+        if maxy < 0:
+            box = (0, 0, w, h)
+        else:
+            box = (
+                max(0, minx - pad),
+                max(0, miny - pad),
+                min(w, maxx + step + pad),
+                min(h, maxy + step + pad),
+            )
+        _OPQ_BBOX_CACHE[filename] = box
+
+    return _OPQ_BBOX_CACHE[filename]
+
+
+def aspect_fit_contain(src_w, src_h, box_w, box_h):
+    """Largest (w, h) <= box with the source's exact aspect ratio.
+
+    Never distorts: the single scale factor is min of both axes.
+    """
+    scale = min(box_w / max(src_w, 1), box_h / max(src_h, 1))
+    return max(1, round(src_w * scale)), max(1, round(src_h * scale))
+
+
 _SEMI_ALPHA_FIXED = {}
 
 
