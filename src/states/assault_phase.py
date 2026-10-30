@@ -32,6 +32,7 @@ from entities.armor import ArmorUnit
 from entities.airplane import AirplaneUnit
 from entities.barracks import Barracks
 from entities.static_building import AirField, TankFactory
+from entities.gold_pickup import COIN_SIZE
 
 from systems.factions import other, roll_scene
 
@@ -53,10 +54,18 @@ from config import (
 
 # Map spot_type string -> player-purchasable building class
 # (spot_types comes from the ASCII map's uppercase markers).
+# Statics are player-buildable TOO (user: "for collisions in the
+# tiles that a non-placed building occupies, if i touch either of the
+# tiles it should be placed if I have cash to place them" — this was
+# broken for F/K because they were not in the payable set at all):
+# cost > 0 in BUILD_COSTS -> touch-and-pay; cost 0 -> free at start
+# (place_zero_cost_buildings), same rules as mg/barracks/artillery.
 BUILDING_CLASSES = {
     "mg": MGNest,
     "barracks": Barracks,
     "artillery": Artillery,
+    "air_field": AirField,
+    "tank_factory": TankFactory,
 }
 
 # Map spot_type string -> enemy building class; these are placed free
@@ -68,12 +77,13 @@ ENEMY_BUILDING_CLASSES = {
     "enemy_artillery": Artillery,
 }
 
-# Map spot_type string -> free player-side static classes (F/K
-# markers): placed without cost and never purchasable — NOT in
-# BUILDING_CLASSES, so the build prompt/paying logic ignores them.
+# Map spot_type string -> free ENEMY-side static classes (f/k
+# markers): placed without cost when BUILD_COSTS allows (0) and never
+# purchasable — NOT in BUILDING_CLASSES, so the build prompt/paying
+# logic ignores them (the enemy has no payment path; the BUILD COSTS
+# DEBUG GATE removes them entirely at cost > 0). The playerside
+# statics moved into BUILDING_CLASSES (payable) above.
 STATIC_BUILDING_CLASSES = {
-    "air_field": AirField,
-    "tank_factory": TankFactory,
     "enemy_air_field": AirField,
     "enemy_tank_factory": TankFactory,
 }
@@ -185,6 +195,15 @@ class AssaultPhase:
             if spot_type == "bunker":
                 bunker_pos = (x, y)
                 break
+
+        # DEBUG COST GATE (user rule): the player bunker obeys the
+        # same cost table as every other free placement — cost 0
+        # (the table value today) places it, a nonzero cost turns the
+        # marker back into "no bunker" and the battle runs through the
+        # supported bunkerless path (no defeat condition, enemies have
+        # no siege target, HUD shows a flat 0 HP).
+        if bunker_pos is not None and BUILD_COSTS.get("bunker", 10**9) != 0:
+            bunker_pos = None
 
         if bunker_pos is not None:
             bunker_x, bunker_y = bunker_pos
@@ -325,6 +344,14 @@ class AssaultPhase:
             if building_class is None:
                 continue
 
+            # DEBUG COST GATE (user rule, applies to BOTH sides): a
+            # spot kind with a nonzero BUILD_COSTS entry is never
+            # placed free. The enemy has no payment path at all, so
+            # the cost table is the lever: cost 0 = exists at battle
+            # start, cost > 0 = removed from the battle entirely.
+            if BUILD_COSTS.get(spot_type, 10**9) != 0:
+                continue
+
             tile = self.tilemap.get_tile(tile_x, tile_y)
             # An occupied tile is skipped: first marker wins, so hand
             # edits to the map never silently overwrite a building.
@@ -347,11 +374,13 @@ class AssaultPhase:
                 )
 
     def place_static_buildings(self):
-        """Place free statics from F/K (player) / f/k (enemy) markers.
+        """Place free statics from the enemy f/k markers.
 
-        Same placement as enemy defenses: free at battle start, open
-        tiles only, no payment. Statics are never purchasable, so the
-        build prompt and payment systems never touch these spots.
+        Same placement as enemy defenses: free at battle start (when
+        BUILD_COSTS allows — see the DEBUG COST GATE below), open
+        tiles only, no payment. The PLAYER-side statics (F/K markers)
+        live in BUILDING_CLASSES since the user made them payable:
+        cost 0 -> place_zero_cost_buildings, cost > 0 -> touch-and-pay.
         Enemy-side statics get the enemy faction for art behavior
         (german buildings/planes) and spawn into the enemy's lists
         via their own is_enemy flag.
@@ -359,6 +388,14 @@ class AssaultPhase:
         for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
             building_class = STATIC_BUILDING_CLASSES.get(spot_type)
             if building_class is None:
+                continue
+
+            # DEBUG COST GATE (user rule, applies to BOTH sides):
+            # statics are never purchasable either, so a nonzero
+            # BUILD_COSTS entry means the static does not exist in
+            # this battle — on the player side (F/K) as well as the
+            # enemy side (f/k). Cost 0 keeps the free placement.
+            if BUILD_COSTS.get(spot_type, 10**9) != 0:
                 continue
 
             tile = self.tilemap.get_tile(tile_x, tile_y)
@@ -1204,6 +1241,12 @@ class AssaultPhase:
                 enemy_unit.draw(world, self.camera_x)
 
         for gold in self.gold_pickups:
+            if close_native_ground:
+                # CLOSE SPRITES view: coins blit straight from their
+                # native art in the hires pass below — the world
+                # layer would only show a 4x-upscaled 12px copy
+                # (user: "coin images with good quality").
+                continue
             if in_view(gold.x, gold.y):
                 gold.draw(world, self.camera_x)
 
@@ -1258,6 +1301,10 @@ class AssaultPhase:
                 src_rect = self.tilemap.native_ground_rect(view_rect)
                 if src_rect is not None:
                     screen.blit(
+                        # Native was already edge-sharpened once at
+                        # load (graphics/ground_sharpen.py via
+                        # tilemap.reload_ground) — the zoom just
+                        # resamples that crisp source per frame.
                         pygame.transform.smoothscale(
                             native.subsurface(src_rect),
                             self.close_view,
@@ -1281,6 +1328,7 @@ class AssaultPhase:
             # normal low-res draw under the entity layer above.
             if close_native_ground:
                 self._blit_building_hires(screen, cx, cy, view_rect)
+                self._blit_coin_hires(screen, cx, cy, view_rect)
         else:
             # FULL view (default/'-'): whole battlefield at once.
             screen.blit(
@@ -1328,9 +1376,15 @@ class AssaultPhase:
             if native is None:
                 continue
 
-            fw, fh = (
-                TILE_SIZE * n for n in building.footprint_tiles
+            # PROPORTIONAL art (user fix): buildings that draw
+            # aspect-true inside their footprint carry draw_size +
+            # draw_offset (bunker bottom-center); others draw the full
+            # footprint box (no attrs = unchanged behavior).
+            fw, fh = getattr(
+                building, "draw_size",
+                tuple(TILE_SIZE * n for n in building.footprint_tiles),
             )
+            ox, oy = getattr(building, "draw_offset", (0, 0))
             target = (
                 int(round(fw * scale)),
                 int(round(fh * scale)),
@@ -1341,21 +1395,71 @@ class AssaultPhase:
                 cache = pygame.transform.smoothscale(native, target)
                 building._hires_cache = cache
 
-            screen_x = (building.tile_x * TILE_SIZE - cx) * scale
+            screen_x = (building.tile_x * TILE_SIZE + ox - cx) * scale
             screen_y = HUD_BAR_HEIGHT + (
-                building.tile_y * TILE_SIZE - cy
+                building.tile_y * TILE_SIZE + oy - cy
             ) * scale
 
-            # Cull: footprint fully outside the CLOSE window is skipped.
+            # Cull: FOOTPRINT fully outside the CLOSE window is skipped
+            # (wider than the drawn art for proportional buildings).
+            cfp_w, cfp_h = (
+                TILE_SIZE * n for n in building.footprint_tiles
+            )
             world_rect = pygame.Rect(
                 building.tile_x * TILE_SIZE,
                 building.tile_y * TILE_SIZE,
-                fw,
-                fh,
+                cfp_w,
+                cfp_h,
             )
             if not world_rect.colliderect(view_rect):
                 continue
 
+            screen.blit(cache, (int(round(screen_x)), int(round(screen_y))))
+
+    def _blit_coin_hires(self, screen, cx, cy, view_rect):
+        """CLOSE view: coin pickups blit straight from native art.
+
+        Mirror of the building hires pass for the gold coins (user:
+        "coin images with good quality"): each uncollected pickup
+        carries image_native (the coin's 256x256 source); in CLOSE
+        SPRITES mode it is smoothscaled ONCE per instance to
+        COIN_SIZE * close_scale (~48x48 screen px) — far sharper than
+        the 4x-upscaled 12px world copy — and blitted at its
+        bob-animated position. Pickups without native art (missing
+        asset) stay on the low-res world path (and pickups hidden by
+        this pass keep it only in FULL / BLOCKS mode).
+        """
+        scale = self.close_scale
+        # Same edge forgiveness as the unit cull so coins bobbing at
+        # the window edge don't pop in/out.
+        margin_rect = view_rect.inflate(CULL_MARGIN, CULL_MARGIN)
+
+        for gold in self.gold_pickups:
+            if gold.collected or gold.image_native is None:
+                continue
+
+            coin_rect = pygame.Rect(
+                gold.x,
+                gold.y + gold.y_offset,
+                COIN_SIZE[0],
+                COIN_SIZE[1],
+            )
+            if not coin_rect.colliderect(margin_rect):
+                continue
+
+            target = (
+                int(round(COIN_SIZE[0] * scale)),
+                int(round(COIN_SIZE[1] * scale)),
+            )
+            cache = gold.__dict__.get("_hires_cache")
+            if cache is None or cache.get_size() != target:
+                cache = pygame.transform.smoothscale(
+                    gold.image_native, target,
+                )
+                gold._hires_cache = cache
+
+            screen_x = (gold.x - cx) * scale
+            screen_y = HUD_BAR_HEIGHT + (gold.y + gold.y_offset - cy) * scale
             screen.blit(cache, (int(round(screen_x)), int(round(screen_y))))
 
     def _draw_pause_overlay(self, screen):
