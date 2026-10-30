@@ -94,16 +94,11 @@ class StaticBuilding:
             except FileNotFoundError:
                 self.image_native = None
 
-        # Mirror enemy art so it faces the battlefield like its units
-        # (the image cache is never mutated: flips make new copies).
-        if is_enemy and self.image is not None:
-            self.image = pygame.transform.flip(self.image, True, False)
-        if is_enemy and self.image_native is not None:
-            self.image_native = pygame.transform.flip(
-                self.image_native,
-                True,
-                False,
-            )
+        # NO ENEMY FLIP (user: "air fields and tank factory SAME
+        # orientation regardless if enemy or not" — and "my side is
+        # currently correct"): both sides draw the art exactly as the
+        # file paints it. This differs from units/mg/bunker/barracks,
+        # which still mirror their enemy copies.
 
     # ---- shared destructible-building body ----
 
