@@ -31,7 +31,7 @@ from entities.gold_pickup import GoldPickup
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from graphics.sprite_generator import SpriteGenerator
-from systems.factions import unit_prefix, coin_texture, scaled_damage, scaled_hp
+from systems.factions import unit_prefix, side_coin, scaled_damage, scaled_hp
 
 
 class EnemyBase:
@@ -55,10 +55,11 @@ class EnemyBase:
         self.dead = False
         self.gold_spawned = False
 
-        # Coin art dropped at death. EnemyInfantry rolls its nation and
-        # sets this from the faction table (germans and austrians share
-        # the german coin); subclasses without a nation keep the
-        # german default so every enemy drop has sensible art.
+        # Coin art dropped at death. EnemyInfantry sets this from the
+        # player's chosen side (factions.side_coin — axis coins when
+        # the player is allies, french coins when they are axis);
+        # subclasses without a side keep the german default so every
+        # enemy drop has sensible art.
         self.coin = "coin_ger.png"
 
     def update(self, dt):
@@ -132,7 +133,6 @@ class EnemyInfantry(EnemyBase):
         # Rolled FIRST so the WWI balance handicaps can scale this
         # unit's stats at spawn (resistance -> hp).
         prefix, self.nation = unit_prefix(faction)
-        self.coin = coin_texture(self.nation)
 
         # Baseline stats: soldier speed, moderate hp, small gold bounty
         # (all from config; hp carries the nation's resistance handicap).
@@ -143,6 +143,14 @@ class EnemyInfantry(EnemyBase):
             hp=scaled_hp(self.nation, "infantry", INFANTRY_HP),
             gold_drop=INFANTRY_GOLD_DROP,
         )
+        # Coin drops follow the PLAYER's chosen side (user rule). Set
+        # AFTER the base ctor — the base writes its own default coin,
+        # which previously OVERWROTE whatever subclass coin had been
+        # set before the call (germ coins everywhere for every nation).
+        # Axis soldiers always drop the german coin; allied soldiers
+        # (brit AND fr alike) always drop the french coin
+        # (factions.side_coin).
+        self.coin = side_coin(faction)
         # Match the sprite footprint; the base 24x32 would not fit the art.
         self.width = 24
         self.height = 24
