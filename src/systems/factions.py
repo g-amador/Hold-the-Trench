@@ -29,13 +29,27 @@ FACTIONS = {
     },
 }
 
-# Coin art keyed by the DYING unit's nation; germans and austrians
-# both drop the german coin (single aust/ger coin asset exists).
+# Coin art by the DYING unit's nation — SUPERSEDED for drops (see
+# COIN_BY_SIDE below; kept as art bookkeeping / potential future use).
+# Germans and austrians both drop the german coin (single aust/ger
+# coin asset exists).
 COIN_BY_NATION = {
     "brit": "coin_brit.png",
     "fr": "coin_fr.png",
     "ger": "coin_ger.png",
     "aust": "coin_ger.png",
+}
+
+# Coin drops depend on the SIDE the player chose (user: coins depend
+# on the side I choose): the drops are the OPPOSING side's currency.
+# Playing allies -> every axis soldier (ger/aust) drops the german
+# coin; playing axis -> every ALLIED soldier drops the french coin —
+# fr units AND brit units alike (the british coin asset stays unused
+# for drops). Only enemy units ever drop gold (the player's own side
+# pays nothing), so keying by the dying side is the whole rule.
+COIN_BY_SIDE = {
+    "axis": "coin_ger.png",
+    "allies": "coin_fr.png",
 }
 
 # Faction-keyed static screens. Allies victory/defeat show allied /
@@ -82,8 +96,17 @@ def building_filename(faction, kind):
 
 
 def coin_texture(nation):
-    """Coin art for a fallen soldier's nation (defaults to german)."""
+    """Coin art for a fallen soldier's nation (defaults to german).
+
+    Art bookkeeping only — gold DROPS go through side_coin() since the
+    coins follow the side the player chose, not the unit's nation.
+    """
     return COIN_BY_NATION.get(nation, "coin_ger.png")
+
+
+def side_coin(faction):
+    """The coin art a faction's soldiers drop (see COIN_BY_SIDE)."""
+    return COIN_BY_SIDE.get(faction, "coin_ger.png")
 
 
 # ---------------- Battle scene (building art variants) ----------------
@@ -125,7 +148,7 @@ def scene_variant():
 
 def ground_texture_filename():
     """Ground texture for the current battle scene: map1_a/b/c/d."""
-    return f"map1_{scene_variant()}.jpg"
+    return f"map1_{scene_variant()}.png"
 
 
 # Artillery art keyed by FACTION (not nation), per the user: both
@@ -254,6 +277,26 @@ def armor_unit_options(nation):
     empty) — never crash.
     """
     return TANK_UNIT_TABLE.get(nation, [])
+
+
+def nation_from_building_filename(filename):
+    """The art nation ("ger"/"fr"/"brit") from a building file stem.
+
+    File convention: building_<kind>_<nation>[_<variant>][.png] —
+    the third underscore token is the nation. Unknown shapes return
+    None (the caller falls back to its default footprint/table).
+    """
+    stem = str(filename).rsplit(".", 1)[0]
+    parts = stem.split("_")
+    if len(parts) >= 3 and parts[0] == "building":
+        # File convention: building_<kind>_<nation>[_variant].png —
+        # kind may itself contain underscores (tank_factory), so the
+        # nation is the token BEFORE the scene-variant suffix; the
+        # suffix is always a single letter a/b/c/d and can be absent.
+        if len(parts[-1]) == 1:
+            return parts[-2]
+        return parts[-1]
+    return None
 
 
 def building_variant_filenames(faction, kind):

@@ -70,19 +70,19 @@ START_GOLD = 500
 # constructs the building only when the full cost is covered.
 # Enemy variants cost 0 because they are placed free from map markers.
 BUILD_COSTS = {
-    "mg": 0,
+    "mg": 0, #30
     "bunker": 0,
-    "barracks": 60,
-    "artillery": 0,
-    "air_field": 0,
-    "tank_factory": 0,
+    "barracks": 60, #60
+    "artillery": 80, #80
+    "air_field": 200, #200
+    "tank_factory": 150, #150
 
     "enemy_mg": 0,
     "enemy_bunker": 0,
     "enemy_barracks": 0,
-    "enemy_artillery": 80,
-    "enemy_air_field": 100,
-    "enemy_tank_factory": 100,
+    "enemy_artillery": 10,
+    "enemy_air_field": 10,
+    "enemy_tank_factory": 10,
 }
 
 # ---------------- Combat ----------------
@@ -198,6 +198,12 @@ CAR_MG_FIRE_RATE = 0.2
 MG_NEST_RANGE = 220
 MG_NEST_DAMAGE = 8
 MG_NEST_FIRE_RATE = 0.2
+# Firing arc (user rule: "MG-nest fire only in 15 degrees up or down
+# in the direction of enemies in range"): the gun faces the battlefield
+# horizontally and may elevate/depress at most this angle, so targets
+# STEEPLY above or below the muzzle (beyond the cone; e.g. on different
+# trench lines) are outside the arc even inside the circular range.
+MG_NEST_ELEVATION_DEG = 15
 
 # ---------------- Building footprints (tiles) ----------------
 # How many tiles each building kind covers: the drawn sprite/block, the
@@ -218,4 +224,15 @@ BUILD_FOOTPRINTS = {
     # K = tank factory): 7x7 per the user; no cost, no firing yet.
     "air_field": (7, 7),
     "tank_factory": (7, 7),
+}
+
+# Bunker footprint by ART nation (user: "brit and ger bunkers can be
+# only 6x4 tiles"): the wide brit/ger cutaways occupy the squat 6x4
+# box; any other nation (fr — and the missing-art fallback) keeps the
+# BUILD_FOOTPRINTS["bunker"] default of 6x6. Read per INSTANCE by
+# entities/bunker.py because the allies bunker rolls brit OR fr art,
+# so the rolled art file decides the collision size for that battle.
+BUNKER_FOOTPRINTS_BY_NATION = {
+    "brit": (6, 4),
+    "ger": (6, 4),
 }

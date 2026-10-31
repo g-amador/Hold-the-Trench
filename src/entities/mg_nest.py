@@ -1,8 +1,12 @@
 """
 Machine gun nest building.
 
-Auto-fires a rapid small-damage stream at the nearest enemy inside a
-circular range from a FIXED MUZZLE CELL outside the footprint (user
+Auto-fires a rapid small-damage stream at the nearest enemy that sits
+INSIDE BOTH the circular muzzle range and the gun's elevation arc: a
+horizontal facing toward the battlefield, elevating/depressing at most
+MG_NEST_ELEVATION_DEG (user rule: "fire only in 15 degrees up or down
+in the direction of enemies in range"). The shot leaves from a FIXED
+MUZZLE CELL outside the footprint (user
 spec: the bullet starts at cell x+4, y+1 for the player side — the
 first column EAST of the 4x4 nest, second row — and at x-1, y+1 for
 the enemy side, mirroring into the first column WEST). Aim vector and
@@ -26,6 +30,7 @@ from config import (
     MG_NEST_RANGE,
     MG_NEST_DAMAGE,
     MG_NEST_FIRE_RATE,
+    MG_NEST_ELEVATION_DEG,
 )
 from entities.bullet import Bullet
 from graphics import render_mode
@@ -119,17 +124,19 @@ class MGNest:
         )
 
     def _muzzle_px(self):
-        """Fixed muzzle cell OUTSIDE the footprint (user spec).
+        """Fixed muzzle cell INSIDE the footprint (user spec).
 
-        Player side: cell (x + fw, y + 1) — the first column EAST of
-        the 4x4 footprint, second row. Enemy side mirrors WEST: cell
-        (x - 1, y + 1). The returned pixel point is the CELL CENTER:
-        bullets spawn there and the aim/range math runs from it.
+        Player side: the 4TH column of the 4x4 footprint (budget
+        x + 3), second row (y + 1). Enemy side mirrors to the 1ST
+        column (x + 0), second row — the muzzle is always on the
+        footprint edge that faces the battlefield. The returned pixel
+        point is the CELL CENTER: bullets spawn there and the
+        aim/range math runs from it.
         """
         if self.is_enemy:
-            cell_x = self.tile_x - 1
+            cell_x = self.tile_x
         else:
-            cell_x = self.tile_x + self.footprint_tiles[0]
+            cell_x = self.tile_x + self.footprint_tiles[0] - 1
         cell_y = self.tile_y + 1
         return (
             (cell_x + 0.5) * TILE_SIZE,
@@ -142,6 +149,13 @@ class MGNest:
         `bullets` must be the side-appropriate list the battle state
         simulates (player-side bullets or enemy_bullets). Destroyed
         nests stop firing.
+
+        User rule (MG_NEST_ELEVATION_DEG): the gun keeps a horizontal
+        facing toward the battlefield and may elevate/depress at most
+        15 degrees, so an in-range enemy OUTSIDE that cone (too steeply
+        above/below the muzzle) is never engaged; targeting picks the
+        NEAREST enemy that sits inside both the circular range and the
+        cone.
         """
         if self.dead:
             return
@@ -151,8 +165,16 @@ class MGNest:
         if self.cooldown > 0:
             return
 
-        # Fire origin: the muzzle cell center (outside the footprint).
+        # Fire origin: the muzzle cell center (4th column / enemy
+        # 1st column, inside the footprint, 2nd row).
         cx, cy = self._muzzle_px()
+
+        # Elevation-cone cutoff as a slope: a target qualifies when its
+        # vertical offset from the muzzle stays inside the arc, i.e.
+        # |dy| <= |dx| * tan(angle). Screen y grows downward, so a
+        # target ABOVE the muzzle has dy < 0 — the abs() keeps the
+        # test symmetric around the horizontal firing line.
+        max_slope = math.tan(math.radians(MG_NEST_ELEVATION_DEG))
 
         # Nearest-target selection: linear scan is fine at this unit count.
         target = None
@@ -160,11 +182,19 @@ class MGNest:
         for e in enemies:
             if e.dead:
                 continue
-            dist = math.hypot(e.x - cx, e.y - cy)
-            if dist <= self.range:
-                if best_dist is None or dist < best_dist:
-                    best_dist = dist
-                    target = e
+            dx = e.x - cx
+            dy = e.y - cy
+            dist = math.hypot(dx, dy)
+            if dist > self.range:
+                continue
+            if abs(dy) > abs(dx) * max_slope:
+                # Outside the gun's elevation arc — straight overhead
+                # shots are physically impossible for a fixed MG, so
+                # hold fire on this enemy.
+                continue
+            if best_dist is None or dist < best_dist:
+                best_dist = dist
+                target = e
 
         if target:
             # Normalize the aim vector so bullet speed stays constant
