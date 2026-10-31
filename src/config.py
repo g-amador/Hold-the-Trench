@@ -198,12 +198,12 @@ CAR_MG_FIRE_RATE = 0.2
 MG_NEST_RANGE = 220
 MG_NEST_DAMAGE = 8
 MG_NEST_FIRE_RATE = 0.2
-# Firing arc (user rule: "MG-nest fire only in 15 degrees up or down
+# Firing arc (user rule: "MG-nest fire only in 25 degrees up or down
 # in the direction of enemies in range"): the gun faces the battlefield
 # horizontally and may elevate/depress at most this angle, so targets
 # STEEPLY above or below the muzzle (beyond the cone; e.g. on different
 # trench lines) are outside the arc even inside the circular range.
-MG_NEST_ELEVATION_DEG = 15
+MG_NEST_ELEVATION_DEG = 25
 
 # ---------------- Building footprints (tiles) ----------------
 # How many tiles each building kind covers: the drawn sprite/block, the

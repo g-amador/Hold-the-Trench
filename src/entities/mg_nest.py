@@ -153,9 +153,11 @@ class MGNest:
         User rule (MG_NEST_ELEVATION_DEG): the gun keeps a horizontal
         facing toward the battlefield and may elevate/depress at most
         15 degrees, so an in-range enemy OUTSIDE that cone (too steeply
-        above/below the muzzle) is never engaged; targeting picks the
-        NEAREST enemy that sits inside both the circular range and the
-        cone.
+        above/below the muzzle) is never engaged. It also fires only
+        TOWARD the battlefield (user: "shoot to the front, not to the
+        back") — enemies behind the facing line are outside the gun's
+        traverse. Targeting picks the NEAREST enemy that satisfies
+        range + cone + facing.
         """
         if self.dead:
             return
@@ -177,6 +179,11 @@ class MGNest:
         max_slope = math.tan(math.radians(MG_NEST_ELEVATION_DEG))
 
         # Nearest-target selection: linear scan is fine at this unit count.
+        # The gun faces the battlefield only (user: "shoot to the front,
+        # not to the back"): player-side nests point EAST (their muzzle
+        # sits on the footprint's eastern edge) and enemy-side nests
+        # point WEST — anything BEHIND that firing line is outside the
+        # gun's traverse even when range and elevation cone both fit.
         target = None
         best_dist = None
         for e in enemies:
@@ -184,6 +191,10 @@ class MGNest:
                 continue
             dx = e.x - cx
             dy = e.y - cy
+            if (dx <= 0) if not self.is_enemy else (dx >= 0):
+                # Behind the gun's facing; a muzzle-column target is
+                # dead-vertical anyway and the cone already blocks it.
+                continue
             dist = math.hypot(dx, dy)
             if dist > self.range:
                 continue
