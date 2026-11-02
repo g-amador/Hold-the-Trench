@@ -56,7 +56,7 @@ class Tile:
         only shifts x because the battlefield is a horizontal strip.
         Buildings are NOT drawn here: TileMap paints EVERY tile grid
         first and every building after, so multi-tile footprints (e.g.
-        the 2x2 MG) are never overpainted by neighboring tiles.
+        the 4x4 MG) are never overpainted by neighboring tiles.
         """
         px = self.x * TILE_SIZE - camera_x
         py = self.y * TILE_SIZE
@@ -83,7 +83,7 @@ class TileMap:
         result = generator.generate_sector()
 
         layout = result["tiles"]
-        self.build_candidates = result["build_candidates"]
+        build_candidates = result["build_candidates"]
 
         self.width = len(layout[0])
         self.height = len(layout)
@@ -114,7 +114,7 @@ class TileMap:
 
         # Build spot types (mg, bunker, barracks, artillery, enemy
         # versions), keyed by tile coordinate for O(1) lookups.
-        self.spot_types = {(c["x"], c["y"]): c["type"] for c in self.build_candidates}
+        self.spot_types = {(c["x"], c["y"]): c["type"] for c in build_candidates}
 
         # Partial payments: key (x, y) -> gold already paid by the
         # player toward that spot. The battle state tops these up each
@@ -140,10 +140,10 @@ class TileMap:
           which smoothscales it to ~half world size anyway — cheap
           and detail-sufficient there.
         - ground_texture_native: the image's OWN pixel size, kept so
-          the CLOSE zoom (4x upscale of a ~10-tile window) can sample
-          per-screen-pixel from true 4K detail instead of the
-          pre-downscaled texture (the 4x-upscaled result of that was
-          the user's "blurry when zoomed" complaint).
+          the CLOSE zoom (~3.1x upscale of a CLOSE_VIEW_TILES window)
+          can sample per-screen-pixel from true 4K detail instead of
+          the pre-downscaled texture (upsampling the pre-scaled
+          texture was the user's "blurry when zoomed" complaint).
 
         The map tilemap is built before the battle (the menu creates
         it), i.e. before roll_scene() — so AssaultPhase calls this
@@ -167,16 +167,6 @@ class TileMap:
         except FileNotFoundError:
             self.ground_texture_native = None
             self.ground_texture = None
-
-    # WaveDirector expects this to exist
-    def configure_build_spots(self, *args, **kwargs):
-        # KNOWN ISSUE (AI.md #5): dead compatibility stub; build spots
-        # already come from TrenchGenerator.
-        return
-
-    def is_build_spot(self, x, y):
-        """True when this tile is a player/enemy build spot marker."""
-        return (x, y) in self.spot_types
 
     def get_tile(self, x, y):
         """Return the tile, or None for any out-of-grid coordinate."""
@@ -403,7 +393,7 @@ class TileMap:
         skip_ground (CLOSE view only): draw buildings but NOT the
         ground texture. AssaultPhase renders the CLOSE window's
         ground straight from the NATIVE 4K image at screen
-        resolution (its 4x zoom needs more detail than the
+        resolution (its ~3.1x zoom needs more detail than the
         world-resolution strip contains), so the caller then blits
         only this surface's ENTITY content over that ground; ground
         must not be baked in underneath. Ignored in BLOCKS mode.
@@ -452,7 +442,7 @@ class TileMap:
             )
         else:
             # Tile grid first, buildings second: a multi-tile building
-            # (2x2 MG) must never have its right/bottom footprint
+            # (4x4 MG) must never have its right/bottom footprint
             # overpainted by the fill of its neighbor tiles. The row/
             # column range is sliced to the visible window when culled.
             if view_rect is None:
@@ -472,7 +462,7 @@ class TileMap:
             )
 
         # Debug/assist overlay: ONE green outline spanning each EMPTY
-        # build spot's FULL footprint (the MG's 2x2 reads as a single
+        # build spot's FULL footprint (the MG's 4x4 reads as a single
         # square to place into, in both graphics modes). Placed spots
         # draw nothing: once the building exists the guide line is
         # removed and the occupied space speaks for itself. Culled to

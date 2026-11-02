@@ -6,8 +6,6 @@ buildings" question is answered by flattening the tile grid. These
 helpers are how the battle state and HUD avoid touching tile internals.
 """
 
-from collections import Counter
-
 
 class BuildingQuery:
     @staticmethod
@@ -25,18 +23,3 @@ class BuildingQuery:
                 if tile and tile.building:
                     buildings.append(tile.building)
         return buildings
-
-    @staticmethod
-    def count_buildings(tilemap):
-        """Return building counts keyed by class name, for the HUD legend.
-
-        Uses the class display name as the key, which is why MG nests
-        show up as "MGNest" in the builds list.
-        """
-        counts = Counter()
-        for y in range(tilemap.height):
-            for x in range(tilemap.width):
-                tile = tilemap.get_tile(x, y)
-                if tile and tile.building:
-                    counts[type(tile.building).__name__] += 1
-        return counts

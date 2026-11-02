@@ -12,8 +12,8 @@ M = MG
 B = bunker
 I = barracks
 A = artillery
-F = air field (free static, 4x4)
-K = tank factory (free static, 4x4)
+F = air field (free static, 7x7)
+K = tank factory (free static, 7x7)
 C = crater
 T = tree
 D = dead tree
@@ -81,7 +81,7 @@ ASCII_TO_TILE = {
 # 'i' barracks markers). The user's map now carries a player 'B'
 # (bunker), enemy 'b' bunker, 'm' MG nests and 'a' artillery, so the
 # terminal conditions CAN fire. '|' separators restore a boundary.
-# M = MG (footprint 2x2, marker = top-left)
+# M = MG (footprint 4x4, marker = top-left)
 # B = bunker
 # I = barracks
 # A = artillery
@@ -100,8 +100,8 @@ ASCII_TO_TILE = {
 # B = bunker
 # I = barracks
 # A = artillery
-# F = air field (free static, 4x4)
-# K = tank factory (free static, 4x4)
+# F = air field (free static, 7x7)
+# K = tank factory (free static, 7x7)
 # C = crater
 # T = tree
 # D = dead tree
@@ -181,16 +181,13 @@ class TrenchGenerator:
     def __init__(self):
         # Keep the raw rows around: TileMap reads row 0.
         self.ascii_map = STATIC_MAP
-        self.height = len(STATIC_MAP)
-        self.width = len(STATIC_MAP[0])
 
     def generate_sector(self):
         """Convert every ASCII character into a tile type and, when the
         char marks a building, record it as a build candidate.
 
-        Returns tiles (row-major ints), build_candidates ({x, y, type}
-        dicts), and trench_graph (kept None: reserved for future
-        pathfinding work).
+        Returns tiles (row-major ints) and build_candidates
+        ({x, y, type} dicts).
         """
         tiles = []
         build_candidates = []
@@ -232,5 +229,4 @@ class TrenchGenerator:
         return {
             "tiles": tiles,
             "build_candidates": build_candidates,
-            "trench_graph": None
         }

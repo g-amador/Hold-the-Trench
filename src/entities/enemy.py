@@ -1,5 +1,5 @@
 """
-WW1 enemies: Infantry, Cavalry, Tank.
+WW1 enemies: EnemyInfantry (the active assault unit).
 
 EnemyBase provides the shared machinery (advance, hp, death, gold
 drops); subclasses override update() to add behavior. Because gold
@@ -9,7 +9,6 @@ uniformly: update -> spawn_gold on death -> filter the list.
 
 import math
 import pygame
-import random
 
 from config import (
     RED,
@@ -21,9 +20,6 @@ from config import (
     INFANTRY_BULLET_DAMAGE,
     ENEMY_SIEGE_DAMAGE,
     ENEMY_SIEGE_COOLDOWN,
-    LEGACY_TANK_SPEED,
-    LEGACY_TANK_HP,
-    LEGACY_TANK_GOLD_DROP,
 )
 from entities.armor import ArmorUnit
 from entities.bullet import Bullet
@@ -92,7 +88,7 @@ class EnemyBase:
         )
 
     def draw(self, screen, camera_x):
-        """Placeholder for units without sprites (Cavalry, Tank): red block."""
+        """No-sprite fallback: red block (kept for future unit kinds)."""
         if self.dead:
             return
 
@@ -377,20 +373,3 @@ class EnemyInfantry(EnemyBase):
         pos = (screen_x, screen_y)
         self.sprite_generator.draw(screen, legs, pos, self.facing)
         self.sprite_generator.draw(screen, upper, pos, self.facing)
-
-class Tank(EnemyBase):
-    """Slow assault placeholder: heavy hp, biggest bounty."""
-
-    def __init__(self, x, y):
-        # Armor removes the usual speed advantage: deliberate contrast
-        # with cavalry, same gold-driven economy pressure. Stats from
-        # the config table (user rule: every stat centralized).
-        super().__init__(
-            x,
-            y,
-            speed=LEGACY_TANK_SPEED,
-            hp=LEGACY_TANK_HP,
-            gold_drop=LEGACY_TANK_GOLD_DROP,
-        )
-        self.width = 48
-        self.height = 32

@@ -6,8 +6,6 @@ know the current mode must call is_sprite()/label() — no other module
 may store render-mode state (see AI.md single-source rules).
 """
 
-MODES = ("SPRITES", "BLOCKS")
-
 # Process-wide toggle; battle state flips it, renderers only read it.
 _mode = "SPRITES"
 

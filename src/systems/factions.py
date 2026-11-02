@@ -29,17 +29,6 @@ FACTIONS = {
     },
 }
 
-# Coin art by the DYING unit's nation — SUPERSEDED for drops (see
-# COIN_BY_SIDE below; kept as art bookkeeping / potential future use).
-# Germans and austrians both drop the german coin (single aust/ger
-# coin asset exists).
-COIN_BY_NATION = {
-    "brit": "coin_brit.png",
-    "fr": "coin_fr.png",
-    "ger": "coin_ger.png",
-    "aust": "coin_ger.png",
-}
-
 # Coin drops depend on the SIDE the player chose (user: coins depend
 # on the side I choose): the drops are the OPPOSING side's currency.
 # Playing allies -> every axis soldier (ger/aust) drops the german
@@ -65,11 +54,6 @@ DEFEAT_BACKGROUND = {
 }
 
 
-def is_valid(faction):
-    """True for every selectable faction string."""
-    return faction in FACTIONS
-
-
 def other(faction):
     """Return the battlefield's opposite side of `faction`."""
     return "axis" if faction == "allies" else "allies"
@@ -83,25 +67,6 @@ def unit_prefix(faction):
     """
     nation = random.choice(FACTIONS[faction]["unit_nations"])
     return f"infantry_unit_{nation}_1", nation
-
-
-def building_filename(faction, kind):
-    """Random building art filename from the side's pool.
-
-    kind is the canonical asset stem ("barraks" — misspelling is part
-    of the asset filename — "mg_nest", "bunker").
-    """
-    nation = random.choice(FACTIONS[faction]["building_nations"])
-    return f"building_{kind}_{nation}.png"
-
-
-def coin_texture(nation):
-    """Coin art for a fallen soldier's nation (defaults to german).
-
-    Art bookkeeping only — gold DROPS go through side_coin() since the
-    coins follow the side the player chose, not the unit's nation.
-    """
-    return COIN_BY_NATION.get(nation, "coin_ger.png")
 
 
 def side_coin(faction):
@@ -148,7 +113,7 @@ def scene_variant():
 
 def ground_texture_filename():
     """Ground texture for the current battle scene: map1_a/b/c/d."""
-    return f"map1_{scene_variant()}.png"
+    return f"map1_{scene_variant()}.jpg"
 
 
 # Artillery art keyed by FACTION (not nation), per the user: both
@@ -306,7 +271,9 @@ def building_variant_filenames(faction, kind):
     Trial order: the scene's own suffix file, then the '_a' (summer
     day) file, then the unsuffixed base art — so a building missing
     its variant image silently keeps summer-day art instead of
-    crashing. (The pool only rolls art-complete letters: "a"/"c".)
+    crashing. (The active SCENE_VARIANTS pool covers all four
+    letters "a"/"b"/"c"/"d" — a missing variant file falls back to
+    the paths above.)
     """
     nation = random.choice(FACTIONS[faction]["building_nations"])
     stem = f"building_{kind}_{nation}"

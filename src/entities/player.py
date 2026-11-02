@@ -21,7 +21,7 @@ from systems.factions import unit_prefix
 # Tile characters that can never be walked through (trench wall, hill).
 BLOCKING_TILES = {"#", "H"}
 # Building type strings that are solid obstacles once constructed
-# (the free-placed statics are solid 4x4s too). ENEMY buildings block
+# (the free-placed statics are solid 7x7s too). ENEMY buildings block
 # the player as well (user: "my controlled unit should collide with
 # enemy buildings and artillery"): the check below matches the bare
 # player-side kind OR any "enemy_"-prefixed kind.

@@ -4,12 +4,12 @@ Machine gun nest building.
 Auto-fires a rapid small-damage stream at the nearest enemy that sits
 INSIDE BOTH the circular muzzle range and the gun's elevation arc: a
 horizontal facing toward the battlefield, elevating/depressing at most
-MG_NEST_ELEVATION_DEG (user rule: "fire only in 15 degrees up or down
-in the direction of enemies in range"). The shot leaves from a FIXED
-MUZZLE CELL outside the footprint (user
-spec: the bullet starts at cell x+4, y+1 for the player side — the
-first column EAST of the 4x4 nest, second row — and at x-1, y+1 for
-the enemy side, mirroring into the first column WEST). Aim vector and
+MG_NEST_ELEVATION_DEG (config, 25 — the user's original "fire only in
+15 degrees up or down" rule was later raised to this constant). The
+shot leaves from a FIXED MUZZLE CELL inside the footprint's facing
+edge: the bullet starts at the 4TH column of the 4x4 nest, second row
+(tile_x + 3, tile_y + 1) for the player side, mirrored to the 1ST
+column (tile_x + 0, tile_y + 1) for the enemy side. Aim vector and
 engagement range are both measured from that muzzle cell. The battle
 state steps these on its simulated frame and passes the correct side's
 bullet/unit lists.
@@ -150,9 +150,10 @@ class MGNest:
         simulates (player-side bullets or enemy_bullets). Destroyed
         nests stop firing.
 
-        User rule (MG_NEST_ELEVATION_DEG): the gun keeps a horizontal
-        facing toward the battlefield and may elevate/depress at most
-        15 degrees, so an in-range enemy OUTSIDE that cone (too steeply
+        User rule (config MG_NEST_ELEVATION_DEG, 25): the gun keeps a
+        horizontal facing toward the battlefield and may
+        elevate/depress at most that many degrees, so an in-range enemy
+        OUTSIDE that cone (too steeply
         above/below the muzzle) is never engaged. It also fires only
         TOWARD the battlefield (user: "shoot to the front, not to the
         back") — enemies behind the facing line are outside the gun's

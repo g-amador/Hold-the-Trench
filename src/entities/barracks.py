@@ -7,7 +7,6 @@ frequency is shared (spawn_cooldown).
 """
 
 import pygame
-import random
 
 from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS, BUILDING_HP
 from entities.enemy import EnemyInfantry
@@ -30,8 +29,8 @@ class Barracks:
         self.tile_x = tile_x
         self.tile_y = tile_y
 
-        # Footprint/table-driven like the other buildings (user set
-        # barracks to 6x6): the drawn sprite/block, and TileMap's
+        # Footprint/table-driven like the other buildings (config sets
+        # barracks to 4x4): the drawn sprite/block, and TileMap's
         # viewport culling, all read footprint_tiles. Collision comes
         # from the same table via tilemap._footprint_covered.
         self.footprint_tiles = BUILD_FOOTPRINTS.get("barracks", (1, 1))
@@ -127,7 +126,7 @@ class Barracks:
         fw_px, fh_px = self.width, self.height
 
         if not render_mode.is_sprite() or self.image is None:
-            # Block mode: flat grey block over the FULL 6x6 footprint
+            # Block mode: flat grey block over the FULL footprint
             # with the facing marker on its leading edge (infantry side
             # hint). Also the no-art fallback (never crash).
             draw_unit_block(

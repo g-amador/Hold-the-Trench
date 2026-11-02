@@ -1,6 +1,7 @@
 """
 Bullet projectile: a straight-flying shot fired by the player,
-machine gun nests, artillery, and infantry.
+machine gun nests, and infantry (artillery drops shells directly,
+via Artillery._land_shell — it never constructs a Bullet).
 
 A bullet stores its own direction vector, moves on every update, and
 leaves hit detection to the battle state: the state walks its bullet

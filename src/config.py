@@ -25,11 +25,12 @@ FPS = 60
 # hidden by it.
 # UNIFORM-ZOOM LOCK (square tiles on ANY map): render() scales the
 # whole map by ONE factor, min(fit_to_width, fit_to_height) — never a
-# per-axis stretch. With the doubled 80x46 map (world 2560x1472) and
-# this 40px bar the zoom is exactly 728/1472 ≈ 0.4946, so every tile
-# renders as a ~15.8px SQUARE and the leftover horizontal space is
-# drawn as dark side bands. Editing the bar, the window, TILE_SIZE,
-# or the map is fine — the one rule: keep the single-factor zoom.
+# per-axis stretch. With the current 78x46 map (world 2496x1472) and
+# this 40px bar the zoom is capped at 728/1472 ≈ 0.4946 by the
+# height, so every tile renders as a ~15.8px SQUARE and the leftover
+# horizontal space is drawn as dark side bands. Editing the bar, the
+# window, TILE_SIZE, or the map is fine — the one rule: keep the
+# single-factor zoom.
 HUD_BAR_HEIGHT = 40
 
 # ---------------- View zoom (+ / - keys) ----------------
@@ -37,17 +38,20 @@ HUD_BAR_HEIGHT = 40
 #   VIEW_FULL  = full zoom-out: whole battlefield below the HUD bar
 #     (the uniform-zoom render).
 #   VIEW_CLOSE = zoomed in: the player rides CENTER of a screen-wide
-#     window CLOSE_VIEW_TILES tiles across ("10 tiles back and
-#     forth"), scaled uniformly so it OCCUPIES the full visible
-#     strip — no side bands (scale 4x at 1280x768: one tile spans
-#     128 screen px, ~5.7 tiles fit vertically, still within the
-#     "at most 5 in each direction" cap).
+#     window CLOSE_VIEW_TILES tiles across, scaled uniformly so it
+#     OCCUPIES the full visible strip — no side bands (scale ≈3.1x at
+#     1280x768 with 13 tiles: one tile spans ~98 screen px, ~7.4
+#     tiles fit vertically). User tweak (was 10/4x): a WEAKER zoom
+#     puts more native pixels under every screen pixel, so the 4K
+#     ground reads sharper — the trade-off is the wider window now
+#     spans ±6.5 tiles (the original design cap was "at most ~5 in
+#     each direction", satisfied at 10).
 # '+' zooms IN (CLOSE), '-' zooms OUT (FULL); both keys work live and
 # paused, and the HUD label after the pause info shows the current
 # view. Each new battle starts at VIEW_FULL.
 VIEW_FULL = "FULL"
 VIEW_CLOSE = "CLOSE"
-CLOSE_VIEW_TILES = 10
+CLOSE_VIEW_TILES = 13
 
 # ---------------- Colors (RGB) ----------------
 # Palette shared by tiles, HUD, texts, pickups, and block-mode rendering.
@@ -109,12 +113,6 @@ ENEMY_SIEGE_DAMAGE = 10
 ENEMY_SIEGE_COOLDOWN = 1.0
 # Per-shot rifle damage (matches Bullet's default 20).
 INFANTRY_BULLET_DAMAGE = 20
-
-# Legacy warehouse heavy (EnemyBase subclass "Tank"): slow, tanky, big
-# bounty. Not factory armor — never had one.
-LEGACY_TANK_HP = 300
-LEGACY_TANK_SPEED = 30
-LEGACY_TANK_GOLD_DROP = 20
 
 # ---------------- Planes (air field production) ----------------
 # USER SPEC: air fields spawn planes at the SAME cadence as tank

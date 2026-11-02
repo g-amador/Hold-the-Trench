@@ -18,6 +18,7 @@ crash the game).
 import math
 import pygame
 
+from config import GOLD
 from utils.image_loader import load_image
 
 # Draw size for coin art in the world layer; scaled copy, the cache is
@@ -26,9 +27,10 @@ from utils.image_loader import load_image
 #   1. the world copy uses smoothscale — the 256x256 source art is
 #      NOT nearest-squeezed into 12x12 anymore,
 #   2. the FULL view's uniform zoom then downscales that smoothly,
-#   3. in the CLOSE view the coin skips the 4x-upscaled world layer
+#   3. in the CLOSE view the coin skips the upscaled world layer
 #      entirely and AssaultPhase._blit_coin_hires smoothscales the
-#      NATIVE art straight to screen (4x more pixels per world px).
+#      NATIVE art straight to screen (more pixels per world px than
+#      the ~3.1x CLOSE zoom could show on the world copy).
 COIN_SIZE = (12, 12)
 
 
@@ -112,6 +114,6 @@ class GoldPickup:
         # Fallback: plain gold square (asset missing or no coin named).
         pygame.draw.rect(
             screen,
-            (255, 215, 0),
+            GOLD,
             (draw_x, draw_y, self.width, self.height),
         )

@@ -57,19 +57,6 @@ class HUD:
                 (SCREEN_WIDTH - mode_text.get_width() - 10, 5),
             )
 
-    def draw_building_counts(self, screen, counts):
-        """List built buildings starting under the status bar, one per row.
-
-        Legacy simple table; the battle panel now uses draw_force_counts.
-        """
-        x = 10
-        y = 40
-
-        for name, count in counts.items():
-            text = self.font.render(f"{name}: {count}", True, WHITE)
-            screen.blit(text, (x, y))
-            y += 20
-
     def draw_force_counts(self, screen, rows):
         """Two-column force summary under the status bar.
 
@@ -99,8 +86,3 @@ class HUD:
                 (SCREEN_WIDTH - right.get_width() - 10, y),
             )
             y += 20
-
-    def draw_text(self, screen, text, x, y):
-        """Convenience one-liner for overlay text anywhere on screen."""
-        surf = self.font.render(text, True, WHITE)
-        screen.blit(surf, (x, y))

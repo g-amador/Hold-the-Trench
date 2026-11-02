@@ -172,9 +172,9 @@ class AssaultPhase:
         self.world_offset_x = (SCREEN_WIDTH - self.world_view[0]) // 2
 
         # CLOSE view geometry ('+'/'-' keys, two views only per user):
-        # a screen-wide 10-tile window around the player scaled at one
-        # uniform factor so it OCCUPIES the full visible strip (no
-        # side bands; 4x at 1280x768 -> 128px screen tiles).
+        # a screen-wide CLOSE_VIEW_TILES window around the player,
+        # scaled at one uniform factor so it OCCUPIES the full visible
+        # strip (no side bands; ~3.1x at 1280x768 → ~98px screen tiles).
         self.view_mode = VIEW_FULL
         self.close_window_w = CLOSE_VIEW_TILES * TILE_SIZE
         self.close_scale = SCREEN_WIDTH / self.close_window_w
@@ -498,41 +498,6 @@ class AssaultPhase:
                 # which keeps placement readable.
                 return
 
-    def _collect_gold_and_pay_debts(self):
-        """Collect gold and apply available gold to unpaid buildings."""
-        remaining_gold = []
-
-        for gold in self.gold_pickups:
-            collected = gold.update(0, self.player)
-
-            if collected:
-                # dt=0 freezes the bob animation for this instant check:
-                # it answers "would the player collect this right now"
-                # without simulating the pickup.
-                self.economy.gold += gold.amount
-            else:
-                remaining_gold.append(gold)
-
-        self.gold_pickups = remaining_gold
-
-        # Pay existing debts using available gold.
-        for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
-            if spot_type not in BUILDING_CLASSES:
-                continue
-
-            tile = self.tilemap.get_tile(tile_x, tile_y)
-            if tile is None or tile.building is None:
-                continue
-
-            cost = BUILD_COSTS[spot_type]
-            paid = self.tilemap.paid_amount.get((tile_x, tile_y), 0)
-            debt = max(0, cost - paid)
-
-            payment = min(debt, max(0, self.economy.gold))
-            if payment > 0:
-                self.economy.spend(payment)
-                self.tilemap.paid_amount[(tile_x, tile_y)] = paid + payment
-
     def update(self, dt):
         """One simulation step of the whole battle.
 
@@ -616,7 +581,7 @@ class AssaultPhase:
             if not bunker.dead
         )
 
-        # Temporarily disabled player shooting.
+        # Player fires automatically at the targets assembled above.
         self.player.auto_fire(dt, player_targets, self.bullets)
 
         # Automatically build when close to a valid build spot.
@@ -1282,17 +1247,18 @@ class AssaultPhase:
         screen.fill((20, 20, 20), (0, HUD_BAR_HEIGHT, SCREEN_WIDTH, SCREEN_HEIGHT - HUD_BAR_HEIGHT))
         if self.view_mode == VIEW_CLOSE:
             # CLOSE view ('+'): subsample the full-res world in a
-            # screen-wide ~10-tile window centered (and map-clamped)
-            # on the player, upscaled so it occupies the WHOLE visible
-            # strip (no side bands). cx/cy were computed before the
-            # crop pass above (culling and zoom share one window).
+            # screen-wide CLOSE_VIEW_TILES window centered (and
+            # map-clamped) on the player, upscaled so it occupies the
+            # WHOLE visible strip (no side bands). cx/cy were computed
+            # before the crop pass above (culling and zoom share one
+            # window).
             #
             # ground pass (SPRITES mode + native 4K asset): the
             # user's 5504x3072 map art holds ~2.15x more pixels per
             # world px than the world strip — sampling THIS window
-            # from the native image means one true source pixel per
-            # screen pixel at 4x zoom (the old path upscaled the
-            # pre-downscaled 2560x1472 texture 4x, the "blurry when
+            # from the native image means MORE true source pixels than
+            # screen pixels at the CLOSE zoom (the old path upscaled
+            # the pre-downscaled 2560x1472 texture 4x, the "blurry when
             # zoomed" complaint). The entity layer (buildings, units,
             # bullets, markers) rides on top from the SRCALPHA world
             # surface, whose ground was skipped this frame.
@@ -1319,7 +1285,7 @@ class AssaultPhase:
             # should have the same high quality"): static buildings
             # usually ship native art much bigger than the world box,
             # so those with image_native blit straight here at SCREEN
-            # resolution (4x sharper than the world surface could
+            # resolution (~3.1x sharper than the world surface could
             # ever show). Buildings without native art keep their
             # normal low-res draw under the entity layer above.
             if close_native_ground:
@@ -1360,8 +1326,9 @@ class AssaultPhase:
         For every building with an image_native surface (the SAME art
         file at its true resolution, sized per instance in the entity
         constructors), the battle caches ONE smoothscaled copy at the
-        CLOSE zoom (native -> footprint * close_scale world px, i.e.
-        ~4x) and blits it at its window-relative screen position.
+        CLOSE zoom (native -> footprint * close_scale world px,
+        i.e. ~3.1x at the default 13-tile window) and blits it at its
+        window-relative screen position.
         Buildings whose art would upscale beyond its source or missing
         files (image_native None) stay on the low-res world path —
         nothing disappears, quality only stays where it can improve.
