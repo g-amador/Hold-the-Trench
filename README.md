@@ -36,7 +36,7 @@ Protect your bunker, manage your supplies, and destroy the enemy bunker to secur
 Each battle takes place on a **newly generated WWI battlefield**, forcing players to adapt their defenses, manage supplies, and make difficult tactical decisions.
 
 The animated .gif bellow illustrates running the current game alpha.
-![Game Alpha](https://raw.githubusercontent.com/g-amador//Hold-the-Trench/main/assets/Hold-the-trench-alpha.gif)
+![Game Alpha](https://raw.githubusercontent.com/g-amador/Hold-the-Trench/main/assets/Hold-the-trench-alpha.gif)
 
 
 [Back to Table of Contents](#toc)
@@ -56,7 +56,6 @@ The animated .gif bellow illustrates running the current game alpha.
 * ⚔️ **Real-time infantry combat**
 * 🪙 **Collect supplies from defeated enemies**
 * 🎯 **Destroy the enemy bunker to win**
-* 🌧️ **Random weather conditions**
 * ⏸️ **Pause and resume at any time**
 * 🔄 **Generate a new defense scenario after each victory**
 * 🚪 **Choose to continue fighting or leave after each completed level**
@@ -98,6 +97,7 @@ Choose:
 
 | Structure                  | Purpose                            |
 | -------------------------- | ---------------------------------- |
+| 🧱 Bunker                  | Protects your HQ — lose it and the battle is over |
 | 🏭 Barracks                | Recruit or spawn infantry          |
 | 🔫 MG Nest                 | Anti-infantry fire support         |
 | 💥 Artillery Position      | Long-range bombardment             |
@@ -163,6 +163,8 @@ Victory grants you a choice:
 | `WASD` / Arrows | Move player                           |
 | `Left Click`  | Build / Select                          |
 | `G`           | Toggle sprite / block graphics mode     |
+| `+` (and `=`) | Zoom IN to the CLOSE view               |
+| `-`           | Zoom OUT to the FULL view               |
 | `A` / `1`     | Main menu: choose the Allies side       |
 | `X` / `2`     | Main menu: choose the Axis side         |
 | `ENTER`       | Start battle as the chosen faction (main menu) |
@@ -209,7 +211,7 @@ For a complete, file-by-file breakdown of the repository, see [ARCHITECTURE.md](
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/hold-the-trench.git
+git clone https://github.com/g-amador/Hold-the-Trench.git
 cd hold-the-trench
 ```
 
@@ -222,7 +224,7 @@ pip install -r requirements.txt
 ### 3. Launch the game
 
 ```bash
-python main.py
+python src/main.py
 ```
 
 [Back to Table of Contents](#toc)
@@ -233,7 +235,7 @@ python main.py
 
 ### Step 1: Generate a Battlefield
 
-Starting a new game creates a procedurally generated WWI battlefield and trenches with randomized terrain, weather conditions, and enemy strength.
+Starting a new game creates a procedurally generated WWI battlefield and trenches with randomized terrain, scene variants, and enemy strength.
 
 No two battles are exactly alike.
 
@@ -333,7 +335,7 @@ Run the game:
 
 ### 🚧 Planned Improvements
 
-* [ ] Procedural scenarios
+* [x] Procedural scenarios — every battle rolls a fresh map variant + scene (`systems/factions.py` `roll_scene`; "continue" replays keep it fresh)
 * [ ] Additional enemy types
 * [ ] Better pathfinding
 * [ ] Visual effects
@@ -346,16 +348,16 @@ Run the game:
 
 ### 📌 Future Features
 
-* [ ] Tanks
+* [x] Tanks — factory-produced armor already exists (`entities/armor.py`: tanks + British machine-gun car per faction pool); a future ENEMY-side tank unit would extend the enemy classes
 * [ ] Cavalry
 * [ ] Difficulty modifiers
 
-### 📝 TODO (Planned — awaiting assets and design)
+### 📝 DONE (was: awaiting assets and design)
 
-* [ ] Distinct victory and defeat screens — dedicated images for the win and game-over screens (currently both reuse the menu background)
-* [ ] Faction selection on the main menu — choose **Axis or Allies** to start a battle instead of a plain "start game"
-* [ ] Unit selection that follows the chosen faction (available units change per side)
-* [ ] Post-battle faction choice — after a victory or defeat, play the same faction again or switch sides for the next battle
+* [x] Distinct victory and defeat screens — per-faction images in `systems/factions.py` (`VICTORY_BACKGROUND` / `DEFEAT_BACKGROUND`), used by `states/win_state.py` / `states/game_over.py`
+* [x] Faction selection on the main menu — `A`/`1` Allies, `X`/`2` Axis, `ENTER` starts the battle as chosen
+* [x] Units that follow the chosen faction — armor art/unit options roll per nation pool (`factions.armor_unit_options`), barracks/MG art is nation-keyed
+* [x] Post-battle faction choice — `R` replays the same faction, `S` switches sides (after victory or defeat)
 
 [Back to Table of Contents](#toc)
 

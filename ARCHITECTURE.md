@@ -11,6 +11,8 @@ hold_the_trench/
 │   │   └── game.py
 │   ├── entities/                   # for units, buildings, projectiles, and pickups
 │   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies unit_cannon_fr / axis unit_heavy_howitzer_ger), GREY block fallback
+│   │   ├── airplane.py             # factory-produced plane (air fields): flies, targets armor/buildings/planes by proximity, bombs ground targets overhead
+│   │   ├── armor.py                # factory-produced armor (tank factories): tanks + British machine-gun car; forward advance, stop-and-shell, armor damage rule
 │   │   ├── barracks.py
 │   │   ├── bullet.py
 │   │   ├── bunker.py
@@ -19,20 +21,18 @@ hold_the_trench/
 │   │   ├── gold_pickup.py
 │   │   ├── mg_nest.py
 │   │   ├── player.py
-│   │   ├── static_building.py      # free player-side statics: AirField (map 'F') / TankFactory (map 'K') — scene-variant art, 3x3, no combat yet
-│   │   └── trench.py
+│   │   └── static_building.py      # free player-side statics: AirField (map 'F') / TankFactory (map 'K') — scene-variant art, 7x7 per config BUILD_FOOTPRINTS, spawn armor/planes
 │   ├── graphics/                   # for sprite generation, animation helpers, rendering utilities, and the graphics toggle.
-│   │   ├── sprite_generator.py                  # unit frame loading/animation/flipping
-│   │   ├── render_mode.py                        # global SPRITES/BLOCKS graphics toggle state (G key)
-│   │   └── block_drawer.py                       # block-mode rendering used by the toggle and as missing-asset fallback
+│   │   ├── sprite_generator.py     # unit frame loading/animation/flipping
+│   │   ├── render_mode.py          # global SPRITES/BLOCKS graphics toggle state (G key)
+│   │   └── block_drawer.py         # block-mode rendering used by the toggle and as missing-asset fallback
 │   ├── states/                     # for menus, battles, victory, defeat, and other game screens.
 │   │   ├── assault_phase.py
 │   │   ├── game_over.py
 │   │   ├── main_menu.py
 │   │   └── win_state.py
-│   ├── systems/                    # for combat, economy, faction rules, spawning, and wave management.
+│   ├── systems/                    # for combat, economy, and faction rules (shared pools/rolls live in factions.py).
 │   │   ├── building_query.py
-│   │   ├── combat_system.py
 │   │   ├── economy_system.py
 │   │   └── factions.py             # single source of truth for sides: nation pools (units/buildings), coin art by nation, menu/victory/defeat backgrounds, and the other()/roll helpers
 │   ├── ui/                         # for HUD, menus, tooltips, and overlays.
