@@ -1,10 +1,12 @@
 """
 Gold dropped by defeated enemies.
 
-The pickup bobs in place until the player walks within range. The
-battle state polls update() every frame and, when it returns True,
-credits the amount to EconomySystem.gold and drops the pickup from
-its list.
+The pickup bobs in place; when the player gets close enough the coin
+is MAGNETICALLY pulled toward them (user request: "the player is a
+magnet attracting the coins") until it reaches the pickup radius and
+pays out. The battle state polls update() every frame and, when it
+returns True, credits the amount to EconomySystem.gold and drops the
+pickup from its list.
 
 Art: the coin side follows the player's choice (user rule): playing
 ALLIES, axis soldiers (ger/aust) drop coin_ger.png; playing AXIS,
@@ -18,7 +20,12 @@ crash the game).
 import math
 import pygame
 
-from config import GOLD, GOLD_PICKUP_RADIUS_PX
+from config import (
+    GOLD,
+    GOLD_PICKUP_RADIUS_PX,
+    GOLD_MAGNET_RADIUS_PX,
+    GOLD_MAGNET_SPEED_PX_S,
+)
 from utils.image_loader import load_image
 
 # Draw size for coin art in the world layer; scaled copy, the cache is
@@ -77,7 +84,7 @@ class GoldPickup:
                 self.image_native = None
 
     def update(self, dt, player):
-        """Advance the bob animation; collect when the player is near.
+        """Advance the bob animation; magnet-pull and collect vs the player.
 
         Returns True exactly once (the collect frame) so the caller
         knows to credit the amount and remove this pickup.
@@ -96,6 +103,22 @@ class GoldPickup:
         if dist < GOLD_PICKUP_RADIUS_PX:
             self.collected = True
             return True
+
+        # MAGNETISM: the player attracts coins (user request). Inside
+        # the magnet radius the coin slides toward the player at a
+        # fixed px/s read from config, so coin hunting becomes
+        # automatic once the player is close; the pull happens over a
+        # few frames at normal speed (never a teleport — a step is
+        # capped at the remaining distance). Coins keep their pulled
+        # position if the player moves on, and still bob while they
+        # fly (force_fly visual charm).
+        if dist < GOLD_MAGNET_RADIUS_PX:
+            # dt is in milliseconds: convert to seconds for the px/s
+            # pull speed.
+            step = min(dist, GOLD_MAGNET_SPEED_PX_S * dt / 1000.0)
+            if step > 0 and dist > 0:
+                self.x += (player.x - self.x) / dist * step
+                self.y += (player.y - self.y) / dist * step
 
         return False
 

@@ -72,6 +72,14 @@ START_GOLD = 500
 # close to it (radial distance test, friendlier than a collision box).
 GOLD_PICKUP_RADIUS_PX = 64
 
+# COIN MAGNETISM (user request: "like the player is a magnet attracting
+# the coins"): a coin inside this radius slides TOWARD the player
+# instead of waiting to be stepped over. The pull speed is px/s toward
+# the player's position; GOLD_PICKUP_RADIUS_PX still triggers the
+# payout, so the magnet radius must stay larger than it.
+GOLD_MAGNET_RADIUS_PX = 80
+GOLD_MAGNET_SPEED_PX_S = 260
+
 # ---------------- Build costs (gold) ----------------
 # Player buildings are paid in partial payments: AssaultPhase tracks
 # how much was already paid per spot in tilemap.paid_amount and
