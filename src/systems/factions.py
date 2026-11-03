@@ -59,13 +59,20 @@ def other(faction):
     return "axis" if faction == "allies" else "allies"
 
 
-def unit_prefix(faction):
+def unit_prefix(faction, nation=None):
     """Random infantry frame prefix + nation for a side.
 
     Returns (prefix, nation) — the nation is needed again at death
     time for the coin drop, so units remember what they rolled.
+
+    nation=None keeps the historical PER-MAN random roll from the
+    faction's unit-nation pool (callers with no parent building).
+    A FORCED nation keeps a barracks uniform with its own rolled
+    building nation (user: "don't mix units in divisions — FR
+    barracks generate only FR units, Brit barracks Brit, etc.").
     """
-    nation = random.choice(FACTIONS[faction]["unit_nations"])
+    if nation is None:
+        nation = random.choice(FACTIONS[faction]["unit_nations"])
     return f"infantry_unit_{nation}_1", nation
 
 

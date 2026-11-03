@@ -26,7 +26,11 @@ from entities.enemy import EnemyInfantry
 from entities.friendly_infantry import FriendlyInfantry
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
-from systems.factions import building_variant_filenames
+from systems.factions import (
+    building_variant_filenames,
+    nation_from_building_filename,
+    unit_prefix,
+)
 from utils.image_loader import load_image, load_first_image_named
 
 
@@ -92,6 +96,20 @@ class Barracks(FlooredDamage):
         if is_enemy and self.image is not None:
             self.image = pygame.transform.flip(self.image, True, False)
 
+        # ONE nation per barracks (user: "don't mix units in divisions —
+        # FR barracks generate only FR units, Brit barracks Brit, etc."):
+        # the building's rolled ART nation is the rule — every section
+        # this barracks deploys is built from that same nation, so a
+        # division's men always match the building they marched out of.
+        # Parsed from the used art filename ("building_barraks_<nation>
+        # _<scene>.png"); with no art at all the barracks still rolls
+        # one nation of its own (unit_prefix), so the uniform rule holds
+        # even for the fallback path.
+        if image_file is not None:
+            self.unit_nation = nation_from_building_filename(image_file)
+        else:
+            _, self.unit_nation = unit_prefix(faction)
+
     def is_destroyed(self):
         return self.hp <= 0
 
@@ -109,6 +127,8 @@ class Barracks(FlooredDamage):
         rank of BARRACKS_FORMATION_ACROSS men slides across the
         footprint front, each further rank steps down a file's depth
         (12 men at 4 across = the classic 4-4-4 section block).
+        Every man is the barracks' OWN nation (self.unit_nation, from
+        the building's art roll) — no mixed-nation sections.
         Units do not collide with buildings, so every man starts
         inside his own barracks and walks out like the old single
         spawn.
@@ -145,7 +165,12 @@ class Barracks(FlooredDamage):
             spawn_y = y + rank * step_y
             if self.is_enemy:
                 units.append(
-                    EnemyInfantry(x=spawn_x, y=spawn_y, faction=self.faction)
+                    EnemyInfantry(
+                        x=spawn_x,
+                        y=spawn_y,
+                        faction=self.faction,
+                        nation=self.unit_nation,
+                    )
                 )
             else:
                 units.append(
@@ -153,6 +178,7 @@ class Barracks(FlooredDamage):
                         x=spawn_x,
                         y=spawn_y,
                         faction=self.faction,
+                        nation=self.unit_nation,
                     )
                 )
 

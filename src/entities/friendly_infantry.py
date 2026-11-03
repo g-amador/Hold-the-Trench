@@ -30,16 +30,17 @@ from systems.factions import unit_prefix, scaled_damage, scaled_hp
 class FriendlyInfantry(FlooredDamage):
     """Ally rifle infantry: one charge, one kill, one death."""
 
-    def __init__(self, x, y, faction="allies"):
+    def __init__(self, x, y, faction="allies", nation=None):
         # Spawn at the barracks' tile origin in pixel coordinates.
         self.x = x
         self.y = y
 
-        # Side-picked soldier art: random nation from the faction pool
-        # (brit/fr for allies, ger/aust for axis — systems/factions.py).
-        # Rolled FIRST so the WWI balance handicaps scale this unit's
-        # stats at spawn.
-        prefix, self.nation = unit_prefix(faction)
+        # Side-picked soldier art: nation comes from the faction pool
+        # (brit/fr for allies — systems/factions.py) unless the caller
+        # forces one. Rolled FIRST so the WWI balance handicaps scale
+        # this unit's stats at spawn; barracks pass THEIR rolled
+        # nation so a building deploys only its own kind of soldier.
+        prefix, self.nation = unit_prefix(faction, nation)
 
         # Baseline stats mirror EnemyInfantry so melee is a fair trade
         # (all from config; hp carries the nation's resistance handicap).

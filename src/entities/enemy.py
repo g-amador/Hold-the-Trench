@@ -120,12 +120,14 @@ class EnemyBase(RawSubtractDamage):
 class EnemyInfantry(EnemyBase):
     """Rifle infantry: homes onto the nearest friendly; the clash is mutually lethal."""
 
-    def __init__(self, x, y, faction="axis"):
+    def __init__(self, x, y, faction="axis", nation=None):
         # Side-picked soldier art: random nation from the faction pool
         # (ger/aust for axis, brit/fr for allies — systems/factions.py).
         # Rolled FIRST so the WWI balance handicaps can scale this
-        # unit's stats at spawn (resistance -> hp).
-        prefix, self.nation = unit_prefix(faction)
+        # unit's stats at spawn (resistance -> hp). nation=None keeps
+        # the historical per-man roll; barracks pass THEIR rolled
+        # nation so a building deploys only its own kind of soldier.
+        prefix, self.nation = unit_prefix(faction, nation)
 
         # Baseline stats: soldier speed, moderate hp, small gold bounty
         # (all from config; hp carries the nation's resistance handicap).
