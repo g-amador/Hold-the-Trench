@@ -16,15 +16,18 @@ from config import (
     INFANTRY_SHOOT_COOLDOWN,
     INFANTRY_SHOOT_RANGE_PX,
     INFANTRY_BULLET_DAMAGE,
+    INFANTRY_ANIM_FRAME_S,
+    INFANTRY_AIM_POSE_S,
 )
 from entities.armor import ArmorUnit
 from entities.bullet import Bullet
+from entities.damage import FlooredDamage
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from graphics.sprite_generator import SpriteGenerator
 from systems.factions import unit_prefix, scaled_damage, scaled_hp
 
-class FriendlyInfantry:
+class FriendlyInfantry(FlooredDamage):
     """Ally rifle infantry: one charge, one kill, one death."""
 
     def __init__(self, x, y, faction="allies"):
@@ -75,11 +78,13 @@ class FriendlyInfantry:
         # facing 1 = right (allies charge east toward the enemy side).
         self.facing = 1
         self.run_frame = 0
+        # Animation timing: the run cycle advances on a fixed frame
+        # duration so animation speed is framerate independent.
         self.run_timer = 0.0
-        self.run_frame_duration = 0.12
+        self.run_frame_duration = INFANTRY_ANIM_FRAME_S
         self.is_moving = False
         self.shoot_animation_timer = 0.0
-        self.shoot_animation_duration = 0.18
+        self.shoot_animation_duration = INFANTRY_AIM_POSE_S
 
     def update(self, dt, enemies, bullets=None):
         """Hunt the nearest enemy: shoot at range, finish in melee.
@@ -203,15 +208,6 @@ class FriendlyInfantry:
         )
         bullets.append(bullet)
         self.shoot_timer = self.shoot_cooldown
-
-    def take_damage(self, damage):
-        """Apply damage and mark the unit dead when its health reaches zero."""
-        if self.dead:
-            return
-
-        self.hp = max(0, self.hp - damage)
-        if self.hp == 0:
-            self.dead = True
 
     def get_hitbox(self):
         """Return the unit's collision rectangle in world coordinates."""

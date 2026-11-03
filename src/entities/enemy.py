@@ -20,9 +20,12 @@ from config import (
     INFANTRY_BULLET_DAMAGE,
     ENEMY_SIEGE_DAMAGE,
     ENEMY_SIEGE_COOLDOWN,
+    INFANTRY_ANIM_FRAME_S,
+    INFANTRY_AIM_POSE_S,
 )
 from entities.armor import ArmorUnit
 from entities.bullet import Bullet
+from entities.damage import RawSubtractDamage
 from entities.gold_pickup import GoldPickup
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
@@ -30,7 +33,7 @@ from graphics.sprite_generator import SpriteGenerator
 from systems.factions import unit_prefix, side_coin, scaled_damage, scaled_hp
 
 
-class EnemyBase:
+class EnemyBase(RawSubtractDamage):
     """Shared enemy behavior: horizontal advance, hp, death, gold drop."""
 
     def __init__(self, x, y, speed, hp, gold_drop):
@@ -97,12 +100,6 @@ class EnemyBase:
             (200, 50, 50),
             (self.x - camera_x, self.y, self.width, self.height)
         )
-
-    def take_damage(self, dmg):
-        """Subtract hp; hp <= 0 flips the dead flag used by all filters."""
-        self.hp -= dmg
-        if self.hp <= 0:
-            self.dead = True
 
     def spawn_gold(self):
         """Drop gold exactly once after death.
@@ -186,12 +183,12 @@ class EnemyInfantry(EnemyBase):
         self.facing = -1
         self.run_frame = 0
         self.run_timer = 0.0
-        self.run_frame_duration = 0.12
+        self.run_frame_duration = INFANTRY_ANIM_FRAME_S
         self.is_moving = False
         # Aim-pose animation mirrors the player's: a short timer keeps
         # the weapon-raised art on screen after each shot triangle.
         self.shoot_animation_timer = 0.0
-        self.shoot_animation_duration = 0.18
+        self.shoot_animation_duration = INFANTRY_AIM_POSE_S
 
     def update(self, dt, friendlies, bullets=None, player_bunker=None):
         """Hunt a friendly, shoot at range, fight on contact; siege the

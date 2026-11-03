@@ -26,6 +26,7 @@ import pygame
 from config import TILE_SIZE, BROWN, BUILD_FOOTPRINTS, BUILDING_HP, FACTORY_UNIT_INTERVAL
 from entities.airplane import AirplaneUnit
 from entities.armor import roll_armor_unit
+from entities.damage import FlooredDamage
 from graphics import render_mode
 from systems.factions import (
     building_variant_filenames,
@@ -39,7 +40,7 @@ from utils.image_loader import (
 )
 
 
-class StaticBuilding:
+class StaticBuilding(FlooredDamage):
     """Shared body of the free-placed static buildings."""
 
     # canonical asset stem (building_<stem>_<nation>[_variant].png)
@@ -101,13 +102,6 @@ class StaticBuilding:
         # which still mirror their enemy copies.
 
     # ---- shared destructible-building body ----
-
-    def take_damage(self, dmg):
-        """Apply damage; hp floors at 0 so `is_destroyed` reads true once."""
-        if self.dead:
-            return
-        self.hp = max(0, self.hp - dmg)
-        self.dead = self.hp <= 0
 
     def is_destroyed(self):
         return self.hp <= 0

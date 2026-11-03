@@ -12,7 +12,7 @@ its configured range (config.BULLET_RANGE_PX).
 
 import pygame
 
-from config import BULLET_RANGE_PX
+from config import BULLET_RANGE_PX, BULLET_SPEED_PX_S, INFANTRY_BULLET_DAMAGE
 
 
 class Bullet:
@@ -22,10 +22,12 @@ class Bullet:
         self.x = x
         self.y = y
 
-        # Movement and damage: speed is pixels per second; damage is
-        # subtracted from a target's hp in one hit.
-        self.speed = 400
-        self.damage = 20
+        # Movement and damage: speed is pixels per second (shared
+        # bullet flight speed, config); damage defaults to the infantry
+        # rifle round (matches INFANTRY_BULLET_DAMAGE) — every other
+        # shooter overrides the value right after constructing the shot.
+        self.speed = BULLET_SPEED_PX_S
+        self.damage = INFANTRY_BULLET_DAMAGE
 
         # Armor rule (user spec): only artillery splash and tank shots
         # can hurt armored units. Bullets default to False (infantry,

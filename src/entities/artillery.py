@@ -22,7 +22,15 @@ import random
 
 import pygame
 
-from config import TILE_SIZE, GREY, BUILDING_HP, footprint_for
+from config import (
+    TILE_SIZE,
+    GREY,
+    BUILDING_HP,
+    footprint_for,
+    ARTILLERY_FIRE_INTERVAL,
+    ARTILLERY_SPLASH_DAMAGE,
+)
+from entities.damage import FlooredDamage
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from systems.factions import (
@@ -34,19 +42,19 @@ from utils.image_loader import load_image, load_first_image_named
 from world.trench_generator import STATIC_MAP, no_mans_land_bounds
 
 
-class Artillery:
+class Artillery(FlooredDamage):
 
     # Barrage pattern (user-tuned): impacts land in the no-man's-land
     # strip between the row-0 '|' markers when a map HAS the pair
     # (" Solely between my and the enemy MG nests"); without the
     # markers the fallback band spans 14-18 tiles toward the front.
     # Columns are center-weighted (the window's own middle); rows span
-    # the strip's FULL height uniformly (see CENTER_ROW). 20 damage =
-    # half of an infantry unit (hp 40).
+    # the strip's FULL height uniformly (see CENTER_ROW). Splash
+    # damage + fire clock live in config (ARTILLERY_SPLASH_DAMAGE = a
+    # half infantry unit, ARTILLERY_FIRE_INTERVAL).
     AHEAD_MIN = 14
     AHEAD_MAX = 18
     ROW_SPREAD = 5
-    SPLASH_DAMAGE = 20
     DOT_TIME = 0.5      # seconds the red blast stays visible
     SHELL_DELAY = 1.0   # seconds the shell takes to land (quick-dirty)
     MUZZLE_TIME = 1.0   # seconds the yellow muzzle flash stays visible
@@ -84,9 +92,9 @@ class Artillery:
         self.hp = BUILDING_HP["artillery"]
         self.dead = False
 
-        # Firing stats: steady barrage cadence; cooldown is subtracted
-        # in update, hence starts at 0.
-        self.fire_rate = 1.5
+        # Firing stats: steady barrage cadence (config); cooldown is
+        # subtracted in update, hence starts at 0.
+        self.fire_rate = ARTILLERY_FIRE_INTERVAL
         self.cooldown = 0
 
         # Barrage bookkeeping: never hit the same tile twice (per gun),
@@ -125,13 +133,6 @@ class Artillery:
                     True,
                     False,
                 )
-
-    def take_damage(self, dmg):
-        """Apply damage; hp floors at 0 so `is_destroyed` reads true once."""
-        if self.dead:
-            return
-        self.hp = max(0, self.hp - dmg)
-        self.dead = self.hp <= 0
 
     def is_destroyed(self):
         return self.hp <= 0
@@ -230,7 +231,7 @@ class Artillery:
         # Damage per shell, scaled by this gun's nation's ARTILLERY
         # handicap (fr 1.1 / ger 1.1 / brit 1.05 / aust 1.0 — factions
         # table).
-        damage = scaled_damage(self.nation, "artillery", self.SPLASH_DAMAGE)
+        damage = scaled_damage(self.nation, "artillery", ARTILLERY_SPLASH_DAMAGE)
 
         # Splash: hit tile + its 8 neighbours; damage any standing
         # unit regardless of side ("any unit", user choice).

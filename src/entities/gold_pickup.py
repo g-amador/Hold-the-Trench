@@ -18,7 +18,7 @@ crash the game).
 import math
 import pygame
 
-from config import GOLD
+from config import GOLD, GOLD_PICKUP_RADIUS_PX
 from utils.image_loader import load_image
 
 # Draw size for coin art in the world layer; scaled copy, the cache is
@@ -93,7 +93,7 @@ class GoldPickup:
         # Radial pickup range instead of a collision rect: friendlier
         # and simpler; the player collects by walking roughly near it.
         dist = math.hypot(player.x - self.x, player.y - self.y)
-        if dist < 64:
+        if dist < GOLD_PICKUP_RADIUS_PX:
             self.collected = True
             return True
 

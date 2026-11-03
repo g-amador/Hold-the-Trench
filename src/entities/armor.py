@@ -45,6 +45,7 @@ from config import (
     CAR_MG_FIRE_RATE,
 )
 from entities.bullet import Bullet
+from entities.damage import RawSubtractDamage
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from utils.image_loader import load_first_image
@@ -57,7 +58,7 @@ def _world_width():
     return len(STATIC_MAP[0]) * TILE_SIZE
 
 
-class ArmorUnit:
+class ArmorUnit(RawSubtractDamage):
     """Shared vehicle behavior: advance, hull MG, hp, death."""
 
     # Vehicle identity for the MG targeting rules and the battle
@@ -122,12 +123,6 @@ class ArmorUnit:
             self.image = pygame.transform.flip(self.image, True, False)
 
     # ---- housekeeping shared with the other units ----
-
-    def take_damage(self, dmg):
-        """Subtract hp; hp <= 0 flips dead (unit lists re-filter)."""
-        self.hp -= dmg
-        if self.hp <= 0:
-            self.dead = True
 
     def get_hitbox(self):
         """Collision rectangle in world coordinates."""

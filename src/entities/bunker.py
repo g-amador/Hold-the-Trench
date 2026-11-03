@@ -15,6 +15,7 @@ from config import (
     BUILDING_HP,
     BUNKER_FOOTPRINTS_BY_NATION,
 )
+from entities.damage import FlooredDamage
 from graphics import render_mode
 from systems.factions import (
     building_variant_filenames,
@@ -27,7 +28,7 @@ from utils.image_loader import (
 )
 
 
-class Bunker:
+class Bunker(FlooredDamage):
     def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
         self.is_enemy = is_enemy
         self.faction = faction
@@ -151,11 +152,6 @@ class Bunker:
     def update(self):
         # Passive objective: nothing to simulate.
         pass
-
-    def take_damage(self, dmg):
-        """Apply damage; hp floors at 0 so `is_destroyed` reads true once."""
-        self.hp = max(0, self.hp - dmg)
-        self.dead = self.hp <= 0
 
     def is_destroyed(self):
         """Win/lose checks test hp directly (hp == 0 = collapsed)."""

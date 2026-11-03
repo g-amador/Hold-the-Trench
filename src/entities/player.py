@@ -10,7 +10,14 @@ degree cone in front of the facing direction.
 import math
 import pygame
 
-from config import TILE_SIZE, BLUE, INFANTRY_SPEED
+from config import (
+    TILE_SIZE,
+    BLUE,
+    INFANTRY_SPEED,
+    PLAYER_SHOOT_COOLDOWN,
+    INFANTRY_ANIM_FRAME_S,
+    INFANTRY_AIM_POSE_S,
+)
 from entities.bullet import Bullet
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
@@ -59,8 +66,9 @@ class Player:
         prefix, self.nation = unit_prefix(faction)
 
         # Shooting: a cooldown gates auto-fire, and a short timer keeps
-        # the aim pose on screen after each shot.
-        self.shoot_cooldown = 0.25
+        # the aim pose on screen after each shot (cadence in config —
+        # the player's is faster than spawning infantry's on purpose).
+        self.shoot_cooldown = PLAYER_SHOOT_COOLDOWN
         self.shoot_timer = 0
 
         # Standard infantry frames; None means missing assets (block fallback).
@@ -83,11 +91,11 @@ class Player:
         # duration so animation speed is framerate independent.
         self.run_frame = 0
         self.run_timer = 0.0
-        self.run_frame_duration = 0.12
+        self.run_frame_duration = INFANTRY_ANIM_FRAME_S
 
         # The aim pose stays visible for a fixed beat after each shot.
         self.shoot_animation_timer = 0.0
-        self.shoot_animation_duration = 0.18
+        self.shoot_animation_duration = INFANTRY_AIM_POSE_S
 
         self.is_moving = False
         self.facing = 1  # 1 = right, -1 = left

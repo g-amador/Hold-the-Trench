@@ -8,7 +8,14 @@ frequency is shared (spawn_cooldown).
 
 import pygame
 
-from config import TILE_SIZE, GREY, BUILD_FOOTPRINTS, BUILDING_HP
+from config import (
+    TILE_SIZE,
+    GREY,
+    BUILD_FOOTPRINTS,
+    BUILDING_HP,
+    BARRACKS_SPAWN_INTERVAL,
+)
+from entities.damage import FlooredDamage
 from entities.enemy import EnemyInfantry
 from entities.friendly_infantry import FriendlyInfantry
 from graphics import render_mode
@@ -17,7 +24,7 @@ from systems.factions import building_variant_filenames
 from utils.image_loader import load_image, load_first_image_named
 
 
-class Barracks:
+class Barracks(FlooredDamage):
 
     def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
         # type strings match the map spot_types keys (building_query
@@ -44,8 +51,9 @@ class Barracks:
         self.x = self.tile_x * TILE_SIZE
         self.y = self.tile_y * TILE_SIZE
 
-        # Spawn clock: infantry deploy every spawn_cooldown milliseconds.
-        self.spawn_cooldown = 5.0
+        # Spawn clock: infantry deploy every BARRACKS_SPAWN_INTERVAL
+        # seconds (the anchor the factory cadence multiplies off).
+        self.spawn_cooldown = BARRACKS_SPAWN_INTERVAL
         self.timer = 0
 
         # 1 = right, -1 = left: enemies face the player side.
@@ -77,13 +85,6 @@ class Barracks:
         # flipped-free: draw() falls back to the block mode instead.
         if is_enemy and self.image is not None:
             self.image = pygame.transform.flip(self.image, True, False)
-
-    def take_damage(self, dmg):
-        """Apply damage; hp floors at 0 so `is_destroyed` reads true once."""
-        if self.dead:
-            return
-        self.hp = max(0, self.hp - dmg)
-        self.dead = self.hp <= 0
 
     def is_destroyed(self):
         return self.hp <= 0

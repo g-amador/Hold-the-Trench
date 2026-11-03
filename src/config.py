@@ -68,6 +68,10 @@ YELLOW = (255, 255, 0)   # artillery muzzle flash (shell-flight marker)
 # or a few partial payments early on.
 START_GOLD = 500
 
+# Gold collect radius: the player picks up a coin by walking this
+# close to it (radial distance test, friendlier than a collision box).
+GOLD_PICKUP_RADIUS_PX = 64
+
 # ---------------- Build costs (gold) ----------------
 # Player buildings are paid in partial payments: AssaultPhase tracks
 # how much was already paid per spot in tilemap.paid_amount and
@@ -97,6 +101,10 @@ BUILD_COSTS = {
 # flying this far instead of streaking across the whole map.
 BULLET_RANGE_PX = 500
 
+# Bullet flight speed (px/s); EVERY bullet shares it (the shared
+# straight-line projectile, independent of who fired it).
+BULLET_SPEED_PX_S = 400
+
 # ---------------- Unit stats (speed px/s, hp, gold drops) ----------------
 # USER RULE: every unit's speed, hp/armor and gold_drop lives HERE (no
 # more stat literals inside entity classes). The per-nation handicap
@@ -113,6 +121,16 @@ ENEMY_SIEGE_DAMAGE = 10
 ENEMY_SIEGE_COOLDOWN = 1.0
 # Per-shot rifle damage (matches Bullet's default 20).
 INFANTRY_BULLET_DAMAGE = 20
+
+# Player's auto-fire trigger cadence (s between shots; faster than the
+# spawning infantry because the player aims at one closest target).
+PLAYER_SHOOT_COOLDOWN = 0.25
+
+# Shared soldier animation timing, identical across the player and
+# BOTH, enemy/friendly spawning infantry (walk cycle frame length and
+# the aim-pose beat after each shot):
+INFANTRY_ANIM_FRAME_S = 0.12
+INFANTRY_AIM_POSE_S = 0.18
 
 # ---------------- Planes (air field production) ----------------
 # USER SPEC: air fields spawn planes at the SAME cadence as tank
@@ -180,6 +198,18 @@ CAR_SPEED = 60
 # infantry timeline is one deployment every 5 s (Barracks), so a
 # factory rolls out a vehicle every 3 x 5 s.
 FACTORY_UNIT_INTERVAL = 15.0
+
+# Barracks spawn clock (s between infantry deployments) — the anchor
+# the factory cadence multiplies off (see comment above). Factories
+# read FACTORY_UNIT_INTERVAL directly; the barracks roll their own.
+BARRACKS_SPAWN_INTERVAL = 5.0
+
+# Artillery fire clock (s between barrages) and the base splash on
+# impact (nation-scaled at fire time). The BARRAGE GEOMETRY pattern
+# (columns/rows band) stays on the Artillery class — it is a
+# user-tuned map pattern, not a unit stat.
+ARTILLERY_FIRE_INTERVAL = 1.5
+ARTILLERY_SPLASH_DAMAGE = 20
 
 # On-board machine guns ("shoot as machine guns"): the tank's gun
 # matches the MG-nest range; damage is bigger per hit, fired slower.

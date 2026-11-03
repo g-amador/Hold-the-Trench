@@ -44,6 +44,7 @@ from config import (
     BLUE,
 )
 from entities.bullet import Bullet
+from entities.damage import GuardedRawDamage
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from utils.image_loader import load_first_image
@@ -51,7 +52,7 @@ from systems.factions import scaled_damage, scaled_hp
 from world.trench_generator import STATIC_MAP
 
 
-class AirplaneUnit:
+class AirplaneUnit(GuardedRawDamage):
     """A flying plane: proximity targets, bombs over targets, air MG."""
 
     # Identity for the battle state's force counts and targeting
@@ -110,14 +111,6 @@ class AirplaneUnit:
         return self.width, self.height
 
     # ---- housekeeping ----
-
-    def take_damage(self, dmg):
-        """Subtract hp; hp <= 0 flips dead (the plane list re-filters)."""
-        if self.dead:
-            return
-        self.hp -= dmg
-        if self.hp <= 0:
-            self.dead = True
 
     def get_hitbox(self):
         return pygame.Rect(

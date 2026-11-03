@@ -19,8 +19,14 @@ from states.win_state import WinState
 
 from systems.economy_system import EconomySystem, BUILD_COSTS
 from systems.building_query import BuildingQuery
+from systems.bullet_resolution import (
+    resolve_bullets,
+    apply_enemy_damage,
+    apply_friendly_damage,
+)
 
 from ui.hud import HUD
+from ui.pause_overlay import PauseOverlay
 
 from graphics import render_mode
 
@@ -94,6 +100,23 @@ STATIC_BUILDING_CLASSES = {
 CULL_MARGIN = 128
 
 
+def hires_cache_for(holder, native, target):
+    """Cached CLOSE-zoom smoothscale shared by both hires blit passes.
+
+    Buildings (`_blit_building_hires`) and coins (`_blit_coin_hires`)
+    memoize ONE smoothscaled copy per holder at the current zoom:
+    attribute-level caching on the holder lets each instance age out
+    only when the target size changes (zoom), keeping every smoothscale
+    off the per-frame hot path. Falls back cleanly to a fresh scale the
+    first time or after a zoom change.
+    """
+    cache = holder.__dict__.get("_hires_cache")
+    if cache is None or cache.get_size() != target:
+        cache = pygame.transform.smoothscale(native, target)
+        holder._hires_cache = cache
+    return cache
+
+
 class AssaultPhase:
     def __init__(self, game):
         self.game = game
@@ -124,18 +147,11 @@ class AssaultPhase:
 
         # Pause is battle-state-owned: SPACE (ESC as secondary) flips
         # it, rendering keeps running, and the simulation (update)
-        # skips while paused.
+        # skips while paused. The overlay art/layout lives in
+        # ui/pause_overlay (built once there; pausing costs nothing
+        # per frame).
         self.paused = False
-
-        # Pause overlay assets, built once: translucent dim surface and
-        # the two fonts (no surface/scale churn per paused frame).
-        self.pause_font = pygame.font.SysFont("arial", 46)
-        self.pause_hint_font = pygame.font.SysFont("arial", 20)
-        self.pause_overlay = pygame.Surface(
-            (SCREEN_WIDTH, SCREEN_HEIGHT),
-            pygame.SRCALPHA,
-        )
-        self.pause_overlay.fill((0, 0, 0, 140))
+        self.pause_overlay = PauseOverlay()
 
         # Offscreen world view sized to the FULL map strip: the whole
         # battlefield is drawn here 1:1 (world pixels are always
@@ -593,82 +609,19 @@ class AssaultPhase:
         self.camera_x = 0
         
         # Player bullets damage enemy infantry or enemy bunkers.
-        # Resolution is a filter loop: every surviving bullet is either
-        # re-listed, or a hit/removal is folded into remaining_bullets.
-        remaining_bullets = []
-
-        for bullet in self.bullets:
-            bullet.update(dt)
-
-            # Self-destructed (out of world) shots are simply dropped.
-            if getattr(bullet, "dead", False):
-                continue
-
-            hit = False
-
-            for enemy in self.enemy_barracks_units:
-                if enemy.dead:
-                    continue
-
-                # ARMOR RULE: infantry/player/MG shots can never hurt
-                # armored units — they pass through (only artillery
-                # splash and tank shells damage armor). Bullets keep
-                # flying on armor contact so they can still hit an
-                # infantry unit behind the tank.
-                if isinstance(enemy, ArmorUnit) and not bullet.armor_damage:
-                    continue
-
-                if bullet.get_hitbox().colliderect(enemy.get_hitbox()):
-                    enemy.take_damage(bullet.damage)
-                    hit = True
-                    break
-
-            # Fallback to objectives when no unit was hit. Buildings
-            # are destructible: armor_damage bullets (tank shells)
-            # hurt ANY enemy building; plane MG bullets never touch
-            # buildings (bombs only); other shots keep the old
-            # bunker-only rule (shooting bunkers is a core win route).
-            if not hit and bullet.armor_damage:
-                for building in enemy_buildings:
-                    if bullet.get_hitbox().colliderect(
-                        building.get_hitbox()
-                    ):
-                        building.take_damage(bullet.damage)
-                        hit = True
-                        break
-            elif not hit and getattr(bullet, "can_damage_buildings", True):
-                for bunker in enemy_bunkers:
-                    if bunker.dead:
-                        continue
-
-                    if bullet.get_hitbox().colliderect(
-                        bunker.get_hitbox()
-                    ):
-                        bunker.take_damage(bullet.damage)
-                        hit = True
-                        break
-
-            # Enemy planes: player-side bullets (and plane MG fire)
-            # reach the opposing planes in the air (bullets with no
-            # armor damage chip planes like infantry; plane bullets
-            # are armorless by design, dogfights stay infantry-like).
-            if not hit:
-                for plane in self.enemy_planes:
-                    if plane.dead:
-                        continue
-
-                    if bullet.get_hitbox().colliderect(
-                        plane.get_hitbox()
-                    ):
-                        plane.take_damage(bullet.damage)
-                        hit = True
-                        break
-
-            # Unhit bullets survive to the next frame.
-            if not hit:
-                remaining_bullets.append(bullet)
-
-        self.bullets = remaining_bullets
+        # The filter loop itself is the unified battle resolver
+        # (systems/bullet_resolution) called once per direction here
+        # and for enemy bullets further below; only the target lists
+        # and the damage callback differ between the two passes.
+        self.bullets = resolve_bullets(
+            self.bullets,
+            self.enemy_barracks_units,
+            enemy_buildings,
+            enemy_bunkers,
+            self.enemy_planes,
+            dt,
+            apply_enemy_damage,
+        )
 
         # Enemy infantry fights friendly infantry in melee. When no
         # friendlies remain, EnemyInfantry sieges player_bunker instead.
@@ -791,77 +744,17 @@ class AssaultPhase:
         # Enemy bullets can damage friendly infantry; armor passes
         # through; friendly BUILDINGS rule mirrors the bullets above
         # (tank shells hit any building, others only bunkers); and
-        # friendly PLANES get hit by anything in the air.
-        remaining_enemy_bullets = []
-
-        for bullet in self.enemy_bullets:
-            bullet.update(dt)
-
-            if getattr(bullet, "dead", False):
-                continue
-
-            hit = False
-
-            for friendly in self.friendlies:
-                if friendly.dead:
-                    continue
-
-                # ARMOR RULE (mirrored): plain enemy bullets pass
-                # through friendly armor; only tank shots/artillery
-                # hurt armored units on this side too.
-                if isinstance(friendly, ArmorUnit) and not bullet.armor_damage:
-                    continue
-
-                if bullet.get_hitbox().colliderect(
-                    friendly.get_hitbox()
-                ):
-                    # Direct hp subtraction: friendlies take raw bullet
-                    # damage instead of a take_damage call (they have
-                    # no armor or special death handling here).
-                    friendly.hp -= bullet.damage
-
-                    if friendly.hp <= 0:
-                        friendly.dead = True
-
-                    hit = True
-                    break
-
-            if not hit and bullet.armor_damage:
-                for building in player_buildings:
-                    if bullet.get_hitbox().colliderect(
-                        building.get_hitbox()
-                    ):
-                        building.take_damage(bullet.damage)
-                        hit = True
-                        break
-            elif not hit and getattr(bullet, "can_damage_buildings", True):
-                for bunker in player_bunkers:
-                    if bunker.dead:
-                        continue
-
-                    if bullet.get_hitbox().colliderect(
-                        bunker.get_hitbox()
-                    ):
-                        bunker.take_damage(bullet.damage)
-                        hit = True
-                        break
-
-            if not hit:
-                for plane in self.friendly_planes:
-                    if plane.dead:
-                        continue
-
-                    if bullet.get_hitbox().colliderect(
-                        plane.get_hitbox()
-                    ):
-                        plane.take_damage(bullet.damage)
-                        hit = True
-                        break
-
-            if not hit:
-                remaining_enemy_bullets.append(bullet)
-
-        self.enemy_bullets = remaining_enemy_bullets
+        # friendly PLANES get hit by anything in the air. All of that
+        # lives in the same unified resolver as the player pass.
+        self.enemy_bullets = resolve_bullets(
+            self.enemy_bullets,
+            self.friendlies,
+            player_buildings,
+            player_bunkers,
+            self.friendly_planes,
+            dt,
+            apply_friendly_damage,
+        )
 
         self.friendlies = [
             friendly for friendly in self.friendlies
@@ -1317,7 +1210,7 @@ class AssaultPhase:
         # Force counts panel: paused-only so live play keeps a clean
         # view; drawn after the dim overlay so the numbers stay crisp.
         if self.paused:
-            self._draw_pause_overlay(screen)
+            self.pause_overlay.draw(screen, self.player.x, self.player.y)
             self.hud.draw_force_counts(screen, self._collect_force_rows())
 
     def _blit_building_hires(self, screen, cx, cy, view_rect):
@@ -1353,10 +1246,7 @@ class AssaultPhase:
                 int(round(fh * scale)),
             )
 
-            cache = building.__dict__.get("_hires_cache")
-            if cache is None or cache.get_size() != target:
-                cache = pygame.transform.smoothscale(native, target)
-                building._hires_cache = cache
+            cache = hires_cache_for(building, native, target)
 
             screen_x = (building.tile_x * TILE_SIZE + ox - cx) * scale
             screen_y = HUD_BAR_HEIGHT + (
@@ -1414,68 +1304,8 @@ class AssaultPhase:
                 int(round(COIN_SIZE[0] * scale)),
                 int(round(COIN_SIZE[1] * scale)),
             )
-            cache = gold.__dict__.get("_hires_cache")
-            if cache is None or cache.get_size() != target:
-                cache = pygame.transform.smoothscale(
-                    gold.image_native, target,
-                )
-                gold._hires_cache = cache
+            cache = hires_cache_for(gold, gold.image_native, target)
 
             screen_x = (gold.x - cx) * scale
             screen_y = HUD_BAR_HEIGHT + (gold.y + gold.y_offset - cy) * scale
             screen.blit(cache, (int(round(screen_x)), int(round(screen_y))))
-
-    def _draw_pause_overlay(self, screen):
-        """Draw the dim + centered PAUSED panel with resume instructions."""
-        # Dim the frozen battle scene; the surface was built once in
-        # __init__ so pausing costs nothing per frame.
-        screen.blit(self.pause_overlay, (0, 0))
-
-        screen_w, screen_h = screen.get_size()
-
-        # Centered text stack: title, resume hint, hard-coded controls
-        # so the player always knows what is usable while frozen.
-        title = self.pause_font.render("PAUSED", True, WHITE)
-        title_rect = title.get_rect(centerx=screen_w // 2, y=screen_h // 3)
-        screen.blit(title, title_rect)
-
-        hint = self.pause_hint_font.render(
-            "Press SPACE (or ESC) to resume",
-            True,
-            WHITE,
-        )
-        hint_rect = hint.get_rect(
-            centerx=screen_w // 2,
-            y=screen_h // 3 + 60,
-        )
-        screen.blit(hint, hint_rect)
-
-        # Live player tile position while frozen, 1-BASED per tile
-        # (floor divide; the NW-most tile is X=1, Y=1 since world x
-        # in [0, TILE_SIZE) belongs to tile 1). Enables distance
-        # reading against the hand-edited map markers.
-        tile_x = int(self.player.x // TILE_SIZE) + 1
-        tile_y = int(self.player.y // TILE_SIZE) + 1
-        pos = self.pause_hint_font.render(
-            f"Player tile: X {tile_x} | Y {tile_y}",
-            True,
-            WHITE,
-        )
-        pos_rect = pos.get_rect(
-            centerx=screen_w // 2,
-            y=screen_h // 3 + 96,
-        )
-        screen.blit(pos, pos_rect)
-
-        # Control reference while frozen: the help the user reads
-        # whenever the battle is paused.
-        controls = self.pause_hint_font.render(
-            "SPACE: pause/resume | +: zoom in | -: zoom out | G: graphics toggle | WASD: move",
-            True,
-            WHITE,
-        )
-        controls_rect = controls.get_rect(
-            centerx=screen_w // 2,
-            y=screen_h - 60,
-        )
-        screen.blit(controls, controls_rect)

@@ -33,6 +33,7 @@ from config import (
     MG_NEST_ELEVATION_DEG,
 )
 from entities.bullet import Bullet
+from entities.damage import FlooredDamage
 from graphics import render_mode
 from systems.factions import building_variant_filenames
 from utils.image_loader import (
@@ -41,7 +42,7 @@ from utils.image_loader import (
 )
 
 
-class MGNest:
+class MGNest(FlooredDamage):
 
     def __init__(self, tile_x, tile_y, is_enemy=False, faction="allies"):
         # type strings match the map spot_types keys.
@@ -103,13 +104,6 @@ class MGNest:
                 True,
                 False,
             )
-
-    def take_damage(self, dmg):
-        """Apply damage; hp floors at 0 so `is_destroyed` reads true once."""
-        if self.dead:
-            return
-        self.hp = max(0, self.hp - dmg)
-        self.dead = self.hp <= 0
 
     def is_destroyed(self):
         return self.hp <= 0
