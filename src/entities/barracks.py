@@ -1,9 +1,13 @@
 """
-Barracks building: spawns infantry on a fixed timer.
+Barracks building: deploys infantry sections on a fixed timer.
 
-Player barracks spawn friendly infantry; enemy barracks spawn enemy
-infantry. `is_enemy` selects both behavior and art side; spawn
-frequency is shared (spawn_cooldown).
+Player barracks deploy friendly sections; enemy barracks deploy enemy
+sections. `is_enemy` selects both behavior and art side; spawn
+frequency is shared (spawn_cooldown), and each deployment is an
+infantry SECTION (BARRACKS_SPAWN_BATCH, WWI army sizes) laid out in
+RANKS (BARRACKS_FORMATION_ACROSS men across the front; with the
+12-man batch that is the classic 4-4-4 — three files of four forming
+a square block). Their own AI then walks the block toward the enemy.
 """
 
 import pygame
@@ -14,6 +18,8 @@ from config import (
     BUILD_FOOTPRINTS,
     BUILDING_HP,
     BARRACKS_SPAWN_INTERVAL,
+    BARRACKS_SPAWN_BATCH,
+    BARRACKS_FORMATION_ACROSS,
 )
 from entities.damage import FlooredDamage
 from entities.enemy import EnemyInfantry
@@ -94,11 +100,18 @@ class Barracks(FlooredDamage):
         return pygame.Rect(self.x, self.y, self.width, self.height)
 
     def update(self, dt, units):
-        """Count down the spawn clock; deploy a unit into `units`.
+        """Count down the spawn clock; deploy a SECTION into `units`.
 
         `units` is the side's unit list owned by the battle state
         (friendlies or enemy_barracks_units there). Destroyed
-        barracks stop spawning.
+        barracks stop deploying. Per WWI army sizes each deployment
+        is BARRACKS_SPAWN_BATCH men, arranged as RANK AND FILE: one
+        rank of BARRACKS_FORMATION_ACROSS men slides across the
+        footprint front, each further rank steps down a file's depth
+        (12 men at 4 across = the classic 4-4-4 section block).
+        Units do not collide with buildings, so every man starts
+        inside his own barracks and walks out like the old single
+        spawn.
         """
         if self.dead:
             return
@@ -116,10 +129,32 @@ class Barracks(FlooredDamage):
         x = self.tile_x * TILE_SIZE
         y = self.tile_y * TILE_SIZE
 
-        if self.is_enemy:
-            units.append(EnemyInfantry(x, y, faction=self.faction))
-        else:
-            units.append(FriendlyInfantry(x, y, faction=self.faction))
+        # Rank-and-file layout: the across-spreading x step and the
+        # depth-stepping y step keep every rank INSIDE the footprint
+        # band (units stacking onto one tile would draw as a single
+        # sprite, which is what the user did not want).
+        cols = BARRACKS_FORMATION_ACROSS
+        step_x = max(1, self.width // cols)
+        ranks = -(-BARRACKS_SPAWN_BATCH // cols)  # ceil division
+        step_y = max(1, self.height // ranks)
+
+        for i in range(BARRACKS_SPAWN_BATCH):
+            col = i % cols
+            rank = i // cols
+            spawn_x = x + col * step_x
+            spawn_y = y + rank * step_y
+            if self.is_enemy:
+                units.append(
+                    EnemyInfantry(x=spawn_x, y=spawn_y, faction=self.faction)
+                )
+            else:
+                units.append(
+                    FriendlyInfantry(
+                        x=spawn_x,
+                        y=spawn_y,
+                        faction=self.faction,
+                    )
+                )
 
     def draw(self, screen, camera_x):
         px = self.tile_x * TILE_SIZE - camera_x

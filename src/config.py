@@ -202,15 +202,34 @@ CAR_HP = 80
 TANK_SPEED = 30
 CAR_SPEED = 60
 
-# Production cadence: 1 tank per 3 infantry created (user rule). The
-# infantry timeline is one deployment every 5 s (Barracks), so a
-# factory rolls out a vehicle every 3 x 5 s.
+# Production cadence: armored vehicles keep their OWN flat interval —
+# one roll every 15 s per factory, INDEPENDENT of the barracks section
+# batch size (the infantry rate scales with BARRACKS_SPAWN_BATCH; the
+# armor rate deliberately does not, so armor stays a slower drumbeat
+# than a batched infantry deployment).
 FACTORY_UNIT_INTERVAL = 15.0
 
 # Barracks spawn clock (s between infantry deployments) — the anchor
 # the factory cadence multiplies off (see comment above). Factories
 # read FACTORY_UNIT_INTERVAL directly; the barracks roll their own.
 BARRACKS_SPAWN_INTERVAL = 5.0
+
+# Barracks deploy a WHOLE SECTION per deployment (user request: army
+# sizes in line with WW I, at battle start). A 1914 rifle section was
+# 8-12 men (British 12, French squad ~12, German Gruppe 8-9): the
+# section is the smallest formation a game-scale battle can place,
+# so each barracks deployment is one section of 12. Enemy barracks
+# deploy their sections with the same size (they share Barracks).
+# Raise/lower to taste: bigger batches = denser melee lines and a
+# heavier per-frame AI load.
+BARRACKS_SPAWN_BATCH = 12
+
+# Section FORMATION (user request: "4-4-4 aspect"): men per RANK
+# across the barracks front. With the 12-man batch this lays the
+# section as the classic 4-4-4 — three files of four, a compact
+# square block instead of one stacked column. The last rank is
+# shorter when the batch is not an exact multiple.
+BARRACKS_FORMATION_ACROSS = 4
 
 # Artillery fire clock (s between barrages) and the base splash on
 # impact (nation-scaled at fire time). The BARRAGE GEOMETRY pattern
@@ -233,7 +252,7 @@ CAR_MG_FIRE_RATE = 0.2
 # Static MG nest building: range/damage/cadence match the car's gun.
 MG_NEST_RANGE = 220
 MG_NEST_DAMAGE = 8
-MG_NEST_FIRE_RATE = 0.2
+MG_NEST_FIRE_RATE = 0.1
 # Firing arc (user rule: "MG-nest fire only in 25 degrees up or down
 # in the direction of enemies in range"): the gun faces the battlefield
 # horizontally and may elevate/depress at most this angle, so targets
