@@ -16,6 +16,7 @@ hold_the_trench/
 │   │   ├── barracks.py
 │   │   ├── bullet.py
 │   │   ├── bunker.py
+│   │   ├── damage.py               # shared take_damage flavors: RawSubtractDamage / GuardedRawDamage (units) and FlooredDamage (buildings, friendly side)
 │   │   ├── enemy.py
 │   │   ├── friendly_infantry.py
 │   │   ├── gold_pickup.py
@@ -28,15 +29,18 @@ hold_the_trench/
 │   │   └── block_drawer.py         # block-mode rendering used by the toggle and as missing-asset fallback
 │   ├── states/                     # for menus, battles, victory, defeat, and other game screens.
 │   │   ├── assault_phase.py
+│   │   ├── end_screen.py           # shared EndScreenState base: R/S/Q restart flow, banner text, faction-keyed background
 │   │   ├── game_over.py
 │   │   ├── main_menu.py
 │   │   └── win_state.py
 │   ├── systems/                    # for combat, economy, and faction rules (shared pools/rolls live in factions.py).
 │   │   ├── building_query.py
+│   │   ├── bullet_resolution.py    # unified per-direction bullet collision pass (units -> buildings/bunkers -> planes), called twice from the battle
 │   │   ├── economy_system.py
 │   │   └── factions.py             # single source of truth for sides: nation pools (units/buildings), coin art by nation, menu/victory/defeat backgrounds, and the other()/roll helpers
 │   ├── ui/                         # for HUD, menus, tooltips, and overlays.
-│   │   └── hud.py
+│   │   ├── hud.py
+│   │   └── pause_overlay.py        # PAUSED panel: dim layer + centered text stack, built once per battle
 │   ├── utils/
 │   │   └── image_loader.py
 │   ├── world/                      # for map generation, tiles, terrain, and battlefield configuration.
