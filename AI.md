@@ -308,3 +308,15 @@ Keep the development checklist current after each step.
 - `verify_wall_zoom.py` regression: re-run PASS (its CLOSE smoothscale assert relaxed to "FIRST TWO calls are the native ground crop (706,379) + entity layer (320,182)" — the new building-hires pass adds legit building smoothscales after those two, all to 4x footprint sizes e.g. factory (1091,976)->(896,896)).
 - `verify_batch7_visual.py`: 35 s headless sim + screenshots `.verify/batch7_close.png` (winter scene: native-scale buildings razor sharp, factory cut-out clean, no milky wash) + `.verify/batch7_full.png` (both sides' artillery: allies 4x2 cannons vs axis 3x2 flipped howitzers, tanks rolling from BOTH factories); 25/25 buildings carry native art and built hi-res caches in CLOSE.
 - Cadence probe: BOTH air fields spawn on the shared 15 s interval (1 plane each per cycle; a degenerate burst preload of 200 produced 67/67 in one update). Plane-count skew in burst-preloaded sims is a stacking artifact, not a spawn bug.
+
+## Asset generation prompts (verbatim, kept so art can be regenerated in the same style)
+- `Terrain Prompt.txt` — the ground map art (snow winter scene, trench network / bunker complex / no-man's-land split, grey placement-square markers):
+
+    Isometric WWII strategy map, clear winter daylight, bright overcast sky casting soft shadows. The map is covered in a thick layer of snow across all terrain and structures, but it is not currently snowing. Hand-drawn comic illustration style with bold black outlines and subtle watercolor shading.
+
+    The map is split down the center:
+    - Left side: A wooden trench network made of logs and timber fortifications, set against a snow-covered landscape with pine trees.
+    - Right side: A concrete military bunker complex with sharp angles and steps, built into a snow-covered rocky mountain terrain.
+    - Middle area: A desolate, snow-filled no-man's-land filled with crater holes, frozen mud patches, scattered barbed wire entanglements, and bare, burnt wooden posts sticking out of the snow.
+
+    Throughout the map, placement zones are marked as clean, simple, light-grey square outlines embedded flush into the snow-covered ground, completely empty with no icons inside. Crisp top-down isometric view, detailed game UI map design.
