@@ -190,13 +190,12 @@ class TileMap:
     def set_factions(self, player_faction, enemy_faction):
         """Bind the battle's sides for FOOTPRINT resolution.
 
-        Footprints can differ per SIDE (axis artillery is 3x2, allies
-        4x2 — config.FACTION_FOOTPRINT_OVERRIDES), but this grid is
-        built before the menu rolls the factions. Placed buildings
-        carry their own footprint_tiles, so only EMPTY-spot probes and
-        outline drawing need the side context: "enemy_"-prefixed spot
-        kinds resolve against the ENEMY faction, the rest against the
-        player's. Defaults (allies/axis) keep pre-battle usage sane.
+        Footprints is 3x2, but this grid is built before the menu rolls 
+        the factions. Placed buildings carry their own footprint_tiles, 
+        so only EMPTY-spot probes and outline drawing need the side context: 
+        "enemy_"-prefixed spot kinds resolve against the ENEMY faction, 
+        the rest against the player's. Defaults (allies/axis) keep pre-battle 
+        usage sane.
         """
         self.player_faction = player_faction
         self.enemy_faction = enemy_faction

@@ -172,20 +172,9 @@ BUILDING_HP = {
     "tank_factory": 150,
 }
 
-# ---------------- Faction footprints (tiles) ----------------
-# Per-side overrides on BUILD_FOOTPRINTS: the axis artillery is the
-# german heavy howitzer on a 3x2 plot (user rule "German artillery
-# should only be 3x2"); the allies keep the wide 4x2 cannon line.
-FACTION_FOOTPRINT_OVERRIDES = {
-    ("artillery", "axis"): (3, 2),
-}
-
 
 def footprint_for(kind, faction):
     """(fw, fh) in tiles for a building kind on a battlefield side."""
-    override = FACTION_FOOTPRINT_OVERRIDES.get((kind, faction))
-    if override is not None:
-        return override
     return BUILD_FOOTPRINTS.get(kind, (1, 1))
 
 
@@ -273,7 +262,7 @@ BUILD_FOOTPRINTS = {
     # Barracks 4x4, bunker 6x6; artillery 4x2 — wide emplacement
     # (4 across, 2 deep), anchored at its marker's top-left.
     "barracks": (4, 4),
-    "artillery": (4, 2),
+    "artillery": (3, 2),
     "bunker": (6, 6),
     # Static markers placed FREE at battle start (F = air field,
     # K = tank factory): 7x7 per the user; no cost, no firing yet.

@@ -10,7 +10,7 @@ hold_the_trench/
 │   ├── engine/
 │   │   └── game.py
 │   ├── entities/                   # for units, buildings, projectiles, and pickups
-│   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies unit_cannon_fr / axis unit_heavy_howitzer_ger), GREY block fallback
+│   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies artillery_brit / axis artillery_ger), GREY block fallback
 │   │   ├── airplane.py             # factory-produced plane (air fields): flies, targets armor/buildings/planes by proximity, bombs ground targets overhead
 │   │   ├── armor.py                # factory-produced armor (tank factories): tanks + British machine-gun car; forward advance, stop-and-shell, armor damage rule
 │   │   ├── barracks.py

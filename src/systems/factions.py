@@ -154,14 +154,14 @@ def ground_texture_filename():
 # allied nations share the french cannon; axis artillery is the heavy
 # howitzer. (No scene-variant suffixes exist for these unit images.)
 ARTILLERY_IMAGE = {
-    "allies": "unit_cannon_fr.png",
-    "axis": "unit_heavy_howitzer_ger.png",
+    "allies": "artillery_brit.png",
+    "axis": "artillery_ger.png",
 }
 
 
 def artillery_filename(faction):
     """Artillery art file for a battlefield side."""
-    return ARTILLERY_IMAGE.get(faction, "unit_cannon_fr.png")
+    return ARTILLERY_IMAGE.get(faction, "artillery_brit.png")
 
 
 def artillery_nation_for_side(faction):
@@ -219,9 +219,9 @@ def scaled_hp(nation, kind, hp):
 # flew german-built Albatros types: no dedicated austrian plane asset
 # exists, so austrian fields hand out german planes.
 PLANE_IMAGE = {
-    "ger": "airplane_unit_ger_plane.png",
-    "brit": "airplane_unit_brit_plane.png",
-    "fr": "airplane_unit_fr_plane.png",
+    "ger": "airplane_ger.png",
+    "brit": "airplane_brit.png",
+    "fr": "airplane_fr.png",
 }
 
 

@@ -13,8 +13,8 @@ unit on the tile + its 8 neighbours for 20 (half of an infantry unit's
 40 hp). A gun never hits the same tile twice; when the band is
 exhausted it stands down.
 
-Art by FACTION (factions.ARTILLERY_IMAGE: allies = unit_cannon_fr,
-axis = unit_heavy_howitzer_ger), drawn across the footprint; missing
+Art by FACTION (factions.ARTILLERY_IMAGE: allies = artillery_brit,
+axis = artillery_ger), drawn across the footprint; missing
 art falls back to the grey block (never crash).
 """
 
@@ -73,9 +73,7 @@ class Artillery(FlooredDamage):
         self.tile_x = tile_x
         self.tile_y = tile_y
 
-        # Footprint: faction-aware (user rule — the GERMAN howitzer is
-        # a 3x2 plot, the allied cannon line stays 4x2; config's
-        # FACTION_FOOTPRINT_OVERRIDES via footprint_for). The drawn
+        # Footprint: regardless of faction is a 3x2 plot. The drawn
         # sprite/block, fire origin, and TileMap viewport culling all
         # read footprint_tiles (collision comes from the same call
         # through tilemap._footprint_covered).
