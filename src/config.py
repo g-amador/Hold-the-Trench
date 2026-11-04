@@ -148,7 +148,7 @@ INFANTRY_AIM_POSE_S = 0.18
 # car, building) they are OVER — nearest first, proximity only.
 PLANE_HP = 30
 PLANE_SPEED = 140
-PLANE_SIZE = (96, 44)      # world px box (art scales to it)
+PLANE_SIZE = (96, 96)      # world px box (art scales to it)
 PLANE_MG_RANGE = 200
 PLANE_MG_DAMAGE = 10
 PLANE_MG_FIRE_RATE = 0.4

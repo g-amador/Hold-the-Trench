@@ -236,25 +236,21 @@ def spawn_plane_nation(faction):
 
 
 # ---------------- Armor (tank factory units) ----------------
-# Per COUNTRY (user spec), not faction: tanks and cars key off the
-# nation that factory rolled. British factories may also produce
-# cars (mobile MG nests); the French and Germans only field tanks.
-# Each image file exists in assets/images (sizes: 176x80, the
-# german tank 256x116 — ArmorUnit scales everything to one box).
+# Per COUNTRY (user spec), not faction: tanks key off the
+# nation that factory rolled. British, French and Germans produce field tanks.
+# Each image file exists in assets/images (sizes: 1518x699 — 
+# ArmorUnit scales everything to one box).
 TANK_UNIT_TABLE = {
     "fr": [
-        ("tank", "tank_unit_fr_tank1.png"),
-        ("tank", "tank_unit_fr_tank2.png"),
-        ("tank", "tank_unit_fr_tank3.png"),
+        ("tank", "tank_fr_male.png"),
+        ("tank", "tank_fr_female.png"),
     ],
     "ger": [
-        ("tank", "tank_unit_ger_tank.png"),
+        ("tank", "tank_ger.png"),
     ],
     "brit": [
-        ("tank", "tank_unit_brit_tank1.png"),
-        ("tank", "tank_unit_brit_tank2.png"),
-        ("car", "car_unit_brit_car1.png"),
-        ("car", "car_unit_brit_car2.png"),
+        ("tank", "tank_brit_male.png"),
+        ("tank", "tank_brit_female.png"),
     ],
 }
 
