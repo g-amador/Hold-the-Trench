@@ -81,6 +81,33 @@ def side_coin(faction):
     return COIN_BY_SIDE.get(faction, "coin_ger.png")
 
 
+def dominant_unit_nation(units, faction):
+    """The nation most of `units` belong to (duck-typed .nation attr).
+
+    Decides WHICH theme the DEFEAT screen plays (user: the anthem of
+    the enemy nation that held the map — ger/brit/fr/aust themes).
+    Counts the ALIVE units' nations and returns the most common one;
+    ties resolve by the faction's unit_nations pool order, and an
+    empty field (no alive unit carries a nation) falls back to that
+    pool's first entry.
+    """
+    pool = FACTIONS[faction]["unit_nations"]
+    counts = {}
+    for unit in units:
+        if getattr(unit, "dead", False):
+            continue
+        nation = getattr(unit, "nation", None)
+        if nation is not None:
+            counts[nation] = counts.get(nation, 0) + 1
+    best = None
+    best_count = -1
+    for nation in pool:  # pool order = deterministic tie-break
+        count = counts.get(nation, 0)
+        if count > best_count:
+            best, best_count = nation, count
+    return best if best is not None else pool[0]
+
+
 # ---------------- Battle scene (building art variants) ----------------
 # Every building kind gets (or will get) four scene images that share
 # one base filename and differ by a suffix letter:

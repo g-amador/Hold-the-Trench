@@ -40,7 +40,7 @@ from entities.barracks import Barracks
 from entities.static_building import AirField, TankFactory
 from entities.gold_pickup import COIN_SIZE
 
-from systems.factions import other, roll_scene
+from systems.factions import other, roll_scene, dominant_unit_nation
 
 from config import (
     SCREEN_WIDTH,
@@ -775,20 +775,30 @@ class AssaultPhase:
         # Lose if the player's bunker is destroyed. Checking at the END
         # of update (not the start) means the frame that destroys it
         # still fully simulates and draws before the switch, avoiding a
-        # half-updated final frame.
+        # half-updated final frame. The defeat theme is the anthem of
+        # the enemy nation that held the map at that moment (user rule:
+        # ger/brit/fr/aust themes keyed by the enemy units' nations).
         if player_bunkers and all(
             bunker.is_destroyed() for bunker in player_bunkers
         ):            
-            self.game.state = GameOverState(self.game)
+            self.game.state = GameOverState(
+                self.game,
+                theme_nation=dominant_unit_nation(
+                    self.enemy_barracks_units, self.enemy_faction
+                ),
+            )
             return
 
         # Win when all enemy bunkers are destroyed. Guarded by
         # enemy_bunkers existing, so a map without enemy bunkers never
-        # auto-wins.
+        # auto-wins. The victory theme is the PLAYER's own rolled
+        # nation anthem (user rule: "for ger/brit/fr/aust").
         if enemy_bunkers and all(
             bunker.is_destroyed() for bunker in enemy_bunkers
         ):            
-            self.game.state = WinState(self.game)
+            self.game.state = WinState(
+                self.game, theme_nation=self.player.nation
+            )
             return
 
     def get_nearby_build_spot(self):

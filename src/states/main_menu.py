@@ -11,6 +11,7 @@ Game.selected_faction and drives every texture decision downstream
 import pygame
 
 from config import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GREY
+from systems import audio
 from utils.image_loader import load_image
 from systems.factions import (
     FACTIONS,
@@ -48,6 +49,11 @@ class MainMenu:
         # side was last played).
         self.selected = "allies"
 
+        # User request: Menu_Loop.wav loops for as long as the start
+        # menu shows. It is cut again when a battle starts (the ENTER
+        # branch below calls audio.stop_menu_audio).
+        audio.play_menu_music()
+
     def handle_event(self, event):
         if event.type != pygame.KEYDOWN:
             return
@@ -55,11 +61,14 @@ class MainMenu:
         # Side selection: W/UP and S/DOWN move between the two sides
         # (top line = Allies, bottom line = Axis), with number
         # shortcuts kept. The labels in FACTIONS render these same
-        # keys as hints.
+        # keys as hints. Every press also fires the select sting
+        # (user: one menu_select.wav per press).
         if event.key in (pygame.K_w, pygame.K_UP, pygame.K_1):
             self.selected = "allies"
+            audio.play_menu_select_sound()
         elif event.key in (pygame.K_s, pygame.K_DOWN, pygame.K_2):
             self.selected = "axis"
+            audio.play_menu_select_sound()
         elif event.key == pygame.K_RETURN:
             # Imported here (not top-level) to avoid a circular
             # import: assault_phase imports states it can switch to.
@@ -70,7 +79,9 @@ class MainMenu:
             self.game.selected_faction = self.selected
 
             # Fresh world per battle so existing buildings/pays from a
-            # previous fight never carry over.
+            # previous fight never carry over. Leaving the menu also
+            # cuts its music (and any pending select sting) first.
+            audio.stop_menu_audio()
             self.game.tilemap = TileMap()
 
             self.game.change_state(AssaultPhase(self.game))

@@ -34,6 +34,7 @@ hold_the_trench/
 │   │   ├── main_menu.py
 │   │   └── win_state.py
 │   ├── systems/                    # for combat, economy, and faction rules (shared pools/rolls live in factions.py).
+│   │   ├── audio.py               # mixer wiring: looping menu music, the ordered select-sting pair per faction-key press, national end themes (all no-op-safe without an audio device)
 │   │   ├── building_query.py
 │   │   ├── bullet_resolution.py    # unified per-direction bullet collision pass (units -> buildings/bunkers -> planes), called twice from the battle
 │   │   ├── economy_system.py

@@ -14,7 +14,9 @@ from states.end_screen import EndScreenState
 
 class GameOverState(EndScreenState):
     """Defeat screen. Per-faction art: allies lose under the german
-    banner, axis under the french one (single source table)."""
+    banner, axis under the french one (single source table). Plays the
+    enemy nation's anthem (theme_nation picked by
+    factions.dominant_unit_nation at the transition)."""
 
     TITLE = "GAME OVER"
     BACKGROUND_TABLE = DEFEAT_BACKGROUND

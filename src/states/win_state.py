@@ -13,7 +13,8 @@ from states.end_screen import EndScreenState
 
 class WinState(EndScreenState):
     """Victory screen. Per-faction art: allies win under the french
-    banner, axis under the german one (single source table)."""
+    banner, axis under the german one (single source table). Plays the
+    PLAYER's rolled nation anthem (theme_nation from the transition)."""
 
     TITLE = "YOU WIN!"
     BACKGROUND_TABLE = VICTORY_BACKGROUND

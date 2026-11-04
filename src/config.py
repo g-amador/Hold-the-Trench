@@ -291,3 +291,26 @@ BUNKER_FOOTPRINTS_BY_NATION = {
     "brit": (6, 4),
     "ger": (6, 4),
 }
+
+# ------------------------------ AUDIO ------------------------------
+# Music and themes live in assets/music, menu stings in assets/sounds
+# (bare filenames here; systems/audio.py resolves the folders).
+
+# Start-menu music: loops for as long as the faction select screen is
+# showing (user: "while start menu is showing play Menu_Loop.wav").
+MENU_MUSIC = "Menu_Loop.wav"
+
+# Faction-select sting: ONE sound per press of a faction-selection
+# key (menu W/S/1/2, end-screen S switch).
+MENU_SELECT_SOUND = "menu_select.wav"
+
+# National victory themes (user list). The WINNER's anthem plays on
+# the end screens: winning = the player's own rolled nation; losing =
+# the enemy nation that held the map. Keyed by unit nation; unknown
+# nations stay silent.
+NATION_VICTORY_THEMES = {
+    "ger": "Victory_Theme_die-deutsche-kaisergarde-german.mp3",
+    "brit": "Victory_Theme_god-save-the-king-queen-british.mp3",
+    "fr": "Victory_Theme_la-marseillaise-french.mp3",
+    "aust": "Victory_Theme_gott-erhalte-franz-den-kaiser-austro-hungarian.mp3",
+}
