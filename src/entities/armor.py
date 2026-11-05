@@ -1,5 +1,5 @@
 """
-Factory-produced armor: tanks and the British machine-gun car.
+Factory-produced armor: tanks and the machine-gun car.
 
 Both classes share the ArmorUnit machinery (user spec):
 - steady FORWARD advance toward the enemy base, STOPPING whenever an
@@ -312,7 +312,7 @@ class TankUnit(ArmorUnit):
 
 
 class CarUnit(ArmorUnit):
-    """British mobile machine gun (MG nest on wheels): 80 hp, quick,
+    """Mobile machine gun (MG nest on wheels): 80 hp, quick,
     can ONLY damage infantry — its MG never engages armor. It still
     STOPS when an enemy building is inside shooting range (user rule)
     but never fires at it."""
@@ -339,10 +339,10 @@ class CarUnit(ArmorUnit):
 def roll_armor_unit(nation, is_enemy, x, y):
     """Build ONE random factory unit of `nation` at (x, y).
 
-    A British factory mixes tanks and cars randomly (per the user:
-    "a random of available units"); French/German factories only
-    field tanks. Nations without table entries yield None (the
-    factory simply stands empty).
+    A factory mixes its nation's available kinds randomly (per the
+    user: "a random of available units"); under the current table
+    every nation fields only tanks. Nations without table entries
+    yield None (the factory simply stands empty).
     """
     from systems.factions import armor_unit_options
 

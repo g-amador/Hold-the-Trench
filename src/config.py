@@ -174,13 +174,14 @@ BUILDING_HP = {
 
 
 def footprint_for(kind, faction):
-    """(fw, fh) in tiles for a building kind on a battlefield side."""
+    """(fw, fh) in tiles for a building kind — BOTH sides share the
+    table (the faction argument is kept for caller compatibility)."""
     return BUILD_FOOTPRINTS.get(kind, (1, 1))
 
 
 # ---------------- Armor (tank factory units) ----------------
 # User spec: factories produce armored vehicles; tanks have 100 hp,
-# the British machine-gun car 80. ONLY artillery splash and other
+# the machine-gun car 80. ONLY artillery splash and other
 # tanks' shots can damage armor (infantry/MG/car fire can't); tanks
 # hurt infantry AND other tanks, cars hurt infantry only.
 TANK_HP = 100
@@ -205,7 +206,7 @@ BARRACKS_SPAWN_INTERVAL = 5.0
 
 # Barracks deploy a WHOLE SECTION per deployment (user request: army
 # sizes in line with WW I, at battle start). A 1914 rifle section was
-# 8-12 men (British 12, French squad ~12, German Gruppe 8-9): the
+# 8-12 men: the
 # section is the smallest formation a game-scale battle can place,
 # so each barracks deployment is one section of 12. Enemy barracks
 # deploy their sections with the same size (they share Barracks).
@@ -233,7 +234,7 @@ TANK_MG_RANGE = 220
 TANK_MG_DAMAGE = 20
 TANK_MG_FIRE_RATE = 0.6
 
-# The British car is literally an MG nest on wheels: MG-nest stats.
+# The car is literally an MG nest on wheels: MG-nest stats.
 CAR_MG_RANGE = 220
 CAR_MG_DAMAGE = 8
 CAR_MG_FIRE_RATE = 0.2
@@ -255,12 +256,12 @@ MG_NEST_ELEVATION_DEG = 25
 # (marker) tile is the TOP-LEFT of the footprint; it extends right and
 # down. Spot kinds can be prefixed ("enemy_mg"): strip the prefix and
 # look up the kind.
-# USER SIZES: MG 4x4, artillery 4x2, barracks 4x4, bunker 6x6,
+# USER SIZES: MG 4x4, artillery 3x2, barracks 4x4, bunker 6x6,
 # statics (air field / tank factory) 7x7.
 BUILD_FOOTPRINTS = {
     "mg": (4, 4),
-    # Barracks 4x4, bunker 6x6; artillery 4x2 — wide emplacement
-    # (4 across, 2 deep), anchored at its marker's top-left.
+    # Barracks 4x4, bunker 6x6; artillery 3x2 — wide emplacement
+    # (3 across, 2 deep), anchored at its marker's top-left.
     "barracks": (4, 4),
     "artillery": (3, 2),
     "bunker": (6, 6),

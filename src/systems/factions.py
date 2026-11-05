@@ -20,15 +20,15 @@ import random
 FACTIONS = {
     "allies": {
         "label": "PLAY AS ALLIES (W)",
-        # FR only right now (user: FR vs GER). Brit rejoins this pool
-        # when its art returns from assets/images/temp.
+        # FR only right now (user: FR vs GER). A nation rejoins this
+        # pool when its art returns from assets/images/temp.
         "unit_nations": ["fr"],
         "building_nations": ["fr"],
     },
     "axis": {
         "label": "PLAY AS AXIS  (S)",
-        # GER only right now (user: GER vs FR). Aust rejoins this pool
-        # when its art returns from assets/images/temp.
+        # GER only right now (user: GER vs FR). A nation rejoins this
+        # pool when its art returns from assets/images/temp.
         "unit_nations": ["ger"],
         "building_nations": ["ger"],
     },
@@ -188,8 +188,8 @@ def artillery_filename(faction):
 def artillery_nation_for_side(faction):
     """Nation whose artillery stats a battlefield side fires with.
 
-    Modifiers are keyed by NATION (user handicaps per Ger/Brit/Fr/
-    Aust), but artillery buildings roll by SIDE: allied guns read as
+    Modifiers are keyed by NATION (user handicaps per nation), but
+    artillery buildings roll by SIDE: allied guns read as
     the french 75s, axis guns as the german heavy howitzers.
     """
     return "fr" if faction == "allies" else "ger"

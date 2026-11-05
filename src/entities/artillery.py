@@ -325,11 +325,11 @@ class Artillery(FlooredDamage):
     def draw(self, screen, camera_x):
         """Faction art in SPRITES mode; flat grey block otherwise.
 
-        The artillery image is keyed by FACTION (allied nations share
-        the french cannon; axis = heavy howitzer), scaled across the
-        footprint (4x2) and blitted directly on the ground (sprite
-        rule: no underlay). Block mode / missing art keeps the grey
-        block, now covering the full footprint.
+        The artillery image is keyed by FACTION (the allied side
+        uses the french cannon; axis the heavy howitzer), scaled
+        across the footprint (3x2) and blitted directly on the
+        ground (sprite rule: no underlay). Block mode / missing art
+        keeps the grey block, now covering the full footprint.
         """
         px = self.tile_x * TILE_SIZE - camera_x
         py = self.tile_y * TILE_SIZE

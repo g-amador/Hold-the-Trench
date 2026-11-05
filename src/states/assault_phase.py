@@ -129,9 +129,10 @@ class AssaultPhase:
         self.player_faction = getattr(game, "selected_faction", "allies")
         self.enemy_faction = other(self.player_faction)
 
-        # Faction-aware EMPTY-spot footprints: the axis artillery spot
-        # is a 3x2 plot while the allies' stays 4x2 (config overrides;
-        # placed buildings carry their own footprint either way).
+        # EMPTY-spot footprints come from the SHARED config table (the
+        # faction argument rides along for compatibility; artillery is
+        # 3x2 on BOTH sides; placed buildings carry their own footprint
+        # either way).
         self.tilemap.set_factions(self.player_faction, self.enemy_faction)
 
         # One scene roll per battle. Everything scene-linked then
@@ -476,8 +477,8 @@ class AssaultPhase:
 
             # Contact against the spot's FULL footprint: touching ANY
             # tile of the MG's 4x4 pays into it, not only the marker.
-            # Faction-aware: the allies/axis artillery spot differs
-            # (axis 3x2; player spots use the player's side).
+            # Footprint-aware: sizes come from the shared config table
+            # (artillery is 3x2 on BOTH sides).
             fw, fh = footprint_for(spot_type, self.player_faction)
             spot_rect = pygame.Rect(
                 tile_x * TILE_SIZE,
@@ -807,8 +808,10 @@ class AssaultPhase:
     def get_nearby_build_spot(self):
         """Return the nearest EMPTY PLAYER build spot within range.
 
-        Only player-purchasable spot types (mg/barracks/artillery) can
-        prompt: enemy defenses are pre-placed free at battle start, so
+        Every player-purchasable spot kind (BUILDING_CLASSES — mg/
+        barracks/artillery plus the payable air_field/tank_factory)
+        can prompt: enemy defenses are pre-placed free at battle
+        start, so
         standing near one shows nothing. Also skipped: any spot that
         already holds a building (nothing left to buy there — finished
         player spots included). Range is circular (build_prompt_radius
@@ -835,7 +838,8 @@ class AssaultPhase:
             # radius left the prompt blind while standing on the far
             # corner tiles (90px > the 72px radius) — edge distance
             # keeps "near the spot" true for its whole footprint.
-            # Faction-aware (axis artillery 3x2 override etc.).
+            # Footprint-aware (shared table — artillery is 3x2 on
+            # BOTH sides; the faction argument rides along).
             fw, fh = footprint_for(spot_type, self.player_faction)
             rect = pygame.Rect(
                 tile_x * TILE_SIZE,

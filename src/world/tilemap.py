@@ -94,10 +94,11 @@ class TileMap:
             for y in range(self.height)
         ]
 
-        # Faction context for EMPTY-spot footprint resolution (axis
-        # artillery 3x2 override etc.). Placed buildings carry their
-        # own footprint_tiles; these defaults are what a pre-battle
-        # grid (no set_factions call yet) resolves with.
+        # Faction context for EMPTY-spot footprint resolution (the
+        # footprint table is SHARED by both sides — the faction
+        # argument rides along for compatibility). Placed buildings
+        # carry their own footprint_tiles; these defaults are what a
+        # pre-battle grid (no set_factions call yet) resolves with.
         self.player_faction = "allies"
         self.enemy_faction = "axis"
 
@@ -469,7 +470,7 @@ class TileMap:
             if tile.building is not None:
                 continue
 
-            # Faction-aware (axis artillery spots outline as 3x2).
+            # Footprint-aware (artillery spots outline as 3x2 on BOTH sides).
             fw, fh = self._footprint_for_spot(spot_kind)
 
             px = x * TILE_SIZE - camera_x
