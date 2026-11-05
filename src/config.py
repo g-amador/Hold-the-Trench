@@ -294,6 +294,11 @@ MENU_MUSIC = "Menu_Loop.wav"
 # key (menu W/S/1/2, end-screen S switch).
 MENU_SELECT_SOUND = "menu_select.wav"
 
+# War background noise (user: the FIRST shot of the battle — from any
+# source: infantry, MG nest, tank/car, plane, artillery, either side —
+# starts ONE of these, picked at random; lives in assets/sounds).
+WAR_NOISE_SOUNDS = ("war_back_noise1.mp3", "war_back_noise2.mp3")
+
 # National victory themes (user spec): the WINNER's anthem plays on
 # the end screens — winning = the player's own rolled nation; losing =
 # the enemy nation that held the map. Keyed by unit nation; unknown

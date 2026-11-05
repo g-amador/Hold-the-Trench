@@ -19,6 +19,7 @@ from states.win_state import WinState
 
 from systems.economy_system import EconomySystem, BUILD_COSTS
 from systems.building_query import BuildingQuery
+from systems import audio
 from systems.bullet_resolution import (
     resolve_bullets,
     apply_enemy_damage,
@@ -134,6 +135,11 @@ class AssaultPhase:
         # 3x2 on BOTH sides; placed buildings carry their own footprint
         # either way).
         self.tilemap.set_factions(self.player_faction, self.enemy_faction)
+
+        # War background noise (user): not yet playing — the FIRST
+        # combat shot of the battle (any source, either side) starts
+        # it once (see the trigger block in update()).
+        self._war_noise_started = False
 
         # One scene roll per battle. Everything scene-linked then
         # shares the same letter: the ground texture (rebound below via
@@ -743,6 +749,35 @@ class AssaultPhase:
         self.enemy_planes = [
             plane for plane in self.enemy_planes if not plane.dead
         ]
+
+        # WAR BACKGROUND NOISE (user): the FIRST shot of the battle —
+        # from ANY source (infantry, MG nest, tank/car, plane MG or
+        # bomb, artillery, either side) — starts ONE random war-noise
+        # file; later shots add nothing. Detection reads the state's
+        # own shot evidence, all of it fresh by this point in the
+        # frame: live bullets in either direction, an artillery gun
+        # with a shell in flight (pending shell / muzzle markers), or
+        # a plane past a bomb drop (bomb_cooldown only turns positive
+        # when a bomb is released). One-shot per battle: the flag dies
+        # with this AssaultPhase, so every new battle picks a fresh
+        # random noise at its own first shot.
+        if not self._war_noise_started:
+            first_shot = bool(self.bullets or self.enemy_bullets)
+            if not first_shot:
+                for building in buildings:
+                    if isinstance(building, Artillery) and (
+                        building.pending or building.muzzles
+                    ):
+                        first_shot = True
+                        break
+            if not first_shot:
+                for plane in self.friendly_planes + self.enemy_planes:
+                    if plane.bomb_cooldown > 0.0:
+                        first_shot = True
+                        break
+            if first_shot:
+                audio.play_war_noise()
+                self._war_noise_started = True
 
         # Enemy bullets can damage friendly infantry; armor passes
         # through; friendly BUILDINGS rule mirrors the bullets above

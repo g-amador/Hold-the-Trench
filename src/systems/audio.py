@@ -1,8 +1,9 @@
 """
-Audio system: menu music, faction-select sting, national end themes.
+Audio system: menu music, faction-select sting, national end themes,
+war background noise.
 
 The first audio wiring in the project (nothing else touches the
-mixer). Three behaviors, all user requests:
+mixer). Four behaviors, all user requests:
 
 - The START menu loops `Menu_Loop.wav` for as long as it shows; the
   loop is cut when a battle starts (see stop_menu_audio callers).
@@ -12,6 +13,10 @@ mixer). Three behaviors, all user requests:
   rolled nation anthem, defeat plays the anthem of the enemy nation
   that held the field (nation picked by the battle state — see
   assault_phase's transitions and factions.dominant_unit_nation).
+- The battle's FIRST shot from ANY source (infantry, MG nest,
+  tank/car, plane, artillery — either side) starts ONE war background
+  noise file, picked at random (WAR_NOISE_SOUNDS); later shots add
+  nothing.
 
 Everything is a safe no-op when the mixer is unavailable (no audio
 device, exotic sandboxes): the game never crashes on sound. Music and
@@ -21,6 +26,7 @@ the previous sting instead of stacking on a new one.
 """
 
 import os
+import random
 
 import pygame
 
@@ -28,6 +34,7 @@ from config import (
     MENU_MUSIC,
     MENU_SELECT_SOUND,
     NATION_VICTORY_THEMES,
+    WAR_NOISE_SOUNDS,
 )
 
 # Asset roots (config stores bare filenames).
@@ -116,6 +123,26 @@ def play_nation_theme(nation):
         # Replaces the menu loop (or the previous theme) in the single
         # music stream; loops=0 plays exactly once.
         pygame.mixer.music.load(_music_path(filename))
+        pygame.mixer.music.play(0)
+    except (pygame.error, FileNotFoundError):
+        pass
+
+
+def play_war_noise():
+    """Start ONE war background noise (user: first shot of a battle).
+
+    The battle state calls this exactly once, when the FIRST shot from
+    any source (infantry, MG nest, tank/car, plane, artillery — either
+    side) fires. The file is picked at random from WAR_NOISE_SOUNDS
+    and runs through the single music stream (mp3 capable, same stream
+    as the themes — an end-screen theme simply replaces it, and battle
+    entry's stop_menu_audio cuts it like any other music).
+    """
+    if not WAR_NOISE_SOUNDS or not _ensure_mixer():
+        return
+    filename = random.choice(WAR_NOISE_SOUNDS)
+    try:
+        pygame.mixer.music.load(_sound_path(filename))
         pygame.mixer.music.play(0)
     except (pygame.error, FileNotFoundError):
         pass
