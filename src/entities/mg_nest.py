@@ -73,9 +73,8 @@ class MGNest(FlooredDamage):
         self.fire_rate = MG_NEST_FIRE_RATE
         self.cooldown = 0
 
-        # Art side: scene-variant chain loader (a summer day / b summer
-        # night / c winter day / d winter night, with base-art
-        # fallback), drawn across the FULL footprint.
+        # Art side: scene-variant chain loader (a day / b night, with
+        # base-art fallback), drawn across the FULL footprint.
         self.image, image_file = load_first_image_named(
             building_variant_filenames(faction, "mg_nest"),
             alpha=True,
@@ -238,7 +237,8 @@ class MGNest(FlooredDamage):
             return
 
         # Sprites blit WITHOUT an underlay: PNG transparency reveals the
-        # real battlefield ground (map1_a/map1_c), same as the bunker.
+        # real battlefield ground (map1_a and its parked scene
+        # variants), same as the bunker.
         # An opaque grey square here was painting the "background" the
         # user saw through the art.
         screen.blit(self.image, (px, py))

@@ -60,8 +60,9 @@ class Player:
         self.width = 24
         self.height = 24
 
-        # Side-picked soldier art: random nation from the faction pool
-        # (brit/fr for allies, ger/aust for axis). The faction table
+        # Side-picked soldier art: nation from the faction pool (fr for
+        # allies, ger for axis — the pools are single-nation right
+        # now, FR vs GER). The faction table
         # owns the pools (systems/factions.py).
         prefix, self.nation = unit_prefix(faction)
 

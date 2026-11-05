@@ -9,8 +9,8 @@ returns True, credits the amount to EconomySystem.gold and drops the
 pickup from its list.
 
 Art: the coin side follows the player's choice (user rule): playing
-ALLIES, axis soldiers (ger/aust) drop coin_ger.png; playing AXIS,
-every allied soldier (fr units AND brit units) drops coin_fr.png
+ALLIES, axis soldiers (ger) drop coin_ger.png; playing AXIS,
+every allied soldier (fr) drops coin_fr.png
 (factions.side_coin). The dying unit passes the filename; missing
 files fall back to the plain gold square (the gold square is also the
 whole look in block mode terms — a coin that cannot load must never

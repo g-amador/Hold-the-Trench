@@ -69,13 +69,14 @@ class Barracks(FlooredDamage):
         # 1 = right, -1 = left: enemies face the player side.
         self.facing = -1 if is_enemy else 1
 
-        # Art side: random per-building from the faction's pool (axis
-        # buildings are always ger; allies mix brit/fr randomly) —
-        # scene-variant chain loader (a/b/c/d with summer-day fallback)
-        # per the user's letter mapping: a summer day, b summer night,
-        # c winter day, d winter night. Scaled across the footprint.
+        # Art side: random per-building from the faction's pool (the
+        # pools are single-nation right now — FR vs GER — so this
+        # resolves to fr or ger; multi-nation pools would mix here
+        # again) —
+        # scene-variant chain loader (a day / b night, with base-art
+        # fallback). Scaled across the footprint.
         self.image, image_file = load_first_image_named(
-            building_variant_filenames(faction, "barraks"),
+            building_variant_filenames(faction, "barracks"),
             alpha=True,
             size=(self.width, self.height),
         )
@@ -97,11 +98,11 @@ class Barracks(FlooredDamage):
             self.image = pygame.transform.flip(self.image, True, False)
 
         # ONE nation per barracks (user: "don't mix units in divisions —
-        # FR barracks generate only FR units, Brit barracks Brit, etc."):
+        # each barracks generates only its own nation"):
         # the building's rolled ART nation is the rule — every section
         # this barracks deploys is built from that same nation, so a
         # division's men always match the building they marched out of.
-        # Parsed from the used art filename ("building_barraks_<nation>
+        # Parsed from the used art filename ("building_barracks_<nation>
         # _<scene>.png"); with no art at all the barracks still rolls
         # one nation of its own (unit_prefix), so the uniform rule holds
         # even for the fallback path.

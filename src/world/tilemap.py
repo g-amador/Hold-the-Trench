@@ -12,8 +12,8 @@ import pygame
 
 from config import TILE_SIZE, BUILD_FOOTPRINTS, footprint_for
 from graphics import render_mode
-from utils.image_loader import load_image
-from systems.factions import ground_texture_filename
+from utils.image_loader import load_first_image
+from systems.factions import ground_texture_candidates
 from world.trench_generator import (
     TrenchGenerator,
     TILE_EMPTY,
@@ -101,11 +101,12 @@ class TileMap:
         self.player_faction = "allies"
         self.enemy_faction = "axis"
 
-        # Ground floor texture for SPRITES mode: map1_a<scene>.jpg
+        # Ground floor texture for SPRITES mode: the scene's map1_<letter>.jpg
         # scaled ONCE to the whole battlefield strip (tiles are then
         # skipped at draw time — the texture IS the ground). The scene
         # letter comes from the shared battle roll, so ground and
-        # buildings always match (map1_a summer / map1_c winter).
+        # buildings always match (while only the base map1_a.jpg is
+        # active, every scene shows it via the candidate fallback).
         # ground_texture_native keeps the file's own resolution for
         # the CLOSE view to sample 4K detail from (see reload_ground).
         self.ground_texture = None
@@ -133,7 +134,7 @@ class TileMap:
         """Bind the ground texture to the CURRENT scene variant.
 
         Two resolution caches, BOTH from the same file (the user's
-        5504x3072 map1_a/map1_c 4K art):
+        5504x3072 map1 4K art):
 
         - ground_texture: pre-scaled down to the world strip
           (width*TILE_SIZE x height*TILE_SIZE) for the FULL view,
@@ -148,25 +149,22 @@ class TileMap:
         The map tilemap is built before the battle (the menu creates
         it), i.e. before roll_scene() — so AssaultPhase calls this
         right after rolling to re-pick the ground alongside the
-        buildings (map1_a.jpg summer day / map1_c.jpg winter day).
-        Loaded through utils/image_loader (cached per size);
-        a missing file keeps both None and draw() falls back to tile
-        rendering instead of crashing.
+        buildings. Resolution goes through the candidate chain
+        (rolled scene's map1_<letter>.jpg first, then the base
+        map1_a.jpg safety net). Loaded through utils/image_loader
+        (cached per size); a missing file keeps both None and draw()
+        falls back to tile rendering instead of crashing.
         """
-        try:
-            filename = ground_texture_filename()
-            # Full-res first: the pre-scale below renders FROM the
-            # cached native surface (transform.scale reads it once),
-            # then both live in the image cache under their own keys.
-            self.ground_texture_native = load_image(filename, alpha=False)
-            self.ground_texture = load_image(
-                filename,
-                alpha=False,
-                size=(self.width * TILE_SIZE, self.height * TILE_SIZE),
-            )
-        except FileNotFoundError:
-            self.ground_texture_native = None
-            self.ground_texture = None
+        candidates = ground_texture_candidates()
+        # Full-res first: the pre-scale below renders FROM the
+        # cached native surface (transform.scale reads it once),
+        # then both live in the image cache under their own keys.
+        self.ground_texture_native = load_first_image(candidates, alpha=False)
+        self.ground_texture = load_first_image(
+            candidates,
+            alpha=False,
+            size=(self.width * TILE_SIZE, self.height * TILE_SIZE),
+        )
 
     def get_tile(self, x, y):
         """Return the tile, or None for any out-of-grid coordinate."""

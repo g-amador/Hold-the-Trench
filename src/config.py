@@ -96,9 +96,9 @@ BUILD_COSTS = {
     "enemy_mg": 0,
     "enemy_bunker": 0,
     "enemy_barracks": 0,
-    "enemy_artillery": 10,
-    "enemy_air_field": 10,
-    "enemy_tank_factory": 10,
+    "enemy_artillery": 0,
+    "enemy_air_field": 0,
+    "enemy_tank_factory": 0,
 }
 
 # ---------------- Combat ----------------
@@ -270,14 +270,14 @@ BUILD_FOOTPRINTS = {
     "tank_factory": (7, 7),
 }
 
-# Bunker footprint by ART nation (user: "brit and ger bunkers can be
-# only 6x4 tiles"): the wide brit/ger cutaways occupy the squat 6x4
-# box; any other nation (fr — and the missing-art fallback) keeps the
+# Bunker footprint by ART nation (user: wide cutaway bunkers sit in a
+# squat 6x4 box): the wide cutaway art occupies the 6x4 footprint;
+# any other nation (fr — and the missing-art fallback) keeps the
 # BUILD_FOOTPRINTS["bunker"] default of 6x6. Read per INSTANCE by
-# entities/bunker.py because the allies bunker rolls brit OR fr art,
-# so the rolled art file decides the collision size for that battle.
+# entities/bunker.py, so the rolled art file decides the collision
+# size for that battle. Further nations rejoin by adding a row here
+# when their (wider) art returns.
 BUNKER_FOOTPRINTS_BY_NATION = {
-    "brit": (6, 4),
     "ger": (6, 4),
 }
 
@@ -293,13 +293,12 @@ MENU_MUSIC = "Menu_Loop.wav"
 # key (menu W/S/1/2, end-screen S switch).
 MENU_SELECT_SOUND = "menu_select.wav"
 
-# National victory themes (user list). The WINNER's anthem plays on
-# the end screens: winning = the player's own rolled nation; losing =
+# National victory themes (user spec): the WINNER's anthem plays on
+# the end screens — winning = the player's own rolled nation; losing =
 # the enemy nation that held the map. Keyed by unit nation; unknown
-# nations stay silent.
+# nations stay silent. The table carries the two playable nations;
+# further countries rejoin by adding a row (music in assets/music).
 NATION_VICTORY_THEMES = {
     "ger": "Victory_Theme_die-deutsche-kaisergarde-german.mp3",
-    "brit": "Victory_Theme_god-save-the-king-queen-british.mp3",
     "fr": "Victory_Theme_la-marseillaise-french.mp3",
-    "aust": "Victory_Theme_gott-erhalte-franz-den-kaiser-austro-hungarian.mp3",
 }

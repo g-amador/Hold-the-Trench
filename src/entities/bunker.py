@@ -53,18 +53,20 @@ class Bunker(FlooredDamage):
         self.x = tile_x * TILE_SIZE
         self.y = tile_y * TILE_SIZE
 
-        # Per-nation footprint (user: "brit and ger bunkers can be
-        # only 6x4 tiles"): the rolled art file decides the footprint
-        # for THIS instance — brit/ger art sits in the squat 6x4 box,
+        # Per-nation footprint (user: wide cutaway bunkers sit in a
+        # squat 6x4 box): the rolled art file decides the footprint
+        # for THIS instance — art with a row in
+        # config.BUNKER_FOOTPRINTS_BY_NATION sits in the squat box,
         # fr (and the no-art fallback) keeps the 6x6 table default.
-        # Handled per instance because the allies bunker rolls brit OR
-        # fr art per battle.
+        # Handled per instance because further nations can rejoin the
+        # footprint table; the allies bunker rolls fr art right now
+        # (FR vs GER).
         self.art_nation = None
 
         # ---- art: PROPORTIONAL DRAW (user fix) ----
         # The bunker art is now:
         #   1. cropped to its OPAQUE content (native bbox, cached per
-        #      file — applies to every scene variant a/b/c/d),
+        #      file — applies to every scene variant),
         #   2. fitted CONTAIN into the footprint box aspect-true
         #      (never stretched), BOTTOM-CENTER anchored (a cutaway
         #      building stands on its ground line).

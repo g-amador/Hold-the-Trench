@@ -10,7 +10,7 @@ COUNTRY; the AIR FIELD produces PLANES into the side's plane list on
 the same cadence (user: "generate planes at the same rate as tanks").
 
 Art follows the battle scene like every other building: the variant
-chain (scene file -> _a file -> base) picks summer/winter art per the
+chain (scene file -> _a file -> base) picks day/night art per the
 shared scene roll. Static art gets the SEMI-ALPHA FIX (user: "tank
 factory transparent background is shown"): the german factory art
 paints its whole backdrop at partial alpha, which reads as a milky
@@ -139,9 +139,9 @@ class AirField(StaticBuilding):
     def __init__(self, tile_x, tile_y, faction="allies", is_enemy=False):
         super().__init__(tile_x, tile_y, faction, is_enemy)
 
-        # The field produces per COUNTRY (factory rule): allies mix
-        # brit/fr randomly, axis fields are always german (austria
-        # flies german-built planes — plane_filename fallback).
+        # The field produces per COUNTRY (factory rule): the pools are
+        # single-nation right now (FR vs GER), so allies fields are
+        # french and axis fields german.
         self.nation = spawn_plane_nation(faction)
 
         # Production clock: one plane every FACTORY_UNIT_INTERVAL
@@ -172,8 +172,8 @@ class AirField(StaticBuilding):
 
 class TankFactory(StaticBuilding):
     """Free-placed tank factory (markers 'K'/'k'): rolls out armored
-    vehicles — tanks for every country; British factories also mix
-    in the machine-gun car ("a random of available units")."""
+    vehicles - tanks for every country in the unit table ("a random of
+    available units")."""
 
     STEM = "tank_factory"
 
@@ -181,8 +181,9 @@ class TankFactory(StaticBuilding):
         super().__init__(tile_x, tile_y, faction, is_enemy)
 
         # The factory produces per COUNTRY (user rule): allies
-        # factories roll brit or fr once at placement (same 50/50 as
-        # building art); axis factories are always german.
+        # factories roll french, axis factories german right now (the
+        # single-nation pools make this deterministic); a multi-nation
+        # pool would mix per factory again.
         self.nation = armor_factory_nation(faction)
 
         # Production clock: one vehicle every FACTORY_UNIT_INTERVAL

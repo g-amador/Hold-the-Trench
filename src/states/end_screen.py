@@ -33,8 +33,8 @@ class EndScreenState:
         self.font = pygame.font.SysFont("arial", 40)
         self.small_font = pygame.font.SysFont("arial", 25)
 
-        # National theme for this outcome (user: ger/brit/fr/aust
-        # anthems). Played once on entry; unknown/None nations stay
+        # National theme for this outcome (the winner's anthem, user
+        # spec). Played once on entry; unknown/None nations stay
         # silent (play_nation_theme no-ops).
         audio.play_nation_theme(theme_nation)
 

@@ -121,10 +121,11 @@ class EnemyInfantry(EnemyBase):
     """Rifle infantry: homes onto the nearest friendly; the clash is mutually lethal."""
 
     def __init__(self, x, y, faction="axis", nation=None):
-        # Side-picked soldier art: random nation from the faction pool
-        # (ger/aust for axis, brit/fr for allies — systems/factions.py).
-        # Rolled FIRST so the WWI balance handicaps can scale this
-        # unit's stats at spawn (resistance -> hp). nation=None keeps
+        # Side-picked soldier art: nation comes from the faction pool
+        # (ger for axis right now — FR vs GER; systems/factions.py)
+        # unless the caller forces one. Rolled FIRST so the WWI
+        # balance handicaps can scale this unit's stats at spawn
+        # (resistance -> hp). nation=None keeps
         # the historical per-man roll; barracks pass THEIR rolled
         # nation so a building deploys only its own kind of soldier.
         prefix, self.nation = unit_prefix(faction, nation)
@@ -143,7 +144,7 @@ class EnemyInfantry(EnemyBase):
         # which previously OVERWROTE whatever subclass coin had been
         # set before the call (germ coins everywhere for every nation).
         # Axis soldiers always drop the german coin; allied soldiers
-        # (brit AND fr alike) always drop the french coin
+        # always drop the french coin
         # (factions.side_coin).
         self.coin = side_coin(faction)
         # Match the sprite footprint; the base 24x32 would not fit the art.

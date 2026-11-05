@@ -13,7 +13,7 @@ unit on the tile + its 8 neighbours for 20 (half of an infantry unit's
 40 hp). A gun never hits the same tile twice; when the band is
 exhausted it stands down.
 
-Art by FACTION (factions.ARTILLERY_IMAGE: allies = artillery_brit,
+Art by FACTION (factions.ARTILLERY_IMAGE: allies = artillery_fr,
 axis = artillery_ger), drawn across the footprint; missing
 art falls back to the grey block (never crash).
 """
@@ -227,7 +227,7 @@ class Artillery(FlooredDamage):
         self.impacts.append([ix, iy, self.DOT_TIME])
 
         # Damage per shell, scaled by this gun's nation's ARTILLERY
-        # handicap (fr 1.1 / ger 1.1 / brit 1.05 / aust 1.0 — factions
+        # handicap (fr / ger — factions
         # table).
         damage = scaled_damage(self.nation, "artillery", ARTILLERY_SPLASH_DAMAGE)
 

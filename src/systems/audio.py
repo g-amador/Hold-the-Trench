@@ -101,7 +101,8 @@ def stop_menu_audio():
 def play_nation_theme(nation):
     """Play the nation's victory theme ONCE (end screens, user rule).
 
-    nation is a unit nation ("ger"/"brit"/"fr"/"aust") chosen by the
+    nation is a unit nation ("ger"/"fr" right now — the playable
+    nations) chosen by the
     battle state: victory = the player's own rolled nation, defeat =
     the enemy nation that held the map. Unknown/None nations stay
     silent rather than falling back to a wrong anthem.

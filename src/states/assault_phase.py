@@ -135,8 +135,10 @@ class AssaultPhase:
         self.tilemap.set_factions(self.player_faction, self.enemy_faction)
 
         # One scene roll per battle. Everything scene-linked then
-        # shares the same letter: the ground texture (map1_a/map1_c is
-        # rebound below) and every building's art (mg nest, bunker,
+        # shares the same letter: the ground texture (rebound below via
+        # the candidate chain — the rolled scene's map file, falling
+        # back to the base map1_a while the other scene maps are
+        # parked) and every building's art (mg nest, bunker,
         # barracks load their suffix from the rolled scene). "If _a
         # then all 3 must be _a" — one roll guarantees it.
         roll_scene()
@@ -776,8 +778,9 @@ class AssaultPhase:
         # of update (not the start) means the frame that destroys it
         # still fully simulates and draws before the switch, avoiding a
         # half-updated final frame. The defeat theme is the anthem of
-        # the enemy nation that held the map at that moment (user rule:
-        # ger/brit/fr/aust themes keyed by the enemy units' nations).
+        # the enemy nation that held the map at that moment (user
+        # rule: the enemy nation's theme, keyed by the enemy units'
+        # nations).
         if player_bunkers and all(
             bunker.is_destroyed() for bunker in player_bunkers
         ):            
@@ -792,7 +795,7 @@ class AssaultPhase:
         # Win when all enemy bunkers are destroyed. Guarded by
         # enemy_bunkers existing, so a map without enemy bunkers never
         # auto-wins. The victory theme is the PLAYER's own rolled
-        # nation anthem (user rule: "for ger/brit/fr/aust").
+        # nation anthem (user rule: the winner's national theme).
         if enemy_bunkers and all(
             bunker.is_destroyed() for bunker in enemy_bunkers
         ):            

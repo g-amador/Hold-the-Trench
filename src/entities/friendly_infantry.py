@@ -36,8 +36,9 @@ class FriendlyInfantry(FlooredDamage):
         self.y = y
 
         # Side-picked soldier art: nation comes from the faction pool
-        # (brit/fr for allies — systems/factions.py) unless the caller
-        # forces one. Rolled FIRST so the WWI balance handicaps scale
+        # (fr for allies right now — FR vs GER; systems/factions.py)
+        # unless the caller forces one. Rolled FIRST so the WWI
+        # balance handicaps scale
         # this unit's stats at spawn; barracks pass THEIR rolled
         # nation so a building deploys only its own kind of soldier.
         prefix, self.nation = unit_prefix(faction, nation)
