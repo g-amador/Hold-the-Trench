@@ -66,7 +66,7 @@ YELLOW = (255, 255, 0)   # artillery muzzle flash (shell-flight marker)
 
 # Starting balance, tuned to let the player afford one building
 # or a few partial payments early on.
-START_GOLD = 500
+START_GOLD = 1000
 
 # Gold collect radius: the player picks up a coin by walking this
 # close to it (radial distance test, friendlier than a collision box).
@@ -86,19 +86,19 @@ GOLD_MAGNET_SPEED_PX_S = 260
 # constructs the building only when the full cost is covered.
 # Enemy variants cost 0 because they are placed free from map markers.
 BUILD_COSTS = {
-    "mg": 0, #30
+    "mg": 30,
     "bunker": 0,
-    "barracks": 60, #60
-    "artillery": 80, #80
-    "air_field": 200, #200
-    "tank_factory": 150, #150
+    "barracks": 60,
+    "artillery": 80,
+    "air_field": 200,
+    "tank_factory": 150,
 
-    "enemy_mg": 0,
+    "enemy_mg": 0, #30
     "enemy_bunker": 0,
-    "enemy_barracks": 0,
-    "enemy_artillery": 0,
-    "enemy_air_field": 0,
-    "enemy_tank_factory": 0,
+    "enemy_barracks": 0, #60
+    "enemy_artillery": 0, #80
+    "enemy_air_field": 0, #200
+    "enemy_tank_factory": 0, #150
 }
 
 # ---------------- Combat ----------------
