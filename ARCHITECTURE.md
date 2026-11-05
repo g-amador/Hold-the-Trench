@@ -10,9 +10,9 @@ hold_the_trench/
 │   ├── engine/
 │   │   └── game.py
 │   ├── entities/                   # for units, buildings, projectiles, and pickups
-│   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies artillery_brit / axis artillery_ger), GREY block fallback
+│   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies artillery_fr / axis artillery_ger), GREY block fallback
 │   │   ├── airplane.py             # factory-produced plane (air fields): flies, targets armor/buildings/planes by proximity, bombs ground targets overhead
-│   │   ├── armor.py                # factory-produced armor (tank factories): tanks + British machine-gun car; forward advance, stop-and-shell, armor damage rule
+│   │   ├── armor.py                # factory-produced armor (tank factories): tanks + the machine-gun car; forward advance, stop-and-shell, armor damage rule
 │   │   ├── barracks.py
 │   │   ├── bullet.py
 │   │   ├── bunker.py
@@ -34,11 +34,11 @@ hold_the_trench/
 │   │   ├── main_menu.py
 │   │   └── win_state.py
 │   ├── systems/                    # for combat, economy, and faction rules (shared pools/rolls live in factions.py).
-│   │   ├── audio.py               # mixer wiring: looping menu music, the ordered select-sting pair per faction-key press, national end themes (all no-op-safe without an audio device)
+│   │   ├── audio.py               # mixer wiring: looping menu music, the per-press select sting, national end themes (all no-op-safe without an audio device)
 │   │   ├── building_query.py
 │   │   ├── bullet_resolution.py    # unified per-direction bullet collision pass (units -> buildings/bunkers -> planes), called twice from the battle
 │   │   ├── economy_system.py
-│   │   └── factions.py             # single source of truth for sides: nation pools (units/buildings), coin art by nation, menu/victory/defeat backgrounds, and the other()/roll helpers
+│   │   └── factions.py             # single source of truth for sides: nation pools (single-nation right now — FR vs GER; future nations rejoin by widening the lists), coin art, menu/victory/defeat backgrounds, day/night scene rolling + ground fallback, and the other()/roll helpers
 │   ├── ui/                         # for HUD, menus, tooltips, and overlays.
 │   │   ├── hud.py
 │   │   └── pause_overlay.py        # PAUSED panel: dim layer + centered text stack, built once per battle

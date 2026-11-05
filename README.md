@@ -46,18 +46,19 @@ The animated .gif bellow illustrates running the current game alpha.
 ## ✨ <a name="features">Features
 
 * 🪖 **Single-player experience**
-* 🌍 **Procedurally generated battlefields**
-* 🕳️ **Procedurally generated trench networks**
+* 🏳️ **Pick your side — Allies (FR) or Axis (GER)**
 * 🔫 **Deploy machine-gun nests**
 * 💥 **Call in artillery support**
-* 🧱 **Construct defensive bunkers**
-* 🪖 **Recruit friendly infantry**
-* 🏭 **Enemy barracks continuously spawn infantry**
+* 🪖 **Recruit friendly infantry** — barracks deploy 12-man rifle sections
+* 🚜 **Build tank factories** that roll out tanks
+* 🛩️ **Build air fields** that launch planes — bombs plus an air machine-gun
+* 🏭 **Enemy barracks continuously spawn infantry** — and the enemy fields tanks and planes of its own
 * ⚔️ **Real-time infantry combat**
-* 🪙 **Collect supplies from defeated enemies**
+* 🪙 **Collect supplies from defeated enemies** — coins magnetize toward you
 * 🎯 **Destroy the enemy bunker to win**
 * ⏸️ **Pause and resume at any time**
-* 🔄 **Generate a new defense scenario after each victory**
+* 🔊 **Sound** — menu music, selection feedback and per-nation victory/defeat themes
+* 🔄 **Load day/night scenario after each victory**
 * 🚪 **Choose to continue fighting or leave after each completed level**
 
 [Back to Table of Contents](#toc)
@@ -95,12 +96,18 @@ Choose:
 
 ## 🛡️ <a name="buildable-defenses">Buildable Defenses
 
-| Structure                  | Purpose                            |
-| -------------------------- | ---------------------------------- |
-| 🧱 Bunker                  | Protects your HQ — lose it and the battle is over |
-| 🏭 Barracks                | Recruit or spawn infantry          |
-| 🔫 MG Nest                 | Anti-infantry fire support         |
-| 💥 Artillery Position      | Long-range bombardment             |
+| Structure                  | Cost              | Purpose                            |
+| -------------------------- | ----------------- | ---------------------------------- |
+| 🧱 Bunker                  | Free (pre-placed) | Protects your HQ — lose it and the battle is over |
+| 🔫 MG Nest                 | 30 gold           | Anti-infantry fire support         |
+| 🏭 Barracks                | 60 gold           | Deploys 12-man rifle sections      |
+| 💥 Artillery Position      | 80 gold           | Bombards the no-man's-land strip between the boundary markers |
+| 🚜 Tank Factory            | 150 gold          | Rolls out tanks for your side      |
+| 🛩️ Air Field               | 200 gold          | Launches planes that strafe and bomb |
+
+Purchasing works in installments: touch a spot and pay toward it — the building goes up once fully paid. Costs live in `src/config.py` (`BUILD_COSTS`).
+
+The enemy fields the same roster for free from its map markers: bunker, MG nests, barracks, artillery, tank factory and air field.
 
 [Back to Table of Contents](#toc)
 
@@ -112,7 +119,9 @@ Choose:
 
 | Enemy | Description |
 |--------|-------------|
-| 🚶 Infantry | Standard assault troops |
+| 🚶 Infantry | Standard assault troops, deployed in 12-man sections |
+| 🚜 Tanks | Armored breakthrough units — rolled out by the tank factory |
+| 🛩️ Planes | Launched by the air field — bombs over ground targets plus an air machine-gun |
 
 ### Planned
 
@@ -121,7 +130,7 @@ Choose:
 | ⚡ Shock Troopers | Fast assault infantry |
 | 🔥 Flamethrowers | Anti-entrenchment troops |
 | 🎯 Mortar Teams | Indirect fire support |
-| 🚜 Tanks | Armored breakthrough units |
+| 🚙 Machine-gun Car | Armored "MG nest on wheels" — the class exists but is not yet in the production tables |
 
 [Back to Table of Contents](#toc)
 
@@ -241,17 +250,19 @@ No two battles are exactly alike.
 
 ### Step 2: Prepare Your Defenses
 
-Use your available supplies to construct defensive positions, including:
+Your bunker is already in place — protect it, because if it falls, the battle is over.
 
-* 🔫 Machine-gun nests
-* 🧱 Bunkers
-* 💥 Artillery positions
+Use your available supplies to construct defensive positions by touching a spot and paying toward it (installments count), including:
 
-Friendly barracks can recruit infantry to help defend your position
+* 🔫 Machine-gun nests (30 gold)
+* 🏭 Barracks (60 gold) — they deploy 12-man rifle sections on their own
+* 💥 Artillery positions (80 gold)
+* 🚜 Tank factories (150 gold)
+* 🛩️ Air fields (200 gold)
 
 ### Step 3: Defend your position
 
-Enemy barracks continuously spawn infantry. Enemy troops will engage your friendly infantry and advance toward your bunker when no friendly infantry remain.
+Enemy barracks continuously spawn infantry. Enemy troops will engage your friendly infantry and advance toward your bunker when no friendly infantry remain. The enemy also runs a tank factory and an air field, so expect armor and air raids.
 
 Your machine-gun nests and artillery provide supporting fire against enemy infantry.
 
@@ -339,8 +350,8 @@ Run the game:
 * [ ] Additional enemy types
 * [ ] Better pathfinding
 * [ ] Visual effects
-* [ ] Sound effects
-* [ ] Music
+* [x] Sound effects — menu selection stings and per-nation victory/defeat themes
+* [x] Music — looping main-menu theme
 * [ ] Weather system
 * [ ] Campaign progression
 * [ ] Save/load support
@@ -348,7 +359,7 @@ Run the game:
 
 ### 📌 Future Features
 
-* [x] Tanks — factory-produced armor already exists (`entities/armor.py`: tanks + British machine-gun car per faction pool); a future ENEMY-side tank unit would extend the enemy classes
+* [x] Tanks — factory-produced armor already exists (`entities/armor.py`: tank factories roll tanks per faction pool; a machine-gun car class is in place but not in the production tables); a future ENEMY-side tank unit would extend the enemy classes
 * [ ] Cavalry
 * [ ] Difficulty modifiers
 
