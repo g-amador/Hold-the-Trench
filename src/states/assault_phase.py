@@ -40,6 +40,7 @@ from entities.airplane import AirplaneUnit
 from entities.barracks import Barracks
 from entities.static_building import AirField, TankFactory
 from entities.gold_pickup import COIN_SIZE
+from utils.image_loader import load_image
 
 from systems.factions import other, roll_scene, dominant_unit_nation
 
@@ -115,6 +116,33 @@ def hires_cache_for(holder, native, target):
     if cache is None or cache.get_size() != target:
         cache = pygame.transform.smoothscale(native, target)
         holder._hires_cache = cache
+    return cache
+
+
+# CLOSE-zoom smoothscale cache for the INFANTRY hires pass: one entry
+# per (art file, zoom target, facing), SHARED by every unit rolling
+# that file. Units animate through 8 full-body frames, so per-holder
+# caches (the building/coin pattern) would rescale on every cycle
+# step; keyed by filename, all units of a nation share their frames'
+# copies.
+_unit_hires_cache = {}
+
+
+def unit_hires_surface(filename, target, facing=1):
+    """Smoothscaled CLOSE-view copy of one infantry frame (cached).
+
+    Mirrors SpriteGenerator.get_facing_sprite: raw art faces right,
+    facing -1 gets a horizontal flip (of the small scaled copy, not
+    the 1088x976 source).
+    """
+    key = (filename, target, facing)
+    cache = _unit_hires_cache.get(key)
+    if cache is None:
+        native = load_image(filename, alpha=True, key_white=True)
+        cache = pygame.transform.smoothscale(native, target)
+        if facing == -1:
+            cache = pygame.transform.flip(cache, True, False)
+        _unit_hires_cache[key] = cache
     return cache
 
 
@@ -1146,6 +1174,13 @@ class AssaultPhase:
                     )
 
         for enemy_unit in self.enemy_barracks_units:
+            # Duck-typed: ArmorUnit has no frame pack and keeps its
+            # normal world-layer draw.
+            if close_native_ground and getattr(enemy_unit, "frames", None) is not None:
+                # CLOSE SPRITES: the unit hires pass draws it crisp —
+                # the world layer would only show a 4x-upscaled 24px
+                # copy (mirror of the coin skip below).
+                continue
             if in_view(enemy_unit.x, enemy_unit.y):
                 enemy_unit.draw(world, self.camera_x)
 
@@ -1168,6 +1203,12 @@ class AssaultPhase:
                 bullet.draw(world, self.camera_x)
 
         for friendly in self.friendlies:
+            # Duck-typed: ArmorUnit has no frame pack and keeps its
+            # normal world-layer draw.
+            if close_native_ground and getattr(friendly, "frames", None) is not None:
+                # CLOSE SPRITES: drawn by the unit hires pass instead
+                # (mirror of the coin skip).
+                continue
             if in_view(friendly.x, friendly.y):
                 friendly.draw(world, self.camera_x)
 
@@ -1181,7 +1222,10 @@ class AssaultPhase:
             if in_view(plane.x, plane.y):
                 plane.draw(world, self.camera_x)
 
-        self.player.draw(world, self.camera_x)
+        if not (close_native_ground and self.player.frames is not None):
+            # CLOSE SPRITES with art loaded: the unit hires pass draws
+            # the player crisp; otherwise the world-layer draw stays.
+            self.player.draw(world, self.camera_x)
 
         # Uniform zoom into the visible strip: single-factor scale
         # keeps every tile square; smoothscale avoids downscale
@@ -1235,6 +1279,7 @@ class AssaultPhase:
             if close_native_ground:
                 self._blit_building_hires(screen, cx, cy, view_rect)
                 self._blit_coin_hires(screen, cx, cy, view_rect)
+                self._blit_unit_hires(screen, cx, cy, view_rect)
         else:
             # FULL view (default/'-'): whole battlefield at once.
             screen.blit(
@@ -1359,4 +1404,54 @@ class AssaultPhase:
 
             screen_x = (gold.x - cx) * scale
             screen_y = HUD_BAR_HEIGHT + (gold.y + gold.y_offset - cy) * scale
+            screen.blit(cache, (int(round(screen_x)), int(round(screen_y))))
+
+    def _blit_unit_hires(self, screen, cx, cy, view_rect):
+        """CLOSE view: infantry blit straight from native frame art.
+
+        Mirror of the building/coin hires passes for the soldiers
+        (user: "infantry image is blurry" — the CLOSE zoom upscales
+        the 24px world copy ~4x, and the 1088x976 sources held the
+        detail all along). Units whose frame pack loaded SKIP the
+        world layer in CLOSE SPRITES mode (see the render loops) and
+        draw HERE instead: the CURRENT pose's file is smoothscaled
+        once per (file, zoom) — shared by every unit of the nation
+        via _unit_hires_cache — to the world box * close_scale and
+        blitted at its window-relative screen position. Block-
+        fallback units (no art files) keep their world-layer draw;
+        FULL and BLOCKS modes never reach this pass.
+        """
+        scale = self.close_scale
+        # Same edge forgiveness as the coin cull: units at the window
+        # edge don't pop in/out mid-step.
+        margin_rect = view_rect.inflate(CULL_MARGIN, CULL_MARGIN)
+
+        # World-surface z-order mirrored: enemies, then friendlies,
+        # the player last.
+        for unit in (
+            self.enemy_barracks_units
+            + self.friendlies
+            + [self.player]
+        ):
+            # Duck-typed: ArmorUnit has no `.dead`-guarantee either —
+            # getattr defaults keep tanks on their world-layer draw.
+            if (getattr(unit, "dead", False)
+                    or getattr(unit, "frames", None) is None):
+                continue
+            filename = unit.current_frame_file()
+            if filename is None:
+                continue
+
+            if not unit.get_hitbox().colliderect(margin_rect):
+                continue
+
+            target = (
+                int(round(unit.width * scale)),
+                int(round(unit.height * scale)),
+            )
+            cache = unit_hires_surface(
+                filename, target, getattr(unit, "facing", 1))
+
+            screen_x = (unit.x - cx) * scale
+            screen_y = HUD_BAR_HEIGHT + (unit.y - cy) * scale
             screen.blit(cache, (int(round(screen_x)), int(round(screen_y))))

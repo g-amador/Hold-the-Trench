@@ -132,18 +132,29 @@ def load_first_image(filenames, *, alpha=False, size=None, smooth=False,
     return None
 
 
-def load_first_image_named(filenames, *, alpha=False, size=None):
+def load_first_image_named(filenames, *, alpha=False, size=None, smooth=False,
+                           key_white=False):
     """load_first_image, but ALSO returns the winning filename.
 
     Returns (surface_or_None, filename_or_None). Buildings store the
     chosen name so they can later load the SAME file at NATIVE
-    resolution for the CLOSE-view hires pass. load_first_image cannot
-    do this (its return is just a surface), so effects and hires both
-    key off this helper.
+    resolution for the CLOSE view's hires blit; the infantry frames
+    ride the same pattern (their files entry powers the unit hires
+    pass). load_first_image cannot do this (its return is just a
+    surface), so effects and hires both key off this helper.
     """
     for filename in filenames:
         try:
-            return load_image(filename, alpha=alpha, size=size), filename
+            return (
+                load_image(
+                    filename,
+                    alpha=alpha,
+                    size=size,
+                    smooth=smooth,
+                    key_white=key_white,
+                ),
+                filename,
+            )
         except FileNotFoundError:
             continue
     return None, None

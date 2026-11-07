@@ -71,11 +71,13 @@ class FriendlyInfantry(FlooredDamage):
             self.frame_rest = self.frames["rest"]
             self.frame_rest_alt = self.frames["rest_alt"]
             self.frames_run = self.frames["run"]
+            self.frame_files = self.frames["files"]
         else:
             # Block fallback; non-empty list keeps animation math safe.
             self.frame_rest = None
             self.frame_rest_alt = None
             self.frames_run = [None]
+            self.frame_files = None
 
         # Animation state: timers mirror the other infantry classes;
         # facing 1 = right (allies charge east toward the enemy side).
@@ -211,6 +213,21 @@ class FriendlyInfantry(FlooredDamage):
         )
         bullets.append(bullet)
         self.shoot_timer = self.shoot_cooldown
+
+    def current_frame_file(self):
+        """CLOSE-view hires: the art file of the pose being drawn.
+
+        Mirrors draw()'s frame selection one-to-one (run cycle wins
+        over the shot blip while moving); None when the block
+        fallback is active (no art files).
+        """
+        if self.frames is None:
+            return None
+        if self.is_moving:
+            return self.frame_files["run"][self.run_frame]
+        if self.shoot_animation_timer > 0:
+            return self.frame_files["rest_alt"]
+        return self.frame_files["rest"]
 
     def get_hitbox(self):
         """Return the unit's collision rectangle in world coordinates."""

@@ -93,10 +93,10 @@ BUILD_COSTS = {
     "air_field": 200,
     "tank_factory": 150,
 
-    "enemy_mg": 10, #30
+    "enemy_mg": 0, #30
     "enemy_bunker": 0,
-    "enemy_barracks": 10, #60
-    "enemy_artillery": 10, #80
+    "enemy_barracks": 0, #60
+    "enemy_artillery": 0, #80
     "enemy_air_field": 10, #200
     "enemy_tank_factory": 10, #150
 }
@@ -135,8 +135,9 @@ INFANTRY_BULLET_DAMAGE = 20
 PLAYER_SHOOT_COOLDOWN = 0.25
 
 # Shared soldier animation timing, identical across the player and
-# BOTH, enemy/friendly spawning infantry (walk cycle frame length and
-# the aim-pose beat after each shot):
+# BOTH, enemy/friendly spawning infantry (run-cycle frame length and
+# the shot-blip beat after each shot — the second rest pose plays
+# while the blip is up):
 INFANTRY_ANIM_FRAME_S = 0.12
 INFANTRY_AIM_POSE_S = 0.18
 

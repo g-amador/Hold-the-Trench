@@ -4,7 +4,7 @@ Sprite utilities for loading and animating character sprites.
 
 import pygame
 
-from utils.image_loader import load_first_image, load_image
+from utils.image_loader import load_first_image, load_first_image_named
 
 
 class SpriteGenerator:
@@ -47,11 +47,15 @@ class SpriteGenerator:
         collision needs no adjustments. Opaque (jpeg) frames get
         their near-white studio background keyed out at load
         (image_loader._key_white_background); alpha-carrying .png
-        cut-outs pass through untouched. Returns None when any file
+        cut-outs pass through untouched. The returned dict also
+        carries "files" — the winning FILENAME per frame — so the
+        CLOSE view's unit hires pass (assault_phase._blit_unit_hires)
+        can reload the SAME art native-size, exactly like the
+        buildings' image_native pattern. Returns None when any file
         is missing so callers can fall back to block rendering.
         """
         def frame(letter):
-            return load_first_image(
+            return load_first_image_named(
                 [f"{prefix}_{letter}{ext}" for ext in self.FRAME_EXTENSIONS],
                 alpha=True,
                 size=size,
@@ -59,16 +63,25 @@ class SpriteGenerator:
                 key_white=True,
             )
 
-        frames = {
-            "rest": frame("g"),
-            "rest_alt": frame("h"),
-            "run": [frame(letter) for letter in "abcdef"],
-        }
-        if (frames["rest"] is None
-                or frames["rest_alt"] is None
-                or any(f is None for f in frames["run"])):
+        run = [frame(letter) for letter in "abcdef"]
+        rest, rest_file = frame("g")
+        rest_alt, rest_alt_file = frame("h")
+
+        if (rest is None
+                or rest_alt is None
+                or any(surface is None for surface, _file in run)):
             return None
-        return frames
+
+        return {
+            "rest": rest,
+            "rest_alt": rest_alt,
+            "run": [surface for surface, _file in run],
+            "files": {
+                "rest": rest_file,
+                "rest_alt": rest_alt_file,
+                "run": [file for _surface, file in run],
+            },
+        }
 
     def get_facing_sprite(self, sprite, facing):
         """
