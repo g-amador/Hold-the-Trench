@@ -61,20 +61,21 @@ class FriendlyInfantry(FlooredDamage):
         self.shoot_timer = 0.0
 
         # Standard infantry frames; None means missing assets (block fallback).
+        # size=(width, height): the 1088x976 full-body sources scale to
+        # the unit's world box at load, so art and hitbox match 1:1.
         self.sprite_generator = SpriteGenerator()
-        self.frames = self.sprite_generator.load_unit_frames(prefix)
+        self.frames = self.sprite_generator.load_unit_frames(
+            prefix, size=(self.width, self.height))
 
         if self.frames is not None:
-            self.legs_idle = self.frames["legs_idle"]
-            self.legs_run = self.frames["legs_run"]
-            self.upper_idle = self.frames["upper_idle"]
-            self.upper_aim = self.frames["upper_aim"]
+            self.frame_rest = self.frames["rest"]
+            self.frame_rest_alt = self.frames["rest_alt"]
+            self.frames_run = self.frames["run"]
         else:
             # Block fallback; non-empty list keeps animation math safe.
-            self.legs_idle = None
-            self.legs_run = [None]
-            self.upper_idle = None
-            self.upper_aim = None
+            self.frame_rest = None
+            self.frame_rest_alt = None
+            self.frames_run = [None]
 
         # Animation state: timers mirror the other infantry classes;
         # facing 1 = right (allies charge east toward the enemy side).
@@ -157,7 +158,7 @@ class FriendlyInfantry(FlooredDamage):
             self.run_timer += dt / 1000
             while self.run_timer >= self.run_frame_duration:
                 self.run_timer -= self.run_frame_duration
-                self.run_frame = (self.run_frame + 1) % len(self.legs_run)
+                self.run_frame = (self.run_frame + 1) % len(self.frames_run)
         else:
             self.run_frame = 0
 
@@ -216,7 +217,8 @@ class FriendlyInfantry(FlooredDamage):
         return pygame.Rect(round(self.x), round(self.y), self.width, self.height)
 
     def draw(self, screen, camera_x):
-        """Draw the animated sprite, or a block fallback when sprites missing."""
+        """Draw the animated full-body frame, or a block fallback when
+        sprites are missing."""
         if self.dead:
             return
 
@@ -235,9 +237,17 @@ class FriendlyInfantry(FlooredDamage):
         screen_x = round(self.x - camera_x)
         screen_y = round(self.y)
 
-        legs = self.legs_run[self.run_frame] if self.is_moving else self.legs_idle
-        upper = self.upper_aim if self.shoot_animation_timer > 0 else self.upper_idle
+        # Single full-body frame (the layered legs/upper composite is
+        # retired): the run cycle while moving — it wins over the shot
+        # blip so a charging soldier never freezes mid-stride — the
+        # second rest pose as the per-shot blip while standing, plain
+        # rest otherwise.
+        if self.is_moving:
+            frame = self.frames_run[self.run_frame]
+        elif self.shoot_animation_timer > 0:
+            frame = self.frame_rest_alt
+        else:
+            frame = self.frame_rest
 
         pos = (screen_x, screen_y)
-        self.sprite_generator.draw(screen, legs, pos, self.facing)
-        self.sprite_generator.draw(screen, upper, pos, self.facing)
+        self.sprite_generator.draw(screen, frame, pos, self.facing)

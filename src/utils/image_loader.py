@@ -20,17 +20,22 @@ IMAGE_DIR = Path(__file__).resolve().parents[2] / "assets" / "images"
 _image_cache = {}
 
 
-def load_image(filename, *, alpha=False, size=None):
+def load_image(filename, *, alpha=False, size=None, smooth=False,
+               key_white=False):
     """Load an image from the project's assets/images directory.
 
     alpha=True converts for per-pixel transparency (units, building
     sprites); alpha=False is faster for opaque art. size rescales
-    before caching, so differently-sized loads are cached separately.
+    before caching, so differently-sized loads are cached separately
+    (smooth=True picks smoothscale — the right resampler for big
+    downscales like the 1088x976 infantry frames). key_white=True
+    keys out a near-white studio backdrop on fully opaque sources
+    (jpeg poses carry no alpha channel; see _key_white_background).
 
     Raises FileNotFoundError for missing files; callers that can go
     without the art should catch it and fall back (see block_drawer).
     """
-    key = (filename, alpha, size)
+    key = (filename, alpha, size, smooth, key_white)
 
     if key not in _image_cache:
         if filename is None:
@@ -44,15 +49,69 @@ def load_image(filename, *, alpha=False, size=None):
         image = pygame.image.load(str(path))
         image = image.convert_alpha() if alpha else image.convert()
 
+        if key_white:
+            image = _key_white_background(image)
+
         if size is not None:
-            image = pygame.transform.scale(image, size)
+            if smooth:
+                image = pygame.transform.smoothscale(image, size)
+            else:
+                image = pygame.transform.scale(image, size)
 
         _image_cache[key] = image
 
     return _image_cache[key]
 
 
-def load_first_image(filenames, *, alpha=False, size=None):
+def _sweep_white(surface, threshold):
+    """Per-pixel Python fallback for _key_white_background."""
+    for y in range(surface.get_height()):
+        for x in range(surface.get_width()):
+            color = surface.get_at((x, y))
+            if min(color.r, color.g, color.b) >= threshold:
+                surface.set_at((x, y), (color.r, color.g, color.b, 0))
+
+
+def _key_white_background(surface, threshold=240):
+    """Zero the alpha of near-white pixels (jpeg studio backdrops).
+
+    USER ART RULE (infantry frames): the .jpeg poses carry no alpha —
+    the soldier sits on a near-white studio backdrop (corners read
+    ~250-255). When the surface is FULLY opaque and all four corners
+    are near-white, every pixel with all channels >= threshold goes
+    alpha 0; real cut-out art (alpha-carrying .png) passes through
+    untouched. Operates in place on the cache-owned surface.
+    """
+    w, h = surface.get_size()
+    corners = [
+        surface.get_at(point)
+        for point in ((0, 0), (w - 1, 0), (0, h - 1), (w - 1, h - 1))
+    ]
+    if any(c.a != 255 for c in corners):
+        return surface   # real transparency somewhere: not a jpeg backdrop
+    if any(min(c.r, c.g, c.b) < threshold for c in corners):
+        return surface   # corners not near-white: not the studio backdrop
+
+    if _numpy is not None and _surfarray is not None:
+        try:
+            red = _surfarray.pixels_red(surface)
+            green = _surfarray.pixels_green(surface)
+            blue = _surfarray.pixels_blue(surface)
+            alpha = _surfarray.pixels_alpha(surface)
+            mask = ((red >= threshold) & (green >= threshold)
+                    & (blue >= threshold))
+            alpha[mask] = 0
+            del red, green, blue, alpha
+        except (NotImplementedError, ModuleNotFoundError):
+            _sweep_white(surface, threshold)
+    else:
+        _sweep_white(surface, threshold)
+
+    return surface
+
+
+def load_first_image(filenames, *, alpha=False, size=None, smooth=False,
+                     key_white=False):
     """Load the first candidate that exists; None when none do.
 
     Candidates are tried in order, every hit served from the shared
@@ -61,7 +120,13 @@ def load_first_image(filenames, *, alpha=False, size=None):
     """
     for filename in filenames:
         try:
-            return load_image(filename, alpha=alpha, size=size)
+            return load_image(
+                filename,
+                alpha=alpha,
+                size=size,
+                smooth=smooth,
+                key_white=key_white,
+            )
         except FileNotFoundError:
             continue
     return None

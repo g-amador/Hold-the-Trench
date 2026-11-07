@@ -73,20 +73,21 @@ class Player:
         self.shoot_timer = 0
 
         # Standard infantry frames; None means missing assets (block fallback).
+        # size=(width, height): the 1088x976 full-body sources scale to
+        # the player's world box at load, so art and hitbox match 1:1.
         self.sprite_generator = SpriteGenerator()
-        self.frames = self.sprite_generator.load_unit_frames(prefix)
+        self.frames = self.sprite_generator.load_unit_frames(
+            prefix, size=(self.width, self.height))
 
         if self.frames is not None:
-            self.legs_idle = self.frames["legs_idle"]
-            self.legs_run = self.frames["legs_run"]
-            self.upper_idle = self.frames["upper_idle"]
-            self.upper_aim = self.frames["upper_aim"]
+            self.frame_rest = self.frames["rest"]
+            self.frame_rest_alt = self.frames["rest_alt"]
+            self.frames_run = self.frames["run"]
         else:
             # Block fallback; non-empty list keeps animation math safe.
-            self.legs_idle = None
-            self.legs_run = None
-            self.upper_idle = None
-            self.upper_aim = None
+            self.frame_rest = None
+            self.frame_rest_alt = None
+            self.frames_run = [None]
 
         # Animation timing: the run cycle advances on a fixed frame
         # duration so animation speed is framerate independent.
@@ -326,7 +327,7 @@ class Player:
 
             while self.run_timer >= self.run_frame_duration:
                 self.run_timer -= self.run_frame_duration
-                self.run_frame = (self.run_frame + 1) % len(self.legs_run)
+                self.run_frame = (self.run_frame + 1) % len(self.frames_run)
         else:
             # Idle pose: reset to the first frame and drain the timer.
             self.run_frame = 0
@@ -440,7 +441,8 @@ class Player:
             self.shoot_toward(nearest_enemy, bullets)
 
     def draw(self, screen, camera_x):
-        """Draw animated legs and upper body, or blocks when sprites are missing."""
+        """Draw the animated full-body frame, or blocks when sprites
+        are missing."""
         if not render_mode.is_sprite() or self.frames is None:
             self._draw_block(screen, camera_x)
             return
@@ -448,22 +450,21 @@ class Player:
         screen_x = round(self.x - camera_x)
         screen_y = round(self.y)
 
+        # Single full-body frame (the layered legs/upper composite is
+        # retired): the run cycle while moving — it wins over the shot
+        # blip so a strafing soldier never freezes mid-stride — the
+        # second rest pose as the per-shot blip while standing, plain
+        # rest otherwise.
         if self.is_moving:
-            legs = self.legs_run[self.run_frame]
+            frame = self.frames_run[self.run_frame]
+        elif self.shoot_animation_timer > 0:
+            frame = self.frame_rest_alt
         else:
-            legs = self.legs_idle
-
-        if self.shoot_animation_timer > 0:
-            upper = self.upper_aim
-        else:
-            upper = self.upper_idle
+            frame = self.frame_rest
 
         position = (screen_x, screen_y)
         self.sprite_generator.draw(
-            screen, legs, position, self.facing
-        )
-        self.sprite_generator.draw(
-            screen, upper, position, self.facing
+            screen, frame, position, self.facing
         )
 
     def _draw_block(self, screen, camera_x):
