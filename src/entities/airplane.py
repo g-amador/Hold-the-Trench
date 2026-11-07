@@ -5,10 +5,10 @@ cadence as tank factories.
 Behavior:
 - living in its side's dedicated PLANE list, it FLYS: no ground
   collision, no tile logic — it steers straight toward its target;
-- target selection = nearest enemy among ARMOR UNITS (tanks/cars),
+- target selection = nearest enemy among ARMOR UNITS (tanks),
   BUILDINGS, and PLANES. No preference but proximity (user: "no
   particular preference aside proximity");
-- ground targets (tank/car/building): the plane bombs it when it is
+- ground targets (tank/building): the plane bombs it when it is
   OVER it — center distance at most PLANE_BOMB_TRIGGER_PX — dropping
   bomb damage on cooldown (direct damage, like artillery splash:
   no bullet, no armor rule); buildings take damage through their

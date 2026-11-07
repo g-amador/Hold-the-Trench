@@ -93,12 +93,12 @@ BUILD_COSTS = {
     "air_field": 200,
     "tank_factory": 150,
 
-    "enemy_mg": 0, #30
+    "enemy_mg": 10, #30
     "enemy_bunker": 0,
-    "enemy_barracks": 0, #60
-    "enemy_artillery": 0, #80
-    "enemy_air_field": 0, #200
-    "enemy_tank_factory": 0, #150
+    "enemy_barracks": 10, #60
+    "enemy_artillery": 10, #80
+    "enemy_air_field": 10, #200
+    "enemy_tank_factory": 10, #150
 }
 
 # ---------------- Combat ----------------
@@ -145,7 +145,7 @@ INFANTRY_AIM_POSE_S = 0.18
 # factories (FACTORY_UNIT_INTERVAL). Planes fly, ignore ground
 # collision, machine-gun enemy PLANES in range (like infantry vs
 # infantry), and drop bombs on whatever enemy ground target (tank,
-# car, building) they are OVER — nearest first, proximity only.
+# building) they are OVER — nearest first, proximity only.
 PLANE_HP = 30
 PLANE_SPEED = 140
 PLANE_SIZE = (96, 96)      # world px box (art scales to it)
@@ -180,17 +180,14 @@ def footprint_for(kind, faction):
 
 
 # ---------------- Armor (tank factory units) ----------------
-# User spec: factories produce armored vehicles; tanks have 100 hp,
-# the machine-gun car 80. ONLY artillery splash and other
-# tanks' shots can damage armor (infantry/MG/car fire can't); tanks
-# hurt infantry AND other tanks, cars hurt infantry only.
+# User spec: factories produce armored vehicles; tanks have 100 hp.
+# ONLY artillery splash and other tanks' shots can damage armor
+# (infantry/MG fire can't); tanks hurt infantry AND other tanks.
 TANK_HP = 100
-CAR_HP = 80
 
-# Advance speeds (px/s) toward the enemy base / enemy bunker; the
-# car is faster (it is a light vehicle), tanks crawl.
+# Advance speed (px/s) toward the enemy base / enemy bunker; tanks
+# crawl.
 TANK_SPEED = 30
-CAR_SPEED = 60
 
 # Production cadence: armored vehicles keep their OWN flat interval —
 # one roll every 15 s per factory, INDEPENDENT of the barracks section
@@ -234,12 +231,7 @@ TANK_MG_RANGE = 220
 TANK_MG_DAMAGE = 20
 TANK_MG_FIRE_RATE = 0.6
 
-# The car is literally an MG nest on wheels: MG-nest stats.
-CAR_MG_RANGE = 220
-CAR_MG_DAMAGE = 8
-CAR_MG_FIRE_RATE = 0.2
-
-# Static MG nest building: range/damage/cadence match the car's gun.
+# Static MG nest building: range/damage/cadence.
 MG_NEST_RANGE = 220
 MG_NEST_DAMAGE = 8
 MG_NEST_FIRE_RATE = 0.1
@@ -295,7 +287,7 @@ MENU_MUSIC = "Menu_Loop.wav"
 MENU_SELECT_SOUND = "menu_select.wav"
 
 # War background noise (user: the FIRST shot of the battle — from any
-# source: infantry, MG nest, tank/car, plane, artillery, either side —
+# source: infantry, MG nest, tank, plane, artillery, either side —
 # starts ONE of these, picked at random; lives in assets/sounds).
 WAR_NOISE_SOUNDS = ("war_back_noise1.mp3", "war_back_noise2.mp3")
 

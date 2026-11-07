@@ -14,7 +14,7 @@ bullets flow through unchanged — resolution never mutates the input
 list itself.
 """
 
-from entities.armor import ArmorUnit
+from entities.tank import ArmorUnit
 
 
 def apply_enemy_damage(unit, damage):

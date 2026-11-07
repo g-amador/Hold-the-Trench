@@ -12,7 +12,6 @@ hold_the_trench/
 │   ├── entities/                   # for units, buildings, projectiles, and pickups
 │   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies artillery_fr / axis artillery_ger), GREY block fallback
 │   │   ├── airplane.py             # factory-produced plane (air fields): flies, targets armor/buildings/planes by proximity, bombs ground targets overhead
-│   │   ├── armor.py                # factory-produced armor (tank factories): tanks + the machine-gun car; forward advance, stop-and-shell, armor damage rule
 │   │   ├── barracks.py
 │   │   ├── bullet.py
 │   │   ├── bunker.py
@@ -22,7 +21,8 @@ hold_the_trench/
 │   │   ├── gold_pickup.py
 │   │   ├── mg_nest.py
 │   │   ├── player.py
-│   │   └── static_building.py      # free player-side statics: AirField (map 'F') / TankFactory (map 'K') — scene-variant art, 7x7 per config BUILD_FOOTPRINTS, spawn armor/planes
+│   │   ├── static_building.py      # free player-side statics: AirField (map 'F') / TankFactory (map 'K') — scene-variant art, 7x7 per config BUILD_FOOTPRINTS, spawn tanks/planes
+│   │   └── tank.py                 # factory tanks (tank factories): forward advance, stop-and-shell, armor damage rule
 │   ├── graphics/                   # for sprite generation, animation helpers, rendering utilities, and the graphics toggle.
 │   │   ├── sprite_generator.py     # unit frame loading/animation/flipping
 │   │   ├── render_mode.py          # global SPRITES/BLOCKS graphics toggle state (G key)

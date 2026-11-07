@@ -84,7 +84,7 @@ class Player:
         else:
             # Block fallback; non-empty list keeps animation math safe.
             self.legs_idle = None
-            self.legs_run = [None]
+            self.legs_run = None
             self.upper_idle = None
             self.upper_aim = None
 

@@ -14,7 +14,7 @@ mixer). Four behaviors, all user requests:
   that held the field (nation picked by the battle state — see
   assault_phase's transitions and factions.dominant_unit_nation).
 - The battle's FIRST shot from ANY source (infantry, MG nest,
-  tank/car, plane, artillery — either side) starts ONE war background
+  tank, plane, artillery — either side) starts ONE war background
   noise file, picked at random (WAR_NOISE_SOUNDS); later shots add
   nothing.
 
@@ -132,7 +132,7 @@ def play_war_noise():
     """Start ONE war background noise (user: first shot of a battle).
 
     The battle state calls this exactly once, when the FIRST shot from
-    any source (infantry, MG nest, tank/car, plane, artillery — either
+    any source (infantry, MG nest, tank, plane, artillery — either
     side) fires. The file is picked at random from WAR_NOISE_SOUNDS
     and runs through the single music stream (mp3 capable, same stream
     as the themes — an end-screen theme simply replaces it, and battle

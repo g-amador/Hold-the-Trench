@@ -25,7 +25,7 @@ import pygame
 
 from config import TILE_SIZE, BROWN, BUILD_FOOTPRINTS, BUILDING_HP, FACTORY_UNIT_INTERVAL
 from entities.airplane import AirplaneUnit
-from entities.armor import roll_armor_unit
+from entities.tank import roll_armor_unit
 from entities.damage import FlooredDamage
 from graphics import render_mode
 from systems.factions import (

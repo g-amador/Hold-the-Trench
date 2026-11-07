@@ -1,15 +1,14 @@
 """
-Factory-produced armor: tanks and the machine-gun car.
+Factory-produced tanks.
 
-Both classes share the ArmorUnit machinery (user spec):
+The ArmorUnit machinery (user spec):
 - steady FORWARD advance toward the enemy base, STOPPING whenever an
-  enemy building is within shooting range (user: "tanks and car
-  should stop when in shooting range of a building") — tanks then
-  shell that building; cars only park (they keep their infantry-only
-  MG rule from the previous batch);
+  enemy building is within shooting range (user: "tanks should stop
+  when in shooting range of a building") — the tank then shells that
+  building;
 - an on-board machine gun that auto-fires at the nearest VALID
   target in range without ever needing to stop ("shoot as machine
-  guns") — tanks hurt infantry AND other tanks, cars only infantry;
+  guns") — tanks hurt infantry AND other tanks;
 - the armor damage rule: armor is ONLY damaged by other tanks' shots
   and artillery splash (the battle state's bullet loops enforce it);
 - armor never drops gold (gold_spawned stays True).
@@ -34,15 +33,10 @@ from config import (
     RED,
     BLUE,
     TANK_HP,
-    CAR_HP,
     TANK_SPEED,
-    CAR_SPEED,
     TANK_MG_RANGE,
     TANK_MG_DAMAGE,
     TANK_MG_FIRE_RATE,
-    CAR_MG_RANGE,
-    CAR_MG_DAMAGE,
-    CAR_MG_FIRE_RATE,
 )
 from entities.bullet import Bullet
 from entities.damage import RawSubtractDamage
@@ -67,14 +61,9 @@ class ArmorUnit(RawSubtractDamage):
     unit_kind = "vehicle"
 
     # Which target kinds this vehicle's MG can hurt: tanks shoot
-    # infantry AND other tanks; cars shoot infantry only (user rule:
-    # a car "cannot damage other tanks"). BUILDINGS are handled
-    # separately via the buildings list passed to update().
+    # infantry AND other tanks. BUILDINGS are handled separately via
+    # the buildings list passed to update().
     MG_TARGETS = ()
-
-    # Buildings targeting (user spec): TANKS target enemy buildings;
-    # cars only ever stop in building range (no building fire).
-    CAN_SHELL_BUILDINGS = False
 
     def __init__(self, x, y, is_enemy, filename, nation,
                  hp, speed, width, height,
@@ -136,36 +125,26 @@ class ArmorUnit(RawSubtractDamage):
         """Advance forward, stop in building range, fire the hull MG.
 
         `targets` is the OPPOSING unit list; only kinds listed in
-        MG_TARGETS are engaged (cars ignore armor, tanks shoot both
-        infantry and tanks). `bullets` is the side-appropriate list
+        MG_TARGETS are engaged. `bullets` is the side-appropriate list
         the battle state simulates. `buildings` is the OPPOSING
         BUILDING list (user spec): a tank stops and SHELLS the
-        nearest building in shooting range; a car stops the advance
-        the same way but parks (its MG can never hurt buildings).
+        nearest building in shooting range.
         """
         if self.dead:
             return
 
         world_w = _world_width()
 
-        # Building stop rule (user): "tanks and car should stop when
-        # in shooting range of a building". Nearest ALIVE enemy
-        # building whose center is inside the gun range halts the
-        # advance this frame.
+        # Building stop rule (user): "tanks should stop when in
+        # shooting range of a building". Nearest ALIVE enemy building
+        # whose center is inside the gun range halts the advance this
+        # frame — the tank parks here and shells it on the gun's
+        # cadence. Its armor_damage shots work on all enemy buildings
+        # (MG nests, artillery, barracks, factories, air fields,
+        # bunkers — destructible since BUILDING_HP).
         building = self._nearest_building(buildings)
-
-        if building is not None and self.CAN_SHELL_BUILDINGS:
-            # Tanks: park here and shell the building on the gun's
-            # cadence. Their armor_damage shots work on all enemy
-            # buildings (MG nests, artillery, barracks, factories,
-            # air fields, bunkers — destructible since BUILDING_HP).
-            self._fire_building_shot(dt, building, bullets)
-            return
-
         if building is not None:
-            # Cars: stop the advance but keep the hull MG (infantry
-            # in range is still engaged; the building never hurts).
-            self._fire_nearest_target(dt, targets, bullets)
+            self._fire_building_shot(dt, building, bullets)
             return
 
         # Steady forward advance; stop at the world edges.
@@ -216,7 +195,8 @@ class ArmorUnit(RawSubtractDamage):
         for t in targets:
             if t.dead:
                 continue
-            # MG targeting rule: cars skip armor, tanks shoot both.
+            # MG targeting rule: only the kinds in MG_TARGETS are
+            # engaged.
             if getattr(t, "unit_kind", "infantry") not in self.MG_TARGETS:
                 continue
             dist = math.hypot(t.x - cx, t.y - cy)
@@ -234,9 +214,9 @@ class ArmorUnit(RawSubtractDamage):
             return
 
         # Tank shells can kill other tanks (Bullet.armor_damage);
-        # car bullets are regular (pass through armor harmlessly —
-        # the battle state's bullet loops handle the skip rule).
-        # Damage carries the producing nation's handicap.
+        # regular shots pass through armor harmlessly — the battle
+        # state's bullet loops handle the skip rule. Damage carries
+        # the producing nation's handicap.
         armor = "tank" in self.MG_TARGETS
         bullet = Bullet(cx, cy, dx / length, dy / length, armor_damage=armor)
         bullet.damage = scaled_damage(
@@ -293,7 +273,6 @@ class TankUnit(ArmorUnit):
 
     unit_kind = "tank"
     MG_TARGETS = ("infantry", "tank")
-    CAN_SHELL_BUILDINGS = True
 
     def __init__(self, x, y, is_enemy=False, filename=None, nation=None):
         # All tank source files scale to one 128x58 world box
@@ -311,29 +290,11 @@ class TankUnit(ArmorUnit):
         )
 
 
-class CarUnit(ArmorUnit):
-    """Mobile machine gun (MG nest on wheels): 80 hp, quick,
-    can ONLY damage infantry — its MG never engages armor. It still
-    STOPS when an enemy building is inside shooting range (user rule)
-    but never fires at it."""
-
-    unit_kind = "car"
-    MG_TARGETS = ("infantry",)
-    CAN_SHELL_BUILDINGS = False
-
-    def __init__(self, x, y, is_enemy=False, filename=None, nation=None):
-        # Cars are lighter than tanks: 3 tiles across.
-        super().__init__(
-            x, y, is_enemy,
-            filename,
-            nation=nation,
-            hp=CAR_HP,
-            speed=CAR_SPEED,
-            width=96, height=44,
-            mg_range=CAR_MG_RANGE,
-            mg_damage=CAR_MG_DAMAGE,
-            mg_fire_rate=CAR_MG_FIRE_RATE,
-        )
+# Kind -> class for the factory roll (list-driven: a future vehicle
+# kind rejoins by adding a row here plus its table entries).
+UNIT_CLASSES = {
+    "tank": TankUnit,
+}
 
 
 def roll_armor_unit(nation, is_enemy, x, y):
@@ -351,7 +312,9 @@ def roll_armor_unit(nation, is_enemy, x, y):
         return None
 
     kind, filename = random.choice(options)
-    unit_class = CarUnit if kind == "car" else TankUnit
+    unit_class = UNIT_CLASSES.get(kind)
+    if unit_class is None:
+        return None
     # The producing nation is passed INTO the ctor so the WWI
     # balance handicaps (hp resistance) apply at spawn directly.
     return unit_class(x, y, is_enemy, filename, nation)

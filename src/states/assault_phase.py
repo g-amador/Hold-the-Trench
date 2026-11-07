@@ -35,7 +35,7 @@ from entities.player import Player
 from entities.mg_nest import MGNest
 from entities.bunker import Bunker
 from entities.artillery import Artillery
-from entities.armor import ArmorUnit
+from entities.tank import ArmorUnit
 from entities.airplane import AirplaneUnit
 from entities.barracks import Barracks
 from entities.static_building import AirField, TankFactory
@@ -699,10 +699,9 @@ class AssaultPhase:
                 else:
                     building.update(dt, self.enemy_barracks_units, self.bullets)
 
-        # Factory armor: vehicles drive toward the enemy base and
-        # hunt with their hull MG. Both stop when an enemy building
-        # is inside shooting range (user rule); tanks shell it, cars
-        # park (their MG never hits buildings).
+        # Factory armor: tanks drive toward the enemy base and hunt
+        # with their hull MG. A tank stops when an enemy building is
+        # inside shooting range (user rule) and shells it.
         for vehicle in list(self.friendlies):
             if isinstance(vehicle, ArmorUnit):
                 vehicle.update(
@@ -719,7 +718,7 @@ class AssaultPhase:
 
         # Planes fly (no ground logic): friendly planes hunt the
         # enemy's armor + buildings + planes; enemy planes mirror.
-        # Ground target list = enemy armor (tanks/cars) + enemy
+        # Ground target list = enemy armor (tanks) + enemy
         # buildings, nearest-first inside the plane itself.
         enemy_ground = [
             unit for unit in self.enemy_barracks_units
@@ -751,7 +750,7 @@ class AssaultPhase:
         ]
 
         # WAR BACKGROUND NOISE (user): the FIRST shot of the battle —
-        # from ANY source (infantry, MG nest, tank/car, plane MG or
+        # from ANY source (infantry, MG nest, tank, plane MG or
         # bomb, artillery, either side) — starts ONE random war-noise
         # file; later shots add nothing. Detection reads the state's
         # own shot evidence, all of it fresh by this point in the
@@ -929,7 +928,7 @@ class AssaultPhase:
 
         # One tuple per row: (name, player display, enemy display).
         # Infantry counts exclude factory armor (planes live in their
-        # OWN lists); armored vehicles (tanks + cars) get their own
+        # OWN lists); armored vehicles (tanks) get their own
         # row and the air forces another.
         infantry_player = sum(
             1 for u in self.friendlies if not isinstance(u, ArmorUnit)

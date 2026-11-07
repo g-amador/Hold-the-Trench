@@ -130,7 +130,6 @@ The enemy fields the same roster for free from its map markers: bunker, MG nests
 | ⚡ Shock Troopers | Fast assault infantry |
 | 🔥 Flamethrowers | Anti-entrenchment troops |
 | 🎯 Mortar Teams | Indirect fire support |
-| 🚙 Machine-gun Car | Armored "MG nest on wheels" — the class exists but is not yet in the production tables |
 
 [Back to Table of Contents](#toc)
 
@@ -359,8 +358,7 @@ Run the game:
 
 ### 📌 Future Features
 
-* [x] Tanks — factory-produced armor already exists (`entities/armor.py`: tank factories roll tanks per faction pool; a machine-gun car class is in place but not in the production tables); a future ENEMY-side tank unit would extend the enemy classes
-* [ ] Cavalry
+* [x] Tanks — factory-produced armor already exists (`entities/tank.py`: tank factories roll tanks per faction pool); a future ENEMY-side tank unit would extend the enemy classes
 * [ ] Difficulty modifiers
 
 ### 📝 DONE (was: awaiting assets and design)

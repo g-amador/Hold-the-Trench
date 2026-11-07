@@ -31,7 +31,7 @@ class Bullet:
 
         # Armor rule (user spec): only artillery splash and tank shots
         # can hurt armored units. Bullets default to False (infantry,
-        # player, MG-nest and car shots pass through armor harmlessly
+        # player and MG-nest shots pass through armor harmlessly
         # — the hit loop skips armored targets they reach); only tank
         # shots set this True.
         self.armor_damage = armor_damage

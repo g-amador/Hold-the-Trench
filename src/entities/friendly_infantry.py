@@ -19,7 +19,7 @@ from config import (
     INFANTRY_ANIM_FRAME_S,
     INFANTRY_AIM_POSE_S,
 )
-from entities.armor import ArmorUnit
+from entities.tank import ArmorUnit
 from entities.bullet import Bullet
 from entities.damage import FlooredDamage
 from graphics import render_mode
