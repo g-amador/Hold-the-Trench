@@ -15,8 +15,9 @@ mixer). Four behaviors, all user requests:
   assault_phase's transitions and factions.dominant_unit_nation).
 - The battle's FIRST shot from ANY source (infantry, MG nest,
   tank, plane, artillery — either side) starts ONE war background
-  noise file, picked at random (WAR_NOISE_SOUNDS); later shots add
-  nothing.
+  noise file, picked at random (WAR_NOISE_SOUNDS), LOOPING until
+  the battle ends (an end theme or the menu loop replaces it);
+  later shots add nothing.
 
 Everything is a safe no-op when the mixer is unavailable (no audio
 device, exotic sandboxes): the game never crashes on sound. Music and
@@ -134,16 +135,20 @@ def play_war_noise():
     The battle state calls this exactly once, when the FIRST shot from
     any source (infantry, MG nest, tank, plane, artillery — either
     side) fires. The file is picked at random from WAR_NOISE_SOUNDS
-    and runs through the single music stream (mp3 capable, same stream
-    as the themes — an end-screen theme simply replaces it, and battle
-    entry's stop_menu_audio cuts it like any other music).
+    and LOOPS (user: "background sound... should play in loop") on
+    the single music stream (mp3 capable, same stream as the themes)
+    until the battle ends — an end-screen theme simply replaces it,
+    the menu loop takes over on menu entry, and battle entry's
+    stop_menu_audio cuts it like any other music.
     """
     if not WAR_NOISE_SOUNDS or not _ensure_mixer():
         return
     filename = random.choice(WAR_NOISE_SOUNDS)
     try:
         pygame.mixer.music.load(_sound_path(filename))
-        pygame.mixer.music.play(0)
+        # loops=-1: loop until an end theme / the menu loop / battle
+        # entry's stop replaces the single music stream.
+        pygame.mixer.music.play(-1)
     except (pygame.error, FileNotFoundError):
         pass
 
