@@ -93,10 +93,10 @@ BUILD_COSTS = {
     "air_field": 200,
     "tank_factory": 150,
 
-    "enemy_mg": 0, #30
+    "enemy_mg": 10, #30
     "enemy_bunker": 0,
     "enemy_barracks": 0, #60
-    "enemy_artillery": 0, #80
+    "enemy_artillery": 10, #80
     "enemy_air_field": 10, #200
     "enemy_tank_factory": 10, #150
 }
@@ -122,17 +122,42 @@ INFANTRY_HP = 40
 INFANTRY_SPEED = 120
 INFANTRY_GOLD_DROP = 5
 
-# Infantry ranged/siege gear (mirrored both sides):
-INFANTRY_SHOOT_COOLDOWN = 1.2
+# Infantry ranged/siege gear:
 INFANTRY_SHOOT_RANGE_PX = 200
 ENEMY_SIEGE_DAMAGE = 10
 ENEMY_SIEGE_COOLDOWN = 1.0
+FRIENDLY_SIEGE_DAMAGE = 10
+FRIENDLY_SIEGE_COOLDOWN = 1.0
 # Per-shot rifle damage (matches Bullet's default 20).
 INFANTRY_BULLET_DAMAGE = 20
 
-# Player's auto-fire trigger cadence (s between shots; faster than the
-# spawning infantry because the player aims at one closest target).
-PLAYER_SHOOT_COOLDOWN = 0.25
+# WWI-standard rifle firing rate per ARMY (rounds per minute), used by
+# both sides' rifle infantry:
+#   fr  -> France, Lebel Mle 1886/93:  43 rounds/min
+#   ger -> Germany, Gewehr 98:         15 rounds/min
+RIFLE_ROUNDS_PER_MIN = {
+    "fr": 43,
+    "ger": 15,
+}
+# Fallback cadence for a nation missing from the table (rounds/min).
+RIFLE_ROUNDS_PER_MIN_DEFAULT = 20
+# Seconds between rifle shots = 60 / rpm, derived from the table.
+RIFLE_SHOOT_COOLDOWN_S = {
+    nation: 60.0 / rpm for nation, rpm in RIFLE_ROUNDS_PER_MIN.items()
+}
+RIFLE_SHOOT_COOLDOWN_S_DEFAULT = 60.0 / RIFLE_ROUNDS_PER_MIN_DEFAULT
+
+
+def rifle_shoot_cooldown(nation):
+    """Seconds between rifle shots for a nation's standard rifle."""
+    return RIFLE_SHOOT_COOLDOWN_S.get(nation, RIFLE_SHOOT_COOLDOWN_S_DEFAULT)
+
+# Distance (in TILES, measured to the bunker's WALL — utils/geometry)
+# at which rifle infantry stop charging and OPEN FIRE on an enemy
+# bunker (user: "when the distance is 1 square apart from enemy bunker
+# shoot it"). Beyond it they charge; at it they stand and shoot at the
+# rifle rate.
+INFANTRY_BUNKER_SHOOT_TILES = 1
 
 # Shared soldier animation timing, identical across the player and
 # BOTH, enemy/friendly spawning infantry (run-cycle frame length and

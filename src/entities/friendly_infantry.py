@@ -1,9 +1,12 @@
 """
 Friendly infantry spawned from barracks.
 
-Homes onto the nearest enemy, engages in melee, kills exactly one
-enemy and dies. The one-kill design keeps fights perfectly
-symmetrical with enemy melee (both sides lose one unit per clash).
+Homes onto the nearest target — enemy infantry and the enemy bunker
+compete by PROXIMITY (user rule: infantry prioritize enemy infantry,
+the bunker only when it is nearer than any enemy infantry), engages
+in melee with infantry, sieges the bunker. The one-kill design keeps
+infantry fights perfectly symmetrical with enemy melee (both sides
+lose one unit per clash).
 """
 
 import math
@@ -11,14 +14,19 @@ import pygame
 
 from config import (
     BLUE,
+    TILE_SIZE,
     INFANTRY_SPEED,
     INFANTRY_HP,
-    INFANTRY_SHOOT_COOLDOWN,
     INFANTRY_SHOOT_RANGE_PX,
     INFANTRY_BULLET_DAMAGE,
+    FRIENDLY_SIEGE_DAMAGE,
+    FRIENDLY_SIEGE_COOLDOWN,
+    INFANTRY_BUNKER_SHOOT_TILES,
+    rifle_shoot_cooldown,
     INFANTRY_ANIM_FRAME_S,
     INFANTRY_AIM_POSE_S,
 )
+from utils.geometry import distance_to_rect
 from entities.tank import ArmorUnit
 from entities.bullet import Bullet
 from entities.damage import FlooredDamage
@@ -55,10 +63,19 @@ class FriendlyInfantry(FlooredDamage):
         # off a single clash.
         self.kill_count = 0
 
-        # Ranged fire: cooldown gates shots; the aim-pose timer plays
-        # on every pull (see update).
-        self.shoot_cooldown = INFANTRY_SHOOT_COOLDOWN
+        # Ranged fire: cooldown gates shots (the nation's WWI rifle
+        # rate from config — fr Lebel 43 rpm, ger Gewehr 98 15 rpm);
+        # the aim-pose timer plays on every pull (see update).
+        self.shoot_cooldown = rifle_shoot_cooldown(self.nation)
         self.shoot_timer = 0.0
+
+        # Siege stats (used when the enemy BUNKER is the nearest
+        # target): swing on a fixed cadence against the wall, mirror
+        # of EnemyInfantry's assault on the player bunker. Timer
+        # starts at 0 so the first contact strike lands immediately.
+        self.attack_damage = FRIENDLY_SIEGE_DAMAGE
+        self.attack_cooldown = FRIENDLY_SIEGE_COOLDOWN
+        self.attack_timer = 0.0
 
         # Standard infantry frames; None means missing assets (block fallback).
         # size=(width, height): the 1088x976 full-body sources scale to
@@ -91,13 +108,18 @@ class FriendlyInfantry(FlooredDamage):
         self.shoot_animation_timer = 0.0
         self.shoot_animation_duration = INFANTRY_AIM_POSE_S
 
-    def update(self, dt, enemies, bullets=None):
-        """Hunt the nearest enemy: shoot at range, finish in melee.
+    def update(self, dt, enemies, bullets=None, enemy_bunker=None):
+        """Hunt the nearest target (infantry or bunker, by proximity),
+        shoot at range, finish infantry in melee, siege the bunker.
 
         `bullets` is the side's bullet list from the battle state; real
-        shots only happen when it is passed. MIXED FIGHT MODEL: bullets
-        weaken targets at range; contact still resolves as the 1:1
-        melee exchange below.
+        shots only happen when it is passed. TARGET RULE (user): enemy
+        infantry and the enemy bunker compete by PROXIMITY — the
+        bunker is attacked when it is nearer than any enemy infantry
+        (i.e. no infantry nearby), otherwise the nearest infantry is.
+        MIXED FIGHT MODEL: bullets weaken infantry at range; contact
+        with infantry resolves as the 1:1 melee exchange below; the
+        bunker is fired on from one square away (no suicide trade).
         """
         if self.dead:
             return
@@ -105,26 +127,101 @@ class FriendlyInfantry(FlooredDamage):
         # Ranged fire cooldown ticks every frame, whichever path runs.
         self.shoot_timer = max(0.0, self.shoot_timer - dt / 1000)
 
-        # Nearest-target selection: single-priority homing, no formation.
+        # Nearest-target selection: enemy infantry and the enemy
+        # bunker in ONE pool, nearest wins (distances measured
+        # center-to-center so the bunker's bigger box compares fairly
+        # against the 24px soldiers). Armor is ignored: infantry can
+        # never scratch armor (only artillery splash and tank shells
+        # can), so they don't charge tanks either.
         target = None
         best_dist = None
 
         for enemy in enemies:
             if enemy.dead:
                 continue
-            # Armored targets are ignored: infantry can never scratch
-            # armor (only artillery splash and tank shells can), so
-            # they don't charge tanks either.
             if isinstance(enemy, ArmorUnit):
                 continue
-            dist = math.hypot(enemy.x - self.x, enemy.y - self.y)
+            dist = math.hypot(
+                enemy.x + enemy.width / 2 - self.x,
+                enemy.y + enemy.height / 2 - self.y,
+            )
             if best_dist is None or dist < best_dist:
                 best_dist = dist
                 target = enemy
 
-        # No enemies left: stop and drop the run animation frame.
+        bunker_alive = (
+            enemy_bunker is not None and not enemy_bunker.is_destroyed()
+        )
+        if bunker_alive:
+            bx = enemy_bunker.x + enemy_bunker.width / 2
+            by = enemy_bunker.y + enemy_bunker.height / 2
+            dist = math.hypot(bx - self.x, by - self.y)
+            if best_dist is None or dist < best_dist:
+                target = enemy_bunker
+
+        # Nothing to fight at all: stop and drop the run animation
+        # frame.
         if target is None:
             self.is_moving = False
+            return
+
+        # The bunker won the proximity race: charge it and OPEN FIRE
+        # from one square away (user rule); NO suicide trade (the 1:1
+        # melee is infantry-only). Rifle bullets at the wall are
+        # resolved by the state's friendly-bullet loop.
+        if bunker_alive and target is enemy_bunker:
+            # Aim vector runs from the unit's body center to the
+            # bunker's center; wall proximity uses the rect edge.
+            dx = bx - (self.x + self.width / 2)
+            dy = by - (self.y + self.height / 2)
+            length = math.hypot(dx, dy)
+            bunker_rect = enemy_bunker.get_hitbox()
+            wall_dist = distance_to_rect(
+                bunker_rect, self.x + self.width / 2, self.y + self.height / 2,
+            )
+
+            if wall_dist <= INFANTRY_BUNKER_SHOOT_TILES * TILE_SIZE:
+                # Within one square of the wall: stop and shoot the
+                # bunker on the rifle rate. The cone check is skipped —
+                # the bunker IS the target and the soldier is facing it.
+                self.is_moving = False
+                self.run_frame = 0
+                self.facing = 1 if dx > 0 else -1
+
+                if bullets is None:
+                    # Callers that did not opt into real firing keep
+                    # the legacy contact swing so behavior sims still
+                    # bite (round-21's siege model).
+                    self.attack_timer -= dt / 1000
+                    if self.attack_timer <= 0:
+                        self.attack_timer = self.attack_cooldown
+                        enemy_bunker.take_damage(self.attack_damage)
+                        self.shoot_animation_timer = (
+                            self.shoot_animation_duration
+                        )
+                elif length > 0:
+                    self._fire(dx / length, dy / length, bullets)
+            else:
+                # Face and walk the direct line toward the wall.
+                self.facing = 1 if dx > 0 else -1
+                self.is_moving = True
+                if length > 0:
+                    self.x += (dx / length) * self.speed * dt / 1000
+                    self.y += (dy / length) * self.speed * dt / 1000
+
+            # Same animation cadence as the hunt path while charging.
+            if self.is_moving:
+                self.run_timer += dt / 1000
+                while self.run_timer >= self.run_frame_duration:
+                    self.run_timer -= self.run_frame_duration
+                    self.run_frame = (
+                        (self.run_frame + 1) % len(self.frames_run)
+                    )
+            else:
+                self.run_frame = 0
+            self.shoot_animation_timer = max(
+                0, self.shoot_animation_timer - dt / 1000
+            )
             return
 
         dx = target.x - self.x

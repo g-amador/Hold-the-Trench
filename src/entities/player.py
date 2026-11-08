@@ -14,7 +14,7 @@ from config import (
     TILE_SIZE,
     BLUE,
     INFANTRY_SPEED,
-    PLAYER_SHOOT_COOLDOWN,
+    rifle_shoot_cooldown,
     INFANTRY_ANIM_FRAME_S,
     INFANTRY_AIM_POSE_S,
 )
@@ -67,9 +67,12 @@ class Player:
         prefix, self.nation = unit_prefix(faction)
 
         # Shooting: a cooldown gates auto-fire, and a short timer keeps
-        # the aim pose on screen after each shot (cadence in config —
-        # the player's is faster than spawning infantry's on purpose).
-        self.shoot_cooldown = PLAYER_SHOOT_COOLDOWN
+        # the aim pose on screen after each shot. The player is rifle
+        # infantry too — the cadence is the ROLLED NATION's WWI rifle
+        # from config's per-army table (fr Lebel ~1.4 s, ger Gewehr 98
+        # 4.0 s; round-22 user: the player joins the rifle table).
+        self.shoot_cooldown = rifle_shoot_cooldown(self.nation)
+        self.shoot_timer = 0
         self.shoot_timer = 0
 
         # Standard infantry frames; None means missing assets (block fallback).

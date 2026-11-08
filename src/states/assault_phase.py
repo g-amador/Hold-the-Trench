@@ -660,8 +660,10 @@ class AssaultPhase:
             apply_enemy_damage,
         )
 
-        # Enemy infantry fights friendly infantry in melee. When no
-        # friendlies remain, EnemyInfantry sieges player_bunker instead.
+        # Enemy infantry fights friendly infantry in melee. TARGET
+        # RULE (round-21): the player bunker competes by PROXIMITY —
+        # sieged when it is nearer than any living friendly (which
+        # includes the no-friendlies-left case).
         player_bunker = player_bunkers[0] if player_bunkers else None
 
         for enemy in self.enemy_barracks_units:
@@ -686,9 +688,21 @@ class AssaultPhase:
             if not enemy.dead
         ]
 
-        # Friendly infantry fights enemy infantry in melee + ranged.
+        # Friendly infantry fights enemy infantry in ranged + melee.
+        # TARGET RULE (user): the enemy bunker competes by proximity —
+        # attacked when it is nearer than any enemy infantry.
+        enemy_bunker = enemy_bunkers[0] if enemy_bunkers else None
         for friendly in self.friendlies:
-            friendly.update(dt, self.enemy_barracks_units, self.bullets)
+            if isinstance(friendly, ArmorUnit):
+                # Tanks keep EXACTLY the pre-existing call shape (this
+                # loop's accidental buildings=None tick); the bunker
+                # arg is infantry-only (a Bunker object must never land
+                # in ArmorUnit.update's buildings list slot).
+                friendly.update(dt, self.enemy_barracks_units, self.bullets)
+                continue
+            friendly.update(
+                dt, self.enemy_barracks_units, self.bullets, enemy_bunker,
+            )
 
         self.friendlies = [
             friendly for friendly in self.friendlies

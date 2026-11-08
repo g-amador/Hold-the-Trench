@@ -12,17 +12,20 @@ import pygame
 
 from config import (
     RED,
+    TILE_SIZE,
     INFANTRY_SPEED,
     INFANTRY_HP,
     INFANTRY_GOLD_DROP,
-    INFANTRY_SHOOT_COOLDOWN,
     INFANTRY_SHOOT_RANGE_PX,
     INFANTRY_BULLET_DAMAGE,
     ENEMY_SIEGE_DAMAGE,
     ENEMY_SIEGE_COOLDOWN,
+    INFANTRY_BUNKER_SHOOT_TILES,
+    rifle_shoot_cooldown,
     INFANTRY_ANIM_FRAME_S,
     INFANTRY_AIM_POSE_S,
 )
+from utils.geometry import distance_to_rect
 from entities.tank import ArmorUnit
 from entities.bullet import Bullet
 from entities.damage import RawSubtractDamage
@@ -118,7 +121,9 @@ class EnemyBase(RawSubtractDamage):
         return None
     
 class EnemyInfantry(EnemyBase):
-    """Rifle infantry: homes onto the nearest friendly; the clash is mutually lethal."""
+    """Rifle infantry: homes onto the NEAREST target — living friendly
+    or the player bunker, whichever is closer (bunker prioritized only
+    when no friendly is nearby); the infantry clash is mutually lethal."""
 
     def __init__(self, x, y, faction="axis", nation=None):
         # Side-picked soldier art: nation comes from the faction pool
@@ -160,9 +165,11 @@ class EnemyInfantry(EnemyBase):
         self.attack_cooldown = ENEMY_SIEGE_COOLDOWN
         self.attack_timer = 0.0
 
-        # Ranged fire against friendlies in range, on cooldown; mirrors
-        # FriendlyInfantry so ranged fights resolve the same both ways.
-        self.shoot_cooldown = INFANTRY_SHOOT_COOLDOWN
+        # Ranged fire against friendlies in range, on the nation's
+        # WWI rifle rate from config (ger Gewehr 98 15 rpm, fr Lebel
+        # 43 rpm); mirrors FriendlyInfantry so ranged fights resolve
+        # the same both ways.
+        self.shoot_cooldown = rifle_shoot_cooldown(self.nation)
         self.shoot_timer = 0.0
 
         # Standard infantry frames; None means missing assets (block fallback).
@@ -197,13 +204,15 @@ class EnemyInfantry(EnemyBase):
         self.shoot_animation_duration = INFANTRY_AIM_POSE_S
 
     def update(self, dt, friendlies, bullets=None, player_bunker=None):
-        """Hunt a friendly, shoot at range, fight on contact; siege the
-        bunker when none remain.
+        """Hunt the nearest target (friendly or bunker, by proximity),
+        shoot at range, melee friendlies on contact, siege the bunker.
 
         `bullets` is the side's bullet list from the battle state; real
-        shots only happen when it is passed. Priority order: nearest
-        living friendly first; when there are no friendlies left,
-        charge and attack the player bunker.
+        shots only happen when it is passed. TARGET RULE (user, mirror
+        of the friendly side): living friendlies and the player bunker
+        compete by PROXIMITY — the bunker is attacked when it is
+        nearer than any living friendly (i.e. no friendlies nearby),
+        otherwise the nearest friendly is.
         """
         if self.dead: return
 
@@ -223,10 +232,90 @@ class EnemyInfantry(EnemyBase):
             if not f.dead and not isinstance(f, ArmorUnit)
         ]
 
-        if living_friendlies:
-            # Nearest living friendly is the single target priority
-            # (no formation behavior).
-            target = min(living_friendlies, key=lambda f: math.hypot(f.x - self.x, f.y - self.y))
+        # Target selection: nearest living friendly (center-to-center,
+        # matching the bunker measurement) vs the player bunker — the
+        # nearer of the two wins the pool.
+        target = None
+        target_dist = None
+        for f in living_friendlies:
+            dist = math.hypot(
+                f.x + f.width / 2 - self.x,
+                f.y + f.height / 2 - self.y,
+            )
+            if target_dist is None or dist < target_dist:
+                target = f
+                target_dist = dist
+
+        bunker_alive = (
+            player_bunker is not None and not player_bunker.is_destroyed()
+        )
+        if bunker_alive:
+            bunker_dist = math.hypot(
+                player_bunker.x + player_bunker.width / 2 - self.x,
+                player_bunker.y + player_bunker.height / 2 - self.y,
+            )
+            if target_dist is None or bunker_dist < target_dist:
+                target = player_bunker
+
+        # The player bunker won the proximity race: charge it and
+        # OPEN FIRE from one square away (user rule, mirror of the
+        # friendly side; this used to be the no-friendlies fallback).
+        if bunker_alive and target is player_bunker:
+            # Aim vector from the unit's body center to the bunker's
+            # center; wall proximity uses the rect edge.
+            bx = player_bunker.x + player_bunker.width / 2
+            by = player_bunker.y + player_bunker.height / 2
+            dx = bx - (self.x + self.width / 2)
+            dy = by - (self.y + self.height / 2)
+            length = math.hypot(dx, dy)
+            bunker_rect = player_bunker.get_hitbox()
+            wall_dist = distance_to_rect(
+                bunker_rect, self.x + self.width / 2, self.y + self.height / 2,
+            )
+
+            if wall_dist <= INFANTRY_BUNKER_SHOOT_TILES * TILE_SIZE:
+                # Within one square of the wall: stop and shoot the
+                # bunker on the rifle rate (the cone check is skipped —
+                # the bunker IS the target). Callers that did not opt
+                # into real firing (bullets=None) keep the legacy
+                # contact swing so behavior sims still bite.
+                self.is_moving = False
+                self.run_frame = 0
+                self.facing = 1 if dx > 0 else -1
+
+                if bullets is None:
+                    self.attack_timer -= dt / 1000
+                    if self.attack_timer <= 0:
+                        self.attack_timer = self.attack_cooldown
+                        player_bunker.take_damage(self.attack_damage)
+                        self.shoot_animation_timer = (
+                            self.shoot_animation_duration
+                        )
+                elif length > 0:
+                    self._fire(dx / length, dy / length, bullets)
+            else:
+                # Charge movement: walk the direct line to the wall,
+                # facing it so the art reads correctly on approach.
+                self.facing = 1 if dx > 0 else -1
+                self.is_moving = True
+                if length > 0:
+                    self.x += (dx / length) * move_amount
+                    self.y += (dy / length) * move_amount
+
+            # Same run-cycle cadence as the hunt path while charging.
+            self.run_timer += dt / 1000
+            while self.run_timer >= self.run_frame_duration:
+                self.run_timer -= self.run_frame_duration
+                self.run_frame = (self.run_frame + 1) % len(self.frames_run)
+            self.shoot_animation_timer = max(
+                0,
+                self.shoot_animation_timer - dt / 1000,
+            )
+            return
+
+        # Nearest living friendly is the target when it beats the
+        # bunker in the pool (no formation behavior).
+        if target is not None:
             dx, dy = target.x - self.x, target.y - self.y
             dist = math.hypot(dx, dy)
 
@@ -271,47 +360,6 @@ class EnemyInfantry(EnemyBase):
                 target.hp -= self.hp
                 target.dead = target.hp <= 0
                 self.take_damage(self.hp)
-            return
-
-        # No friendly unit left to fight: siege the player bunker.
-        if player_bunker is not None and not player_bunker.is_destroyed():
-            # Aim at the bunker's center: its hitbox sticks up from the
-            # anchor tile, so walking to the center reaches the wall.
-            bx = player_bunker.x + player_bunker.width / 2
-            by = player_bunker.y + player_bunker.height / 2
-            dx, dy = bx - self.x, by - self.y
-            dist = math.hypot(dx, dy)
-
-            # In contact: stop advancing (the siege reads as attackers
-            # pressed against the wall, not marching through it) and
-            # swing on a fixed cadence; the rifle pose marks the hits.
-            if self.get_hitbox().colliderect(player_bunker.get_hitbox()):
-                self.is_moving = False
-                self.run_frame = 0
-
-                self.attack_timer -= dt / 1000
-                if self.attack_timer <= 0:
-                    self.attack_timer = self.attack_cooldown
-                    player_bunker.take_damage(self.attack_damage)
-                    self.shoot_animation_timer = self.shoot_animation_duration
-                return
-
-            # Charge movement: walk the direct line to the bunker,
-            # facing it so the art reads correctly on approach.
-            self.facing = 1 if dx > 0 else -1
-            if dist > 0:
-                self.x += (dx / dist) * move_amount
-                self.y += (dy / dist) * move_amount
-
-            # Same run-cycle cadence as the hunt path while charging.
-            self.run_timer += dt / 1000
-            while self.run_timer >= self.run_frame_duration:
-                self.run_timer -= self.run_frame_duration
-                self.run_frame = (self.run_frame + 1) % len(self.frames_run)
-            self.shoot_animation_timer = max(
-                0,
-                self.shoot_animation_timer - dt / 1000,
-            )
             return
 
         # Nothing alive to fight and no bunker to siege (bunker already
