@@ -1,4 +1,6 @@
 -> beta
+Artilery, Buildings, and tanks if destroyed (by tanks or plane bombs) should dissaper from the map.
+
 Tanks
 - Spawn west of the factory, toward enemy trenches. Use WWI-inspired production rates, with longer production times for German tanks.
 - Scale movement to map size. Target the nearest enemy infantry, MG, or building; turn toward a closer valid target. Stop only when none remain.
@@ -8,8 +10,13 @@ Tanks
 - `tank_fr_male`: 37 mm guns. `tank_fr_female`: Hotchkiss/Reibel machine guns. Assign weapons by sprite variant.
 - For side with male and female variant tank both should be generated at the time randomly. 
 So in a battle it's possible that both are generated at least once.
-- Tanks should avoid buildings by rule never collide with them.
-- Infantry should avoid tanks, if a tank passes by infantry the infantry should be killed as if squished.
+- Tanks should avoid buildings by rule never colliding with them.
+- If a tank passes by infantry the infantry should be killed as if squished.
+- Tanks from the same side as the infantry should be avoided by each other. Meaning that enemy tanks 
+should not squish enemy infantry and vice versa for alied tanks and alied infantry.
+- Note that french tanks can rotate their turrents and therefore shoot in any direction.
+- German tanks can only shoot infantry above bellow and behind them. Their cannon can also only shoot 
+targets in front of it.
 
 Planes
 - Use approximate WWI cyclic machine-gun rates: France—Vickers, 450–600 rounds/min; Germany—Spandau lMG 08/15, 400–500 rounds/min.
