@@ -96,7 +96,7 @@ BUILD_COSTS = {
     "enemy_mg": 10, #30
     "enemy_bunker": 0,
     "enemy_barracks": 0, #60
-    "enemy_artillery": 10, #80
+    "enemy_artillery": 0, #80
     "enemy_air_field": 10, #200
     "enemy_tank_factory": 10, #150
 }
@@ -250,6 +250,22 @@ BARRACKS_FORMATION_ACROSS = 4
 # user-tuned map pattern, not a unit stat.
 ARTILLERY_FIRE_INTERVAL = 1.5
 ARTILLERY_SPLASH_DAMAGE = 20
+# LETHAL zone (user: "an artillery explosion red dot should kill any
+# infantry in a 5x5 tile radius considering the dot at its center"):
+# any standing INFANTRY whose body center lies within this MANY-TILES
+# square centered on the red dot's center dies outright (span 3 -> a
+# 5x5 tile box, +-1.5 tiles from the dot). Armor is NOT instakilled —
+# it keeps taking its ARTILLERY_SPLASH_DAMAGE chip (rifles can't hurt
+# it; only splash/shells can).
+ARTILLERY_KILL_SPAN_TILES = 5
+
+# GOD MODE (user: "In god mode I can't be killed, with god mode to off
+# shells can kill the player"): True = the player is INVINCIBLE — no
+# artillery blast can kill them. False = the player is mortal: enemy
+# AND own shells that land with his body center inside the red dot's
+# 5x5 tile kill zone kill him, and a dead player ends the battle in
+# defeat (his command unit is gone).
+GOD_MODE = True
 
 # On-board machine guns ("shoot as machine guns"): the tank's gun
 # matches the MG-nest range; damage is bigger per hit, fired slower.

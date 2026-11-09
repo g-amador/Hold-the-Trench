@@ -29,8 +29,10 @@ from config import (
     footprint_for,
     ARTILLERY_FIRE_INTERVAL,
     ARTILLERY_SPLASH_DAMAGE,
+    ARTILLERY_KILL_SPAN_TILES,
 )
 from entities.damage import FlooredDamage
+from entities.tank import ArmorUnit
 from graphics import render_mode
 from graphics.block_drawer import draw_unit_block
 from systems.factions import (
@@ -143,16 +145,19 @@ class Artillery(FlooredDamage):
             self.height,
         )
 
-    def update(self, dt, enemies, bullets):
+    def update(self, dt, enemies, bullets, own_side=None):
         """Shell one random unused tile in the no-man's-land band.
 
         Sequence (user quick-dirty illustration): the shot lights a
         small YELLOW muzzle flash in front of the gun; the shell flies for
         `SHELL_DELAY` seconds; then the red blast pops on the impact
         tile and the splash applies. `enemies` is the opposing unit
-        list passed by the battle state; anything standing on the
-        impact tile or its 8 neighbours takes the splash damage at
-        LANDING time (the live list — never a stale snapshot).
+        list passed by the battle state; anything standing within the
+        dot-centered 5x5 tile kill zone dies OUTRIGHT at LANDING time
+        (the live list — never a stale snapshot); armor keeps its
+        splash chip. `own_side`, when passed (round: "kill any
+        infantry" — the gun sees BOTH sides), adds the shooter's own
+        infantry list: artillery kills its own men in the zone too.
         `bullets` is kept for signature compatibility (shells are
         instant, none are flown). A destroyed gun stands down
         entirely.
@@ -182,7 +187,7 @@ class Artillery(FlooredDamage):
             landed = [e for e in self.pending if e[2] <= 0]
             self.pending = [e for e in self.pending if e[2] > 0]
             for col, row, _t in landed:
-                self._land_shell(col, row, enemies)
+                self._land_shell(col, row, enemies, own_side)
 
         # Reload gate: no shots until the cooldown drains to 0.
         self.cooldown -= dt / 1000
@@ -219,27 +224,44 @@ class Artillery(FlooredDamage):
 
         self.cooldown = self.fire_rate
 
-    def _land_shell(self, col, row, enemies):
-        """Shell touchdown: red blast marker + splash damage."""
+    def _land_shell(self, col, row, enemies, own_side=None):
+        """Shell touchdown: red blast marker + dot-centered kill zone."""
         # Blast marker: brief red flash at the tile's center.
         ix = col * TILE_SIZE + TILE_SIZE / 2
         iy = row * TILE_SIZE + TILE_SIZE / 2
         self.impacts.append([ix, iy, self.DOT_TIME])
 
-        # Damage per shell, scaled by this gun's nation's ARTILLERY
-        # handicap (fr / ger — factions
-        # table).
+        # Splash chip for armor, scaled by this gun's nation's
+        # ARTILLERY handicap (fr / ger — factions table).
         damage = scaled_damage(self.nation, "artillery", ARTILLERY_SPLASH_DAMAGE)
 
-        # Splash: hit tile + its 8 neighbours; damage any standing
-        # unit regardless of side ("any unit", user choice).
-        for unit in enemies:
-            if unit.dead:
+        # LETHAL ZONE (user: the red dot should kill any infantry in a
+        # 5x5 tile radius, dot at its center): the box spans +-1.5
+        # tiles around the DOT's CENTER; a body center inside dies
+        # outright. The old rule (impact tile + 8 neighbours by
+        # top-left corner, 20 damage) is retired — a direct hit never
+        # even wounded an infantry to death before.
+        kill_half = ARTILLERY_KILL_SPAN_TILES / 2 * TILE_SIZE
+
+        # Both sides burn in the bowl: the opposing list always, the
+        # shooter's own infantry when the state passes it (friendly
+        # fire is real — "any infantry", user choice).
+        for unit in list(enemies) + list(own_side or ()):
+            # Duck-typed: the player (god-off = mortal) has no .dead
+            # until a shell kills him.
+            if getattr(unit, "dead", False):
                 continue
-            uc = int(unit.x // TILE_SIZE)
-            ur = int(unit.y // TILE_SIZE)
-            if abs(uc - col) <= 1 and abs(ur - row) <= 1:
+            if (abs(unit.x + unit.width / 2 - ix) > kill_half
+                    or abs(unit.y + unit.height / 2 - iy) > kill_half):
+                continue
+            if isinstance(unit, ArmorUnit):
+                # Armor is never instakilled by the blast — it keeps
+                # taking its splash chip (only artillery splash and
+                # tank shells can hurt armor at all).
                 unit.take_damage(damage)
+            else:
+                unit.hp = 0
+                unit.dead = True
 
     def _pick_impact_tile(self):
         """Pick a random UNUSED (col, row) in this gun's barrage band.

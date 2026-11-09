@@ -49,6 +49,7 @@ from config import (
     SCREEN_HEIGHT,
     TILE_SIZE,
     HUD_BAR_HEIGHT,
+    GOD_MODE,
     WHITE,
     RED,
     YELLOW,
@@ -731,6 +732,22 @@ class AssaultPhase:
                     building.update(dt, self.enemy_barracks_units)
                 elif isinstance(building, AirField):
                     building.update(dt, self.enemy_planes)
+                elif isinstance(building, Artillery):
+                    # Artillery sees BOTH sides' infantry: the kill
+                    # zone is side-blind ("any infantry", user) — its
+                    # own men standing in the zone die to their own
+                    # barrage too. GOD MODE OFF: the player's body
+                    # joins the sweep list (a fresh list — the state's
+                    # real lists are never mutated).
+                    gun_units = list(self.friendlies)
+                    if not GOD_MODE:
+                        gun_units.append(self.player)
+                    building.update(
+                        dt,
+                        gun_units,
+                        self.enemy_bullets,
+                        self.enemy_barracks_units,
+                    )
                 else:
                     building.update(dt, self.friendlies, self.enemy_bullets)
             else:
@@ -738,8 +755,20 @@ class AssaultPhase:
                     building.update(dt, self.friendlies)
                 elif isinstance(building, AirField):
                     building.update(dt, self.friendly_planes)
+                elif isinstance(building, Artillery):
+                    gun_units = list(self.enemy_barracks_units)
+                    if not GOD_MODE:
+                        gun_units.append(self.player)
+                    building.update(
+                        dt,
+                        gun_units,
+                        self.bullets,
+                        self.friendlies,
+                    )
                 else:
-                    building.update(dt, self.enemy_barracks_units, self.bullets)
+                    building.update(
+                        dt, self.enemy_barracks_units, self.bullets
+                    )
 
         # Factory armor: tanks drive toward the enemy base and hunt
         # with their hull MG. A tank stops when an enemy building is
@@ -858,9 +887,14 @@ class AssaultPhase:
         # the enemy nation that held the map at that moment (user
         # rule: the enemy nation's theme, keyed by the enemy units'
         # nations).
-        if player_bunkers and all(
-            bunker.is_destroyed() for bunker in player_bunkers
-        ):            
+        # GOD MODE OFF: the same fate applies to the PLAYER HIMSELF —
+        # a shell that kills him (his body inside the red dot's kill
+        # zone) ends the battle in defeat too (his command unit is
+        # gone; the flag is set by Artillery's sweep).
+        if (not GOD_MODE and getattr(self.player, "dead", False)) or (
+            player_bunkers
+            and all(bunker.is_destroyed() for bunker in player_bunkers)
+        ):
             self.game.state = GameOverState(
                 self.game,
                 theme_nation=dominant_unit_nation(
