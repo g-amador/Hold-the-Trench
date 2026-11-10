@@ -177,12 +177,28 @@ PLANE_SPEED = 140
 PLANE_SIZE = (96, 96)      # world px box (art scales to it)
 PLANE_MG_RANGE = 200
 PLANE_MG_DAMAGE = 10
-PLANE_MG_FIRE_RATE = 0.4
+PLANE_MG_FIRE_RATE = 0.4   # generic fallback seconds (unlisted nation)
 PLANE_BOMB_DAMAGE = 35
 PLANE_BOMB_COOLDOWN = 3.0
 # "Over them" = the plane's center is this close to the target's
 # center when the bomb is released (proximity only, no aim).
 PLANE_BOMB_TRIGGER_PX = 40
+
+# WWI cyclic dogfight rates (user spec), keyed by NATION: France's
+# Vickers c. 450-600 rounds/min; Germany's Spandau lMG 08/15 c.
+# 400-500 rounds/min. Midpoints sit in the table (bands above are the
+# historical spread); AirplaneUnit turns rpm into its fire interval
+# (60 / rpm). A nation not listed keeps the generic rate above.
+PLANE_MG_ROUNDS_PER_MIN = {
+    "fr": 525,   # Vickers (450-600 rpm band)
+    "ger": 450,  # Spandau lMG 08/15 (400-500 rpm band)
+}
+
+# Plane bomb visuals (user spec): the released bomb is a small YELLOW
+# dot in flight; on impact a RED flash appears briefly and the damage
+# lands THEN (on touch-down, not on release).
+PLANE_BOMB_FLIGHT_TIME = 0.6    # seconds the bomb is airborne
+PLANE_BOMB_IMPACT_TIME = 0.5    # seconds the red blast stays visible
 
 # ---------------- Building hp ----------------
 # Buildings are destructible now (tanks shell them, planes bomb them).

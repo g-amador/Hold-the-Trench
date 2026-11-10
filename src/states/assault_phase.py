@@ -818,16 +818,17 @@ class AssaultPhase:
                 )
 
         # Planes fly (no ground logic): friendly planes hunt the
-        # enemy's armor + buildings + planes; enemy planes mirror.
-        # Ground target list = enemy armor (tanks) + enemy
-        # buildings, nearest-first inside the plane itself.
+        # enemy's units + buildings + planes; enemy planes mirror.
+        # Ground target list = live enemy units (tanks AND infantry,
+        # user rule: planes attack infantry too) + enemy buildings,
+        # nearest-first inside the plane itself. Bombs hit whatever is
+        # under the plane; infantry lists are dead-filtered below, so
+        # planes re-pick the next nearest target automatically.
         enemy_ground = [
-            unit for unit in self.enemy_barracks_units
-            if isinstance(unit, ArmorUnit) and not unit.dead
+            unit for unit in self.enemy_barracks_units if not unit.dead
         ] + enemy_buildings
         friendly_ground = [
-            unit for unit in self.friendlies
-            if isinstance(unit, ArmorUnit) and not unit.dead
+            unit for unit in self.friendlies if not unit.dead
         ] + player_buildings
 
         for plane in list(self.friendly_planes):
@@ -1247,6 +1248,28 @@ class AssaultPhase:
                         7,
                     )
             for ix, iy, _ttl in building.impacts:
+                if in_view(ix, iy):
+                    pygame.draw.circle(
+                        world,
+                        RED,
+                        (int(ix - self.camera_x), int(iy)),
+                        8,
+                    )
+
+        # Plane bombs mirror artillery's marker rules (user spec): a
+        # small YELLOW dot while the bomb is in flight, a brief RED
+        # flash where it lands. Positions are the MARKER's own world
+        # coordinates, so both show even when their plane is culled.
+        for plane in self.enemy_planes + self.friendly_planes:
+            for bx, by, _ttl, _entity in plane.pending_bombs:
+                if in_view(bx, by):
+                    pygame.draw.circle(
+                        world,
+                        YELLOW,
+                        (int(bx - self.camera_x), int(by)),
+                        5,
+                    )
+            for ix, iy, _ttl in plane.impacts:
                 if in_view(ix, iy):
                     pygame.draw.circle(
                         world,

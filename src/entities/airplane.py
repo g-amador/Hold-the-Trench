@@ -4,21 +4,34 @@ cadence as tank factories.
 
 Behavior:
 - living in its side's dedicated PLANE list, it FLYS: no ground
-  collision, no tile logic — it steers straight toward its target;
+  collision, no tile logic — it steers straight toward its target
+  and NEVER stops while one is alive (user: continuous movement);
 - target selection = nearest enemy among ARMOR UNITS (tanks),
-  BUILDINGS, and PLANES. No preference but proximity (user: "no
-  particular preference aside proximity");
-- ground targets (tank/building): the plane bombs it when it is
-  OVER it — center distance at most PLANE_BOMB_TRIGGER_PX — dropping
-  bomb damage on cooldown (direct damage, like artillery splash:
-  no bullet, no armor rule); buildings take damage through their
-  own take_damage (destructible since BUILDING_HP);
+  infantry, BUILDINGS, and PLANES. No preference but proximity
+  (user: "no particular preference aside proximity");
+- ground targets (tank/infantry/building): the plane bombs it when it
+  is OVER it — center distance at most PLANE_BOMB_TRIGGER_PX. The
+  bomb is a small YELLOW dot that flies for PLANE_BOMB_FLIGHT_TIME;
+  it detonates at the pinned point — brief RED flash (markers, like
+  artillery's), damage lands ON IMPACT on the pinned entity if it is
+  still alive there; buildings take damage through their own
+  take_damage (destructible since BUILDING_HP);
+- bombs ONCE per pass (user rule): the struck body is skipped in
+  target selection while the bomb clock runs (last_bombed), so the
+  plane continues to the NEXT nearest target — plane, tank,
+  infantry, or another building. A body the bomb failed to kill
+  becomes re-eligible once the clock drains;
 - air targets (planes): machine gun in range, "like infantry vs
   infantry" — PLANE_MG bullets fly; the battle state's bullet loops
   hit their own side's planes with them (and never armored bodies —
-  plane MG fire skips armor, bombs do the anti-armor work);
-- when no target exists the plane keeps flying on its heading and
-  bounces at the world edges (endless patrol).
+  plane MG fire skips armor, bombs do the anti-armor work). Only
+  confirmed bullet hits reduce hp; the cyclic rate per WWI armament
+  (Vickers ~450-600 rpm French, Spandau ~400-500 rpm German) lives
+  in config.PLANE_MG_ROUNDS_PER_MIN keyed by NATION;
+- when one plane dies mid-dogfight the survivor just re-picks the
+  nearest target next frame (proximity selection is per frame);
+- when NO target remains ANYWHERE the plane flies to the NEAREST map
+  edge and out, then dies (the state's dead-filter removes it).
 
 The WWI balance handicaps (systems/factions.py) scale spawn hp and
 both weapon damages per the producing nation. Art per country
@@ -37,9 +50,12 @@ from config import (
     PLANE_MG_RANGE,
     PLANE_MG_DAMAGE,
     PLANE_MG_FIRE_RATE,
+    PLANE_MG_ROUNDS_PER_MIN,
     PLANE_BOMB_DAMAGE,
     PLANE_BOMB_COOLDOWN,
     PLANE_BOMB_TRIGGER_PX,
+    PLANE_BOMB_FLIGHT_TIME,
+    PLANE_BOMB_IMPACT_TIME,
     RED,
     BLUE,
 )
@@ -88,13 +104,26 @@ class AirplaneUnit(GuardedRawDamage):
         # start drained so the first contact strikes immediately.
         self.mg_range = PLANE_MG_RANGE
         self.mg_damage = PLANE_MG_DAMAGE
-        self.mg_fire_rate = PLANE_MG_FIRE_RATE
+        # WWI cyclic rate per NATION (config table, rpm -> seconds);
+        # an unlisted nation keeps the generic rate.
+        rpm = PLANE_MG_ROUNDS_PER_MIN.get(nation)
+        self.mg_fire_rate = (60.0 / rpm) if rpm else PLANE_MG_FIRE_RATE
         self.mg_cooldown = 0.0
 
         self.bomb_damage = PLANE_BOMB_DAMAGE
         self.bomb_cooldown_time = PLANE_BOMB_COOLDOWN
         self.bomb_cooldown = 0.0
         self.bomb_trigger = PLANE_BOMB_TRIGGER_PX
+
+        # Bomb bookkeeping (artillery's marker pattern): pending bombs
+        # [x_px, y_px, ttl_seconds, pinned entity] in flight, and live
+        # red impact markers [x_px, y_px, ttl_seconds].
+        self.pending_bombs = []
+        self.impacts = []
+
+        # Bomb-once rule: the LAST hit body. Skipped in target
+        # selection while the bomb clock runs (see update).
+        self.last_bombed = None
 
         # Patrol heading steady EAST (enemy planes WEST), like every
         # other unit's advance direction.
@@ -124,7 +153,7 @@ class AirplaneUnit(GuardedRawDamage):
 
     def update(self, dt, ground_targets, air_targets, bullets):
         """Fly toward the nearest enemy; bomb over ground targets,
-        machine-gun enemy planes in range, patrol when nothing picks."""
+        machine-gun enemy planes in range, leave the map otherwise."""
 
         if self.dead:
             return
@@ -135,15 +164,89 @@ class AirplaneUnit(GuardedRawDamage):
         self.mg_cooldown = max(0.0, self.mg_cooldown - dt_s)
         self.bomb_cooldown = max(0.0, self.bomb_cooldown - dt_s)
 
+        # Red impact markers tick down; expired ones are dropped.
+        if self.impacts:
+            for imp in self.impacts:
+                imp[2] -= dt_s
+            self.impacts = [imp for imp in self.impacts if imp[2] > 0]
+
+        # Bomb flight: pending bombs land after PLANE_BOMB_FLIGHT_TIME
+        # and damage the PINNED entity at that moment (release only
+        # launches the yellow dot). Render reads pending/impacts for
+        # the yellow-in-flight / red-blast markers.
+        if self.pending_bombs:
+            for bomb in self.pending_bombs:
+                bomb[2] -= dt_s
+            landed = [b for b in self.pending_bombs if b[2] <= 0]
+            self.pending_bombs = [
+                b for b in self.pending_bombs if b[2] > 0
+            ]
+            for bx, by, _t, entity in landed:
+                self._bomb_impact(bx, by, entity)
+
         cx = self.x + self.width / 2
         cy = self.y + self.height / 2
 
-        # Nearest target, AIR or GROUND mixed (proximity only).
-        target = None
-        kind = None       # "ground" or "air"
+        # Bomb-once rule (user): the attacked body is bombed ONCE,
+        # then the plane continues to the NEXT nearest target (plane,
+        # tank, infantry, or another building). The just-bombed body
+        # is skipped while the bomb clock runs; if the bomb failed to
+        # kill it and it is STILL the nearest body once the clock
+        # drains, the plane comes back for another pass (selection
+        # re-runs every frame). The fallback below keeps a sole
+        # surviving half-bombed target from being abandoned — an
+        # alive enemy still means "targets remain", so the plane may
+        # not leave the map while it stands.
+        exclude = self.last_bombed if self.bomb_cooldown > 0.0 else None
+        target, kind = self._pick_target(
+            ground_targets, air_targets, exclude,
+        )
+        if target is None and exclude is not None:
+            target, kind = self._pick_target(ground_targets, air_targets)
+
+        if target is None:
+            # Nothing left to fight anywhere: leave the battlefield
+            # through the nearest edge (user rule — no endless patrol).
+            self._leave_map(dt_s)
+            return
+
+        tgx, tgy, entity = target
+        dx, dy = tgx - cx, tgy - cy
+        length = math.hypot(dx, dy) or 1.0
+
+        # Steer directly at the target (planes ignore the ground).
+        # Movement NEVER stops — over, past, or in a dogfight, the
+        # plane keeps flying (user rule).
+        self.x += (dx / length) * self.speed * dt_s
+        self.y += (dy / length) * self.speed * dt_s
+
+        # Ground target: bomb when OVER it (proximity gate + cooldown).
+        if kind == "ground":
+            if length <= self.bomb_trigger and self.bomb_cooldown == 0:
+                self._drop_bomb(entity)
+
+        # Air target: machine gun inside the MG range ("like infantry
+        # vs infantry") — a real bullet into the side's bullet list.
+        elif kind == "air" and length <= self.mg_range:
+            self._fire_mg(cx, cy, tgx, tgy, bullets)
+
+    def _pick_target(self, ground_targets, air_targets, exclude=None):
+        """Nearest ALIVE enemy across both lists (proximity only).
+
+        Returns (target, kind) or (None, None); kind is "ground" or
+        "air" matching the list the winner came from. `exclude` is
+        skipped by IDENTITY (the just-bombed body, per the bomb-once
+        rule) — dead/destroyed bodies never qualify anyway.
+        """
+        cx = self.x + self.width / 2
+        cy = self.y + self.height / 2
         best = None
+        target = None
+        kind = None
         for t in ground_targets:
             if getattr(t, "dead", False) or getattr(t, "is_destroyed", bool)():
+                continue
+            if t is exclude:
                 continue
             tgx, tgy = _target_center(t)
             dist = math.hypot(tgx - cx, tgy - cy)
@@ -160,50 +263,79 @@ class AirplaneUnit(GuardedRawDamage):
                 best = dist
                 target = (ttx, tty, t)
                 kind = "air"
+        return target, kind
 
-        if target is None:
-            # Patrol: keep the heading, bounce at the world edges.
-            self._patrol(dt_s)
-            return
+    def _leave_map(self, dt_s):
+        """No target left: fly to the NEAREST edge and out (user rule).
 
-        tgx, tgy, entity = target
-        dx, dy = tgx - cx, tgy - cy
-        length = math.hypot(dx, dy) or 1.0
+        The plane measures its center against the four world
+        boundaries, steers straight at the closest one, and keeps
+        going; once fully outside the world it dies, which the battle
+        state's dead-filter uses to remove it from the plane lists.
 
-        # Steer directly at the target (planes ignore the ground).
-        self.x += (dx / length) * self.speed * dt_s
-        self.y += (dy / length) * self.speed * dt_s
-
-        # Ground target: bomb when OVER it (proximity gate + cooldown).
-        if kind == "ground":
-            if length <= self.bomb_trigger and self.bomb_cooldown == 0:
-                self._drop_bomb(entity)
-
-        # Air target: machine gun inside the MG range ("like infantry
-        # vs infantry") — a real bullet into the side's bullet list.
-        elif kind == "air" and length <= self.mg_range:
-            self._fire_mg(cx, cy, tgx, tgy, bullets)
-
-    def _patrol(self, dt_s):
-        """No target: fly the heading; bounce off the left/right edges.
-
-        No vertical motion keeps the plane on its altitude track —
-        bounces only reset horizontal heading.
+        Marching order is the OLD patrol-echo: LEFT, RIGHT, TOP,
+        BOTTOM — an equidistant tie resolves to the first candidate,
+        so planes never jitter between edges.
         """
         world_w = len(STATIC_MAP[0]) * TILE_SIZE
-        self.x += self.dir_x * self.speed * dt_s
-        if self.x <= 0:
-            self.x = 0
-            self.dir_x = 1
-        elif self.x >= world_w - self.width:
-            self.x = world_w - self.width
-            self.dir_x = -1
+        world_h = len(STATIC_MAP) * TILE_SIZE
+        cx = self.x + self.width / 2
+        cy = self.y + self.height / 2
+
+        candidates = (
+            (cx,             -1.0, 0.0),   # west edge
+            (world_w - cx,    1.0, 0.0),   # east edge
+            (cy,              0.0, -1.0),  # north edge
+            (world_h - cy,    0.0, 1.0),   # south edge
+        )
+        _dist, vx, vy = min(candidates, key=lambda c: c[0])
+
+        self.x += vx * self.speed * dt_s
+        self.y += vy * self.speed * dt_s
+        if vx:
+            self.dir_x = int(vx)
+
+        if (
+            self.x + self.width <= 0 or self.x >= world_w
+            or self.y + self.height <= 0 or self.y >= world_h
+        ):
+            self.dead = True
 
     def _drop_bomb(self, target):
-        """Bomb release: direct damage on the target under the plane."""
-        damage = scaled_damage(self.nation, "plane", self.bomb_damage)
-        target.take_damage(damage)
+        """Bomb release: a YELLOW dot flies to the pinned point.
+
+        Damage is NOT instant anymore: the bomb lands after
+        PLANE_BOMB_FLIGHT_TIME and _bomb_impact applies it then.
+        The cooldown starts at release (artillery's fire-clock echo).
+        `last_bombed` is pinned NOW: the bomb-once rule skips this
+        body in selection until the clock drains (see update), so the
+        plane keeps moving to the next nearest target instead of
+        circling over the one it just struck.
+        """
+        bx, by = _target_center(target)
+        self.pending_bombs.append(
+            [bx, by, PLANE_BOMB_FLIGHT_TIME, target],
+        )
+        self.last_bombed = target
         self.bomb_cooldown = self.bomb_cooldown_time
+
+    def _bomb_impact(self, bx, by, entity):
+        """Bomb touchdown: brief RED flash + damage on the pinned body.
+
+        The pinned entity may already be gone by touch-down (faster
+        hands also fired between release and impact): only a still-
+        alive/undestroyed body takes the hit, at the bomb's own
+        coordinates — the impact position is fixed at release.
+        """
+        self.impacts.append([bx, by, PLANE_BOMB_IMPACT_TIME])
+
+        if getattr(entity, "dead", False):
+            return
+        if getattr(entity, "is_destroyed", bool)():
+            return
+        entity.take_damage(
+            scaled_damage(self.nation, "plane", self.bomb_damage),
+        )
 
     def _fire_mg(self, cx, cy, tx, ty, bullets):
         """One machine-gun bullet at an enemy plane, on cooldown."""
