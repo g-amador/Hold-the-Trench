@@ -19,11 +19,13 @@ Behavior:
   IMPACT on the pinned entity if it is still alive there;
   buildings take damage through their own take_damage (destructible
   since BUILDING_HP);
-- bombs ONCE per pass (user rule): the struck body is skipped in
-  target selection while the bomb clock runs (last_bombed), so the
-  plane continues to the NEXT nearest target — plane, tank,
-  infantry, or another building. A body the bomb failed to kill
-  becomes re-eligible once the clock drains;
+- bombs ONCE per pass (user reports, v2): a bomb-on-cooldown makes
+  tanks/buildings drop out of selection ENTIRELY (ready gate in
+  _pick_target) — the plane cruises straight past instead of
+  circling/chasing on top of the struck body, and re-engages (same
+  or nearest) once the bomb is ready or a dogfight walks into MG
+  range. Nothing attackable but enemies alive = straight cruise
+  along the last flight vector (bounced at the map edges).
 - machine gun: PLANE_MG bullets fly; the battle state's bullet loops
   hit infantry and enemy planes with them (and never armored bodies
   — plane MG fire skips armor, bombs do the anti-armor work). Only
@@ -127,9 +129,11 @@ class AirplaneUnit(GuardedRawDamage):
         self.pending_bombs = []
         self.impacts = []
 
-        # Bomb-once rule: the LAST hit body. Skipped in target
-        # selection while the bomb clock runs (see update).
-        self.last_bombed = None
+        # Cruise vector (UNIT length): the LAST flown direction.
+        # Straight cruising reuses it when nothing is attackable (bomb
+        # clock running, no dogfight) — see _pick_target/_cruise.
+        self.flight_vx = -1.0 if is_enemy else 1.0
+        self.flight_vy = 0.0
 
         # Initial horizontal heading: EAST for player planes, WEST for
         # enemy planes (the nose will follow this and every change of
@@ -203,24 +207,30 @@ class AirplaneUnit(GuardedRawDamage):
         cx = self.x + self.width / 2
         cy = self.y + self.height / 2
 
-        # Bomb-once rule (user): the attacked body is bombed ONCE,
-        # then the plane continues to the NEXT nearest target (plane,
-        # tank, infantry, or another building). The just-bombed body
-        # is skipped while the bomb clock runs; if the bomb failed to
-        # kill it and it is STILL the nearest body once the clock
-        # drains, the plane comes back for another pass (selection
-        # re-runs every frame). The fallback below keeps a sole
-        # surviving half-bombed target from being abandoned — an
-        # alive enemy still means "targets remain", so the plane may
-        # not leave the map while it stands.
-        exclude = self.last_bombed if self.bomb_cooldown > 0.0 else None
+        # READY-GATED selection (user fix for hovering + tank-chasing):
+        # MG bodies (infantry, enemy planes) are always attackable;
+        # BOMB bodies (tanks, buildings) only while the bomb is READY.
+        # On cooldown they are skipped ENTIRELY — the plane never
+        # steers at a body it cannot strike yet, so it cruises
+        # straight past instead of circling on top (bomb once, then
+        # move on; selection re-runs every frame).
         target, kind = self._pick_target(
-            ground_targets, air_targets, exclude,
+            ground_targets, air_targets, self.bomb_cooldown == 0.0,
         )
-        if target is None and exclude is not None:
-            target, kind = self._pick_target(ground_targets, air_targets)
 
         if target is None:
+            allies_alive = self._pick_target(
+                ground_targets, air_targets, True,
+            )[0] is not None
+
+            if allies_alive:
+                # Enemies are ALIVE but none is attackable yet (bomb
+                # clock running, no dogfight in range): straight
+                # cruise along the last flight vector — never a hover,
+                # never a chase over a cooldown target.
+                self._cruise(dt_s)
+                return
+
             # Nothing left to fight anywhere: leave the battlefield
             # through the nearest edge (user rule — no endless patrol).
             self._leave_map(dt_s)
@@ -235,6 +245,8 @@ class AirplaneUnit(GuardedRawDamage):
         # plane keeps flying (user rule).
         self.x += (dx / length) * self.speed * dt_s
         self.y += (dy / length) * self.speed * dt_s
+        self.flight_vx = dx / length
+        self.flight_vy = dy / length
 
         # FACING (user rule): the nose points the way the plane goes,
         # exactly like the controlled player's facing flip. The
@@ -257,18 +269,20 @@ class AirplaneUnit(GuardedRawDamage):
             if length <= self.mg_range:
                 self._fire_mg(cx, cy, tgx, tgy, bullets)
         else:
-            # Bomb body (tank or building): bomb when OVER it
-            # (proximity gate + cooldown).
-            if length <= self.bomb_trigger and self.bomb_cooldown == 0:
+            # Bomb body (tank or building): bomb when OVER it. The
+            # selection gate guarantees the bomb is ready right now.
+            if length <= self.bomb_trigger:
                 self._drop_bomb(entity)
 
-    def _pick_target(self, ground_targets, air_targets, exclude=None):
-        """Nearest ALIVE enemy across both lists (proximity only).
+    def _pick_target(self, ground_targets, air_targets, bomb_ready=True):
+        """Nearest ALIVE attackable enemy across both lists.
 
         Returns (target, kind) or (None, None); kind is "ground" or
-        "air" matching the list the winner came from. `exclude` is
-        skipped by IDENTITY (the just-bombed body, per the bomb-once
-        rule) — dead/destroyed bodies never qualify anyway.
+        "air" matching the list the winner came from. The READY GATE
+        (user fix): BOMB bodies (tanks via ArmorUnit, buildings via
+        is_destroyed) qualify only while `bomb_ready`; MG bodies
+        (infantry, enemy planes) always qualify. Dead/destroyed
+        bodies never qualify either way.
         """
         cx = self.x + self.width / 2
         cy = self.y + self.height / 2
@@ -278,7 +292,10 @@ class AirplaneUnit(GuardedRawDamage):
         for t in ground_targets:
             if getattr(t, "dead", False) or getattr(t, "is_destroyed", bool)():
                 continue
-            if t is exclude:
+            bomb_body = (
+                isinstance(t, ArmorUnit) or hasattr(t, "is_destroyed")
+            )
+            if bomb_body and not bomb_ready:
                 continue
             tgx, tgy = _target_center(t)
             dist = math.hypot(tgx - cx, tgy - cy)
@@ -296,6 +313,43 @@ class AirplaneUnit(GuardedRawDamage):
                 target = (ttx, tty, t)
                 kind = "air"
         return target, kind
+
+    def _cruise(self, dt_s):
+        """Nothing attackable right now: straight cruise (user rule).
+
+        All bomb targets sit on the bomb clock and no MG body is in
+        range: the plane keeps flying along its LAST flight vector —
+        bouncing off the left/right world edges, clamped to the
+        map's vertical bounds. Steering resumes the frame a weapon
+        becomes ready again; hovering over a previously bombed body
+        (the reported back-and-forth) can no longer happen.
+        """
+        world_w = len(STATIC_MAP[0]) * TILE_SIZE
+        world_h = len(STATIC_MAP) * TILE_SIZE
+
+        self.x += self.flight_vx * self.speed * dt_s
+        self.y += self.flight_vy * self.speed * dt_s
+
+        # Horizontal bounce: heading (+ nose art) mirrors with it.
+        if self.x <= 0:
+            self.x = 0
+            self.flight_vx = abs(self.flight_vx) or 1.0
+            self.dir_x = 1
+        elif self.x >= world_w - self.width:
+            self.x = world_w - self.width
+            self.flight_vx = -abs(self.flight_vx) or -1.0
+            self.dir_x = -1
+
+        # Vertical clamp: slide along the ceiling/floor line instead
+        # of leaving the strip; the vertical component dies there so
+        # the cruise stays horizontal.
+        max_y = world_h - self.height
+        if self.y < 0:
+            self.y = 0
+            self.flight_vy = 0.0
+        elif self.y > max_y:
+            self.y = max_y
+            self.flight_vy = 0.0
 
     def _leave_map(self, dt_s):
         """No target left: fly to the NEAREST edge and out (user rule).
@@ -339,16 +393,14 @@ class AirplaneUnit(GuardedRawDamage):
         Damage is NOT instant anymore: the bomb lands after
         PLANE_BOMB_FLIGHT_TIME and _bomb_impact applies it then.
         The cooldown starts at release (artillery's fire-clock echo).
-        `last_bombed` is pinned NOW: the bomb-once rule skips this
-        body in selection until the clock drains (see update), so the
-        plane keeps moving to the next nearest target instead of
-        circling over the one it just struck.
+        While that clock runs, tank/building targets drop out of
+        selection entirely (READY GATE), so the plane keeps moving
+        away instead of circling the body it just struck.
         """
         bx, by = _target_center(target)
         self.pending_bombs.append(
             [bx, by, PLANE_BOMB_FLIGHT_TIME, target],
         )
-        self.last_bombed = target
         self.bomb_cooldown = self.bomb_cooldown_time
 
     def _bomb_impact(self, bx, by, entity):
