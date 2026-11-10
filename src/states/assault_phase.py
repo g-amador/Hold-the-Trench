@@ -552,6 +552,36 @@ class AssaultPhase:
                 # which keeps placement readable.
                 return
 
+    def clear_destroyed_buildings(self, buildings):
+        """Destroyed buildings LEAVE the map (user rule).
+
+        Any building whose hp is spent is cut from the battlefield in
+        the same frame it fell: its anchor tile is cleared (so it stops
+        drawing, colliding, and being queried) and its build-spot
+        marker is retired so the ruin never reopens the slot — no
+        green outline, no stale partial payments, no walk-in rebuild.
+
+        Runs at the END of an update, after every damage source (tank
+        shells, plane bombs, bullets) has resolved. Win/lose checks
+        capture their bunker lists at the TOP of update from this same
+        flat list, so a bunker destroyed THIS frame still ends (or
+        wins) the battle below — the tile clearing here never eats the
+        verdict.
+        """
+        for building in buildings:
+            if not building.is_destroyed():
+                continue
+
+            tile = self.tilemap.get_tile(building.tile_x, building.tile_y)
+            # Clear only THIS building's anchor tile; the identity
+            # check keeps the pass harmless if a spot never built here.
+            if tile is not None and tile.building is building:
+                tile.building = None
+
+            spot_key = (building.tile_x, building.tile_y)
+            self.tilemap.spot_types.pop(spot_key, None)
+            self.tilemap.paid_amount.pop(spot_key, None)
+
     def update(self, dt):
         """One simulation step of the whole battle.
 
@@ -868,6 +898,10 @@ class AssaultPhase:
             friendly for friendly in self.friendlies
             if not friendly.dead
         ]
+
+        # All damage sources have resolved by this point: buildings
+        # that just fell vanish from the map now (see the helper).
+        self.clear_destroyed_buildings(buildings)
 
         # Collect gold pickups and add their full value to gold.
         remaining_gold = []
