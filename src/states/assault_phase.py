@@ -804,18 +804,23 @@ class AssaultPhase:
         # nearest enemy tank/building — or infantry for the french
         # female), halt in gun range and shoot it until it falls;
         # they steer around buildings and never collide with them.
+        # ALL BUILDINGS, BOTH SIDES (user rule: tanks never touch a
+        # building border — allied or enemy, targeted or not). The
+        # combined list drives the stand-off avoidance; the tank
+        # itself commits only to the OPPOSING side's buildings.
+        tank_buildings = player_buildings + enemy_buildings
         for vehicle in list(self.friendlies):
             if isinstance(vehicle, ArmorUnit):
                 vehicle.update(
                     dt, self.enemy_barracks_units, self.bullets,
-                    enemy_buildings,
+                    tank_buildings,
                 )
 
         for vehicle in list(self.enemy_barracks_units):
             if isinstance(vehicle, ArmorUnit):
                 vehicle.update(
                     dt, self.friendlies, self.enemy_bullets,
-                    player_buildings,
+                    tank_buildings,
                 )
 
         # Planes fly (no ground logic): friendly planes hunt the

@@ -2,8 +2,10 @@
 Factory-produced tanks.
 
 The ArmorUnit machinery (Beta user spec):
-- spawn WEST of the factory, heading toward the enemy trenches
-  (roll_armor_unit offsets the unit off the factory's west edge);
+- spawn OUTSIDE the factory on the battle-facing side (user rule):
+  player armor rolls out EAST of the factory, enemy armor WEST of it
+  (roll_armor_unit offsets the unit off the factory's battle-facing
+  edge);
 - movement SCALES TO MAP SIZE (config.TANK_SPEED_REF_TILES) and is
   FULL 2D — the tank drives back/forward and up/down toward its
   COMMITTED target (user rule). The commit is picked per variant
@@ -78,6 +80,7 @@ from config import (
     TANK_HP,
     TANK_SPEED,
     TANK_SPEED_REF_TILES,
+    TANK_BUILDING_STANDOFF_PX,
     TANK_MG_RANGE,
     TANK_MG_DAMAGE,
     TANK_MG_FIRE_RATE,
@@ -235,7 +238,10 @@ class ArmorUnit(RawSubtractDamage):
 
         `targets` is the OPPOSING unit list (infantry + armor).
         `bullets` is the side-appropriate list the battle state
-        simulates. `buildings` is the OPPOSING BUILDING list.
+        simulates. `buildings` is the building list of BOTH SIDES
+        (user rule: tanks never touch any building border — the
+        stand-off avoidance needs the allied buildings too; commit
+        targets filter to the OPPOSING side's buildings only).
 
         Movement model (user rules): the tank drives in FULL 2D
         (back/forward, up/down) toward its COMMITTED target — the
@@ -254,6 +260,12 @@ class ArmorUnit(RawSubtractDamage):
         """
         if self.dead:
             return
+
+        # STAND-OFF INVARIANT (user rule: a tank NEVER touches a
+        # building border — allied or enemy): any hull that somehow
+        # ended up inside a building's stand-off zone is shoved back
+        # out before anything else runs.
+        self._push_out_of_buildings(buildings)
 
         # COMMITTED TARGET: the nearest valid target (per variant).
         # Re-picked — with a possible direction change — ONLY when
@@ -285,6 +297,10 @@ class ArmorUnit(RawSubtractDamage):
                 # in 2D, steering around buildings (never colliding).
                 self._advance_step(dt, tx, ty, buildings)
                 self._face_towards(tx, ty)
+                # The step probe already keeps the stand-off, but the
+                # slide blend is not probed itself — re-assert the
+                # invariant after the move.
+                self._push_out_of_buildings(buildings)
 
         # Infantry are NEVER a reason to stop (user rule): enemy
         # infantry under the hull die outright ("killed as if
@@ -378,8 +394,10 @@ class ArmorUnit(RawSubtractDamage):
                     best = t
             return best
 
-        # Cannon tanks: enemy TANKS (user rule) plus BUILDINGS
-        # (MG nests and artillery are buildings too).
+        # Cannon tanks: enemy TANKS (user rule) plus the OPPOSING
+        # side's BUILDINGS (MG nests and artillery are buildings
+        # too). The buildings list carries BOTH sides — same-side
+        # buildings are never commit targets.
         for t in targets:
             if getattr(t, "dead", False):
                 continue
@@ -394,6 +412,8 @@ class ArmorUnit(RawSubtractDamage):
         for build in buildings or ():
             if build.is_destroyed():
                 continue
+            if build.is_enemy == self.is_enemy:
+                continue
             hb = build.get_hitbox()
             dist = math.hypot(hb.centerx - cx, hb.centery - cy)
             if best_dist is None or dist < best_dist:
@@ -401,14 +421,66 @@ class ArmorUnit(RawSubtractDamage):
                 best = build
         return best
 
+    def _standoff_zone(self, build):
+        """A building's collision zone: its footprint grown by the
+        stand-off margin on every side (user rule: tanks never touch
+        a building border — the margin IS the no-touch radius)."""
+        return build.get_hitbox().inflate(
+            TANK_BUILDING_STANDOFF_PX * 2,
+            TANK_BUILDING_STANDOFF_PX * 2,
+        )
+
+    def _push_out_of_buildings(self, buildings):
+        """Shove the hull out of any building stand-off zone.
+
+        The user rule is absolute: a tank NEVER touches a building
+        border. If the hull somehow ends up inside a zone (map-edge
+        spawn clamp, a slide blend, anything), it is pushed out
+        along the axis with the smaller penetration, away from the
+        building's center.
+        """
+        moved = False
+        for build in buildings or ():
+            if build.is_destroyed():
+                continue
+            zone = self._standoff_zone(build)
+            hull = self.get_hitbox()
+            if not hull.colliderect(zone):
+                continue
+
+            bcx, bcy = zone.center
+            hcx, hcy = hull.center
+            # Axis with the smaller penetration wins; the push
+            # direction follows the hull's side of the zone.
+            if hcx >= bcx:
+                px = zone.right - hull.left + 1      # push east
+            else:
+                px = -(hull.right - zone.left + 1)   # push west
+            if hcy >= bcy:
+                py = zone.bottom - hull.top + 1      # push south
+            else:
+                py = -(hull.bottom - zone.top + 1)   # push north
+            if abs(px) <= abs(py):
+                self.x += px
+            else:
+                self.y += py
+            moved = True
+
+        if moved:
+            world_w = _world_width()
+            world_h = len(STATIC_MAP) * TILE_SIZE
+            self.x = max(0, min(self.x, world_w - self.width))
+            self.y = max(0, min(self.y, world_h - self.height))
+
     def _advance_step(self, dt, tx, ty, buildings):
         """One frame of movement toward (tx, ty).
 
         Movement is FULL 2D (user: back and forward, up and down).
-        Buildings are the only obstacle: the step probes the hull
-        one step ahead and, when a building blocks it, slides along
-        the building's edge on the shortest-detour side — tanks go
-        AROUND buildings, never colliding with them (user rule).
+        Buildings are the only obstacle — BOTH sides' buildings:
+        each step probes the hull one step ahead against the
+        buildings' stand-off zones and, when one blocks it, slides
+        along the zone's edge on the shortest-detour side — tanks go
+        AROUND buildings and never touch their borders (user rule).
         """
         cx = self.x + self.width / 2
         cy = self.y + self.height / 2
@@ -424,24 +496,26 @@ class ArmorUnit(RawSubtractDamage):
             self.width, self.height,
         )
         blocked = None
+        blocked_zone = None
         for build in buildings or ():
             if build.is_destroyed():
                 continue
-            if probe.colliderect(build.get_hitbox()):
+            zone = self._standoff_zone(build)
+            if probe.colliderect(zone):
                 blocked = build
+                blocked_zone = zone
                 break
 
         if blocked is None:
             self.x += ux * step
             self.y += uy * step
         else:
-            # GO AROUND (user rule): steer along the building's edge
+            # GO AROUND (user rule): steer along the zone's edge
             # toward the side the travel line does NOT pass — the
             # shorter detour — keeping a little forward progress so
             # the tank flows around the corner instead of hugging
             # the wall.
-            hb = blocked.get_hitbox()
-            bx, by = hb.center
+            bx, by = blocked_zone.center
             cross = ux * (by - cy) - uy * (bx - cx)
             side = -1 if cross > 0 else 1
             px, py = -uy * side, ux * side
@@ -735,7 +809,8 @@ UNIT_CLASSES = {
 }
 
 
-def roll_armor_unit(nation, is_enemy, x, y, force_filename=None):
+def roll_armor_unit(nation, is_enemy, x, y, factory_width=0,
+                    force_filename=None):
     """Build ONE random factory unit of `nation` at (x, y).
 
     A factory mixes its nation's available kinds randomly (per the
@@ -747,9 +822,13 @@ def roll_armor_unit(nation, is_enemy, x, y, force_filename=None):
     male AND female both appear in a battle): the file must exist in
     the nation's option pool or the roll yields None.
 
-    SPAWN WEST OF THE FACTORY (user rule): the unit is placed just
-    outside the anchor's west edge and moves toward the trenches
-    from there — never overlapping the factory building.
+    SPAWN OUTSIDE THE FACTORY, BATTLE-FACING SIDE (user rule):
+    player-side armor rolls out EAST of the factory (toward the
+    enemy lines); enemy-side armor rolls out WEST of it (toward the
+    player). One hull width + the building STAND-OFF margin of clear
+    air — the hull NEVER starts inside its own factory — clamped
+    in-world. `x` is the factory anchor tile's left edge;
+    `factory_width` is the factory footprint in px.
     """
     from systems.factions import armor_unit_options
 
@@ -777,7 +856,13 @@ def roll_armor_unit(nation, is_enemy, x, y, force_filename=None):
     # balance handicaps (hp resistance) apply at spawn directly.
     unit = unit_class(x, y, is_enemy, filename, nation)
 
-    # West of the anchor (the factory's top-left tile): one hull
-    # width + a small gap clear of the building, clamped in-world.
-    unit.x = max(0, x - unit.width - 4)
+    # Battle-facing side of the factory (user rule): player units
+    # east of the factory's east edge, enemy units west of its west
+    # edge — always with the stand-off margin of clear air.
+    world_w = _world_width()
+    if is_enemy:
+        unit.x = max(0, x - unit.width - TANK_BUILDING_STANDOFF_PX)
+    else:
+        unit.x = x + factory_width + TANK_BUILDING_STANDOFF_PX
+    unit.x = max(0, min(unit.x, world_w - unit.width))
     return unit

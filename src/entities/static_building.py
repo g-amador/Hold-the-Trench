@@ -244,6 +244,7 @@ class TankFactory(StaticBuilding):
             self.is_enemy,
             self.tile_x * TILE_SIZE,
             self.tile_y * TILE_SIZE,
+            factory_width=self.width,
             force_filename=filename,
         )
         if unit is not None:

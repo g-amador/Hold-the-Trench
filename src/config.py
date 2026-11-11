@@ -87,19 +87,19 @@ GOLD_MAGNET_SPEED_PX_S = 260
 # constructs the building only when the full cost is covered.
 # Enemy variants cost 0 because they are placed free from map markers.
 BUILD_COSTS = {
-    "mg": 0,
+    "mg": 30,
     "bunker": 0,
     "barracks": 60,
-    "artillery": 0,
-    "air_field": 0,
-    "tank_factory": 0,
+    "artillery": 80,
+    "air_field": 200,
+    "tank_factory": 150,
 
     "enemy_mg": 0, #30
     "enemy_bunker": 0,
     "enemy_barracks": 0, #60
     "enemy_artillery": 0, #80
     "enemy_air_field": 0, #200
-    "enemy_tank_factory": 10, #150
+    "enemy_tank_factory": 0, #150
 }
 
 # ---------------- Combat ----------------
@@ -235,6 +235,13 @@ TANK_HP = 100
 # (effective speed = TANK_SPEED * map_width / reference_width).
 TANK_SPEED = 30
 TANK_SPEED_REF_TILES = 79   # current STATIC_MAP width in tiles
+
+# BUILDING STAND-OFF (user rule): a tank NEVER touches a building
+# border — allied or enemy, targeted or not. Every building carries
+# this invisible clear-air margin around its footprint; the tank's
+# movement steers around the inflated zone and any hull ending up
+# inside one is pushed back out.
+TANK_BUILDING_STANDOFF_PX = 24
 
 # Production cadence: armored vehicles keep their OWN flat interval —
 # one roll every 15 s per factory, INDEPENDENT of the barracks section
