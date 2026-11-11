@@ -37,7 +37,6 @@ from entities.mg_nest import MGNest
 from entities.bunker import Bunker
 from entities.artillery import Artillery
 from entities.tank import ArmorUnit
-from entities.airplane import AirplaneUnit
 from entities.barracks import Barracks
 from entities.static_building import AirField, TankFactory
 from entities.gold_pickup import COIN_SIZE
@@ -111,6 +110,14 @@ ENEMY_DELAYED_BUILD_KINDS = {
     "enemy_air_field",
     "enemy_tank_factory",
 }
+
+
+# Hoisted getattr default for the building dispatch loops: every
+# building class defines is_destroyed, so the getattr guard should
+# never fire — but constructing a fresh lambda per building per frame
+# was pure allocation churn, so the fallback is one shared function.
+def _always_alive():
+    return False
 
 # Entity cull margin in world px: entities up to a big sprite's size
 # may poke into the CLOSE window from outside its rect, so draws are
@@ -363,6 +370,12 @@ class AssaultPhase:
         self.enemy_build_queue = []
         self.enemy_build_clock = 0.0
 
+        # Building-roster cache: the per-frame side/bunker split of
+        # the tilemap's buildings is rebuilt ONLY when a tile.building
+        # mutation invalidates it (_invalidate_building_roster), not
+        # every frame.
+        self._building_roster = None
+
         self.place_enemy_buildings()
         self.place_static_buildings()
         self.place_zero_cost_buildings()
@@ -412,6 +425,12 @@ class AssaultPhase:
         # Live gameplay keys (event-driven only).
         if event.key == pygame.K_g:
             render_mode.toggle()
+
+    def _invalidate_building_roster(self):
+        """Drop the cached building split; call after ANY change to a
+        tile's building (placements, enemy delayed builds, ruin
+        clearing) so the next update rebuilds the roster lists."""
+        self._building_roster = None
 
     def place_enemy_buildings(self):
         """Place enemy defenses from lowercase map markers without charging gold."""
@@ -563,6 +582,7 @@ class AssaultPhase:
                 is_enemy=True,
                 faction=self.enemy_faction,
             )
+            self._invalidate_building_roster()
 
         self.enemy_build_queue = still_pending
 
@@ -648,6 +668,7 @@ class AssaultPhase:
                     tile_y,
                     faction=self.player_faction,
                 )
+                self._invalidate_building_roster()
                 # One construction per pass: the next spot waits a frame,
                 # which keeps placement readable.
                 return
@@ -677,6 +698,7 @@ class AssaultPhase:
             # check keeps the pass harmless if a spot never built here.
             if tile is not None and tile.building is building:
                 tile.building = None
+                self._invalidate_building_roster()
 
             spot_key = (building.tile_x, building.tile_y)
             self.tilemap.spot_types.pop(spot_key, None)
@@ -709,30 +731,50 @@ class AssaultPhase:
         if self.paused:
             return
 
-        # Retrieve all buildings from the tilemap.
-        buildings = BuildingQuery.get_all_buildings(self.tilemap)
+        # Building roster: split ONCE and cached (see
+        # _invalidate_building_roster) — the side/bunker lists rebuild
+        # only when a tile.building mutation happened since, not every
+        # frame.
+        if self._building_roster is None:
+            buildings = BuildingQuery.get_all_buildings(self.tilemap)
 
-        # Split the building roster by side, ALIVE only: destructible
-        # buildings (all of them, since BUILDING_HP) take damage from
-        # tank shells, plane bombs, and bunker-bound bullets; the dead
-        # ones stop firing, spawning, and being targeted.
-        enemy_buildings = [
-            b for b in buildings
-            if b.is_enemy and not b.is_destroyed()
-        ]
-        player_buildings = [
-            b for b in buildings
-            if not b.is_enemy and not b.is_destroyed()
-        ]
+            # Split the building roster by side, ALIVE only: destructible
+            # buildings (all of them, since BUILDING_HP) take damage from
+            # tank shells, plane bombs, and bunker-bound bullets; the dead
+            # ones stop firing, spawning, and being targeted.
+            enemy_buildings = [
+                b for b in buildings
+                if b.is_enemy and not b.is_destroyed()
+            ]
+            player_buildings = [
+                b for b in buildings
+                if not b.is_enemy and not b.is_destroyed()
+            ]
 
-        player_bunkers = [
-            b for b in buildings
-            if isinstance(b, Bunker) and not b.is_enemy
-        ]
-        enemy_bunkers = [
-            b for b in buildings
-            if isinstance(b, Bunker) and b.is_enemy
-        ]
+            player_bunkers = [
+                b for b in buildings
+                if isinstance(b, Bunker) and not b.is_enemy
+            ]
+            enemy_bunkers = [
+                b for b in buildings
+                if isinstance(b, Bunker) and b.is_enemy
+            ]
+
+            self._building_roster = (
+                buildings,
+                enemy_buildings,
+                player_buildings,
+                player_bunkers,
+                enemy_bunkers,
+            )
+
+        (
+            buildings,
+            enemy_buildings,
+            player_buildings,
+            player_bunkers,
+            enemy_bunkers,
+        ) = self._building_roster
 
         # Update the player.
         self.player.update(
@@ -853,7 +895,7 @@ class AssaultPhase:
         # the state's choice (buildings aim at the opposing unit
         # list). Destroyed buildings stand down entirely.
         for building in buildings:
-            if getattr(building, "is_destroyed", lambda: False)():
+            if getattr(building, "is_destroyed", _always_alive)():
                 continue
 
             if not isinstance(
@@ -1224,7 +1266,7 @@ class AssaultPhase:
         text = self.hud.font.render(
             message,
             True,
-            (255, 255, 255),
+            WHITE,
         )
 
         padding = 8

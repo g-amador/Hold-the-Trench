@@ -14,6 +14,7 @@ from config import (
     TILE_SIZE,
     BLUE,
     INFANTRY_SPEED,
+    PLAYER_SHOOT_RANGE_PX,
     rifle_shoot_cooldown,
     INFANTRY_ANIM_FRAME_S,
     INFANTRY_AIM_POSE_S,
@@ -25,8 +26,9 @@ from graphics.sprite_generator import SpriteGenerator
 from systems.factions import unit_prefix
 
 
-# Tile characters that can never be walked through (trench wall, hill).
-BLOCKING_TILES = {"#", "H"}
+# Tile characters that can never be walked through (trench wall).
+# ('H' was removed: the map's ASCII alphabet never produces it.)
+BLOCKING_TILES = {"#"}
 # Building type strings that are solid obstacles once constructed
 # (the free-placed statics are solid 7x7s too). ENEMY buildings block
 # the player as well (user: "my controlled unit should collide with
@@ -162,7 +164,7 @@ class Player:
                 if tile is None:
                     return True
 
-                # Solid terrain: trench wall, hill face.
+                # Solid terrain: trench wall.
                 if tile.type_char in BLOCKING_TILES:
                     return True
 
@@ -175,11 +177,6 @@ class Player:
                 # the player).
                 spot = tilemap.empty_spot_covering(tile_x, tile_y)
                 if spot is not None and spot[0] in BUILDABLE_SPOTS:
-                    return True
-
-                # Solid terrain: trench wall, hill face — checked AFTER
-                # spots so multi-tile spot logic stays together.
-                if tile.type_char in BLOCKING_TILES:
                     return True
 
                 # Constructed buildings block every tile their
@@ -439,8 +436,8 @@ class Player:
             dy = enemy_y - player_y
             distance = math.hypot(dx, dy)
 
-            # Range gate: 300px is the player's engagement envelope.
-            if distance == 0 or distance > 300:
+            # Range gate: the player's engagement envelope (config).
+            if distance == 0 or distance > PLAYER_SHOOT_RANGE_PX:
                 continue
 
             # Normalize target vector

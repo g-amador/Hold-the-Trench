@@ -24,6 +24,15 @@ from world.trench_generator import (
 )
 
 
+# The footprint table is STATIC, so the footprint-probe radius is a
+# module constant instead of a max() over the whole table on every
+# collision probe (_footprint_covered runs inside per-frame movement
+# tests — per-probe recomputation was pure churn).
+_PROBE_REACH = max(
+    max(fw, fh) for fw, fh in BUILD_FOOTPRINTS.values()
+)
+
+
 class Tile:
     """One world cell: terrain type plus an optional building anchor."""
 
@@ -224,15 +233,14 @@ class TileMap:
 
         Footprints anchor at their UPPER-LEFT tile and grow right and
         down, so an anchor sits within (footprint_side - 1) tiles up-
-        left. The probe radius derives from the footprint table (its
-        biggest side covers e.g. the 4x4 MG), staying correct
-        automatically as kinds grow. Stateless probing means direct
+        left. The probe radius comes from the module constant derived
+        from the footprint table (its biggest side covers e.g. the
+        4x4 MG), staying correct automatically as kinds grow.
+        Stateless probing means direct
         `tile.building = ...` assignment needs no extra bookkeeping
         anywhere.
         """
-        probe_reach = max(
-            max(fw, fh) for fw, fh in BUILD_FOOTPRINTS.values()
-        )
+        probe_reach = _PROBE_REACH
         for dy in range(probe_reach):
             for dx in range(probe_reach):
                 tile = self.get_tile(tile_x - dx, tile_y - dy)

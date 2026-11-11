@@ -327,12 +327,13 @@ class EnemyInfantry(EnemyBase):
                 self.x += (dx / dist) * move_amount
                 self.y += (dy / dist) * move_amount
 
-                # Ranged fire (Range 200px, Cone 90 deg): a real
-                # bullet on cooldown into `bullets` (the state's
-                # enemy-bullet loop hits friendlies). The aim pose is
-                # raised by _fire on the actual shot and drains after
-                # it, so shooting reads as a blip per volley.
-                if dist < 200:
+                # Ranged fire (Range: config INFANTRY_SHOOT_RANGE_PX,
+                # Cone 90 deg): a real bullet on cooldown into
+                # `bullets` (the state's enemy-bullet loop hits
+                # friendlies). The aim pose is raised by _fire on the
+                # actual shot and drains after it, so shooting reads
+                # as a blip per volley.
+                if dist < INFANTRY_SHOOT_RANGE_PX:
                     if (dx / dist * self.facing) >= 0.707:
                         self._fire(dx / dist, dy / dist, bullets)
 

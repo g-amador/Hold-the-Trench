@@ -58,6 +58,20 @@ def resolve_bullets(bullets, units, buildings, bunkers, planes,
     """
     remaining = []
 
+    # Collision boxes are built ONCE per pass, not per bullet-target
+    # pair: get_hitbox() constructs a fresh Rect on every call, and the
+    # old per-pair pattern churned O(bullets x targets) Rects per frame
+    # on the game's hottest loop. Targets don't move during this pass
+    # (their updates ran before resolution), so the paired boxes stay
+    # valid; liveness is still checked LIVE per bullet below (a unit
+    # killed by an earlier bullet this pass must not block another).
+    unit_boxes = [(unit, unit.get_hitbox()) for unit in units]
+    building_boxes = [
+        (building, building.get_hitbox()) for building in buildings
+    ]
+    bunker_boxes = [(bunker, bunker.get_hitbox()) for bunker in bunkers]
+    plane_boxes = [(plane, plane.get_hitbox()) for plane in planes]
+
     for bullet in bullets:
         bullet.update(dt)
 
@@ -66,20 +80,21 @@ def resolve_bullets(bullets, units, buildings, bunkers, planes,
             continue
 
         hit = False
+        bullet_box = bullet.get_hitbox()
 
         # Opposing UNITS first. ARMOR RULE (both directions): plain
         # shots can never hurt armored units — they pass through
         # (only artillery splash and tank shells damage armor).
         # On armor contact the bullet keeps flying so it can still
         # hit an infantry unit behind the tank.
-        for unit in units:
+        for unit, unit_box in unit_boxes:
             if unit.dead:
                 continue
 
             if isinstance(unit, ArmorUnit) and not bullet.armor_damage:
                 continue
 
-            if bullet.get_hitbox().colliderect(unit.get_hitbox()):
+            if bullet_box.colliderect(unit_box):
                 apply_damage(unit, bullet.damage)
                 hit = True
                 break
@@ -95,21 +110,17 @@ def resolve_bullets(bullets, units, buildings, bunkers, planes,
         if not hit and bullet.armor_damage and getattr(
             bullet, "can_damage_buildings", True,
         ):
-            for building in buildings:
-                if bullet.get_hitbox().colliderect(
-                    building.get_hitbox()
-                ):
+            for building, building_box in building_boxes:
+                if bullet_box.colliderect(building_box):
                     building.take_damage(bullet.damage)
                     hit = True
                     break
         elif not hit and getattr(bullet, "can_damage_buildings", True):
-            for bunker in bunkers:
+            for bunker, bunker_box in bunker_boxes:
                 if bunker.dead:
                     continue
 
-                if bullet.get_hitbox().colliderect(
-                    bunker.get_hitbox()
-                ):
+                if bullet_box.colliderect(bunker_box):
                     bunker.take_damage(bullet.damage)
                     hit = True
                     break
@@ -120,13 +131,11 @@ def resolve_bullets(bullets, units, buildings, bunkers, planes,
         # the player's rifle — passes harmlessly beneath the
         # aircraft; a plane's own MG bullets carry from_plane=True.
         if not hit and getattr(bullet, "from_plane", False):
-            for plane in planes:
+            for plane, plane_box in plane_boxes:
                 if plane.dead:
                     continue
 
-                if bullet.get_hitbox().colliderect(
-                    plane.get_hitbox()
-                ):
+                if bullet_box.colliderect(plane_box):
                     plane.take_damage(bullet.damage)
                     hit = True
                     break

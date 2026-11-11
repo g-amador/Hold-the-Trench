@@ -12,7 +12,12 @@ its configured range (config.BULLET_RANGE_PX).
 
 import pygame
 
-from config import BULLET_RANGE_PX, BULLET_SPEED_PX_S, INFANTRY_BULLET_DAMAGE
+from config import (
+    BULLET_RANGE_PX,
+    BULLET_SPEED_PX_S,
+    INFANTRY_BULLET_DAMAGE,
+    YELLOW,
+)
 
 
 class Bullet:
@@ -84,6 +89,6 @@ class Bullet:
         # strip, so world y maps 1:1 to screen y.
         pygame.draw.rect(
             screen,
-            (255, 255, 0),
+            YELLOW,
             (self.x - camera_x, self.y, self.width, self.height)
         )

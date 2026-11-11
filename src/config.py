@@ -132,6 +132,9 @@ INFANTRY_GOLD_DROP = 5
 
 # Infantry ranged/siege gear:
 INFANTRY_SHOOT_RANGE_PX = 200
+# The PLAYER's auto-fire reach (selection radius in auto_fire): kept
+# beside the infantry range so all shooting distances stay in config.
+PLAYER_SHOOT_RANGE_PX = 300
 ENEMY_SIEGE_DAMAGE = 10
 ENEMY_SIEGE_COOLDOWN = 1.0
 FRIENDLY_SIEGE_DAMAGE = 10
