@@ -4,31 +4,52 @@ Factory-produced tanks.
 The ArmorUnit machinery (Beta user spec):
 - spawn WEST of the factory, heading toward the enemy trenches
   (roll_armor_unit offsets the unit off the factory's west edge);
-- movement SCALES TO MAP SIZE (config.TANK_SPEED_REF_TILES) and the
-  advance targets the nearest enemy infantry/MG/building: the tank
-  stops ONLY to shell a building/MG with its cannon when one is
-  inside gun range (and inside the gun's facing cone), never for
-  infantry — those are machine-gunned on the move, "stop only when
-  none remain";
+- movement SCALES TO MAP SIZE (config.TANK_SPEED_REF_TILES) and is
+  FULL 2D — the tank drives back/forward and up/down toward its
+  COMMITTED target (user rule). The commit is picked per variant
+  (cannon tanks: the nearest enemy TANK/BUILDING/MG-nest/artillery;
+  french female: the nearest enemy INFANTRY — she is the sole
+  infantry pursuer) and is re-picked — possibly turning the tank —
+  ONLY when the committed target is destroyed. A target in gun
+  range halts the tank: it shoots the committed target until the
+  target falls or the tank dies, then rolls to the next nearest.
+  No target left: the tank stops where it stands. Infantry are
+  NEVER a reason to stop — they are squished when driven over and
+  machine-gunned in range;
+- tanks NEVER collide with buildings (user rule): the movement step
+  probes ahead and STEERS AROUND any building in the path (a slide
+  along the building's edge on the shortest-detour side);
+- armor_damage cannon shells work on all enemy buildings (MG nests,
+  artillery, barracks, factories, air fields, bunkers — destructible
+  since BUILDING_HP) AND on enemy tanks caught in front of the gun;
+  tank MG rounds NEVER damage buildings or tanks (the cannon is the
+  only anti-armor/anti-building weapon);
 - cannon and machine guns fire SIMULTANEOUSLY (separate cooldowns)
-  when suitable targets are in range; several guns may engage
-  several targets in one volley (mg_gun_count);
+  when their targets are in range;
 - weapon layout per SPRITE VARIANT (user spec):
     tank_ger        5.7 cm Maxim-Nordenfelt cannon (FRONT hull
-                    muzzle, forward shots only) + six 7.9 mm MGs
-                    (two each behind/below/above, fired from their
-                    rear/roof/belly mounts);
+                    muzzle) vs tanks/buildings/MG-nests/artillery
+                    IN FRONT + MGs vs infantry only, ONE column per
+                    position simultaneously — one above, one below,
+                    one behind (never two columns in the same
+                    position), fired from their rear/roof/belly
+                    mounts;
     tank_fr_male    37 mm gun in the ROTATING turret (fires from
-                    the hull center in ANY direction);
-    tank_fr_female  Hotchkiss/Reibel MGs only; the turret ROTATES,
-                    so french tanks shoot in ANY direction while the
-                    fixed german hull is restricted (MGs never fire
-                    into the front arc — only behind or steeply
-                    above/below);
-- the armor damage rule: armor is ONLY damaged by other tanks' shots
-  and artillery splash (the battle state's bullet loops enforce it);
-- tanks NEVER collide with buildings: the stop rule halts the tank
-  inside gun range, long before any footprint contact;
+                    the hull center in ANY direction); targets
+                    tanks/buildings/MG-nests/artillery (no MG —
+                    infantry are engaged only by being run over);
+    tank_fr_female  Hotchkiss/Reibel MGs only — targets INFANTRY
+                    only (her rounds never hurt tanks or
+                    buildings), ONE column at a time; a column
+                    directly ahead of her facing is RUN OVER, not
+                    shot (she never stops for it); the turret
+                    ROTATES, so she shoots in ANY direction while
+                    the fixed german hull is restricted (MGs never
+                    fire into the front arc — only behind or
+                    steeply above/below);
+- the armor damage rule: armor is ONLY damaged by other tanks'
+  cannon shots and artillery splash (the battle state's bullet
+  loops enforce it);
 - a tank passing over OPPOSING infantry squishes it (dead outright);
   same-side infantry is never touched (the state passes only the
   opposing list);
@@ -53,6 +74,7 @@ from config import (
     TILE_SIZE,
     RED,
     BLUE,
+    PINK,
     TANK_HP,
     TANK_SPEED,
     TANK_SPEED_REF_TILES,
@@ -82,24 +104,39 @@ class ArmorUnit(RawSubtractDamage):
     # through the same getattr fallback.
     unit_kind = "vehicle"
 
-    # Which target kinds this vehicle's MG can hurt: tanks shoot
-    # infantry AND other tanks. BUILDINGS are handled separately via
-    # the buildings list passed to update().
+    # Which target kinds this vehicle's MG can hurt: tanks machine-gun
+    # INFANTRY only — enemy armor is a CANNON target. BUILDINGS are
+    # handled separately via the buildings list passed to update().
     MG_TARGETS = ()
 
     # Weapon layout per VARIANT (user spec, assigned by sprite
     # variant — see the subclasses below):
-    # cannon         stops for buildings/MGs and shells them; a
-    #                cannon-less tank never parks for buildings;
-    # mg_gun_count   guns fired per MG volley (several guns may
-    #                engage several infantry targets);
-    # turret_rotates False = fixed hull (german): the cannon only
-    #                fires FORWARD and the MGs never fire into the
-    #                front arc; True (french rotating turret) = any
-    #                direction.
+    # cannon           the tank shells its committed target (buildings,
+    #                  MG nests, artillery AND enemy tanks in front of
+    #                  a fixed hull) once it halts in gun range;
+    # mg_gun_count     guns fired per MG volley (the german hull
+    #                  caps the volley at ONE column per position:
+    #                  above/below/behind);
+    # turret_rotates   False = fixed hull (german): the cannon only
+    #                  fires FORWARD and the MGs never fire into the
+    #                  front arc; True (french rotating turret) = any
+    #                  direction;
+    # pursues_infantry False = the ADVANCE commits to the nearest
+    #                  body that is NOT infantry (enemy tanks,
+    #                  buildings, MG nests, artillery); infantry are
+    #                  only squished en route and machine-gunned in
+    #                  range, never pursued. The french female
+    #                  variant is the SOLE pursuer of infantry — the
+    #                  only body her guns can hurt.
     cannon = True
     mg_gun_count = 1
     turret_rotates = True
+    pursues_infantry = False
+
+    # Block-mode look (user rule): the french female tank renders
+    # with a PINK body and the side color on its facing marker; all
+    # other variants keep the plain side-color block.
+    block_accented = False
 
     def __init__(self, x, y, is_enemy, filename, nation,
                  hp, speed, width, height,
@@ -146,6 +183,12 @@ class ArmorUnit(RawSubtractDamage):
         # buildings' facing convention.
         self.dir_x = -1 if is_enemy else 1
 
+        # COMMIT slot (user movement rules): the body the tank is
+        # driving to / shooting at. It is re-picked — possibly with a
+        # direction change — ONLY when it is destroyed; with no
+        # valid target left the tank halts where it stands.
+        self.move_target = None
+
         # Per-country art, scaled to this class's world size. A
         # missing file (like the factory art chain) falls back to
         # the block color instead of crashing.
@@ -188,113 +231,229 @@ class ArmorUnit(RawSubtractDamage):
     # ---- behavior ----
 
     def update(self, dt, targets, bullets, buildings=None):
-        """Advance toward the enemy, shell buildings, volley the MGs.
+        """Drive to the committed target, halt in range, shoot.
 
         `targets` is the OPPOSING unit list (infantry + armor).
         `bullets` is the side-appropriate list the battle state
-        simulates. `buildings` is the OPPOSING BUILDING list: a
-        cannon tank stops and SHELLS the nearest alive building in
-        gun range (and inside the facing cone) — the ONLY thing the
-        tank stops for ("stop only when none remain"); infantry are
-        machine-gunned on the move or while parked (simultaneous
-        fire), and bodies run over are squished.
+        simulates. `buildings` is the OPPOSING BUILDING list.
+
+        Movement model (user rules): the tank drives in FULL 2D
+        (back/forward, up/down) toward its COMMITTED target — the
+        nearest enemy tank/building/MG-nest/artillery for cannon
+        tanks, the nearest enemy infantry for the french female.
+        The commit is re-picked (with a possible direction change)
+        ONLY when the committed target is destroyed. A target in
+        gun range halts the tank: it shoots the committed target
+        until the target falls or the tank dies, then rolls to the
+        next nearest target. With no valid target left the tank
+        stops where it stands. Infantry are NEVER a reason to stop:
+        bodies driven over are squished outright, and the machine
+        guns keep firing in range whatever the tank is doing.
+        Buildings are never collided with — the movement step
+        STEERS AROUND them.
         """
         if self.dead:
             return
 
-        world_w = _world_width()
-        world_h = len(STATIC_MAP) * TILE_SIZE
+        # COMMITTED TARGET: the nearest valid target (per variant).
+        # Re-picked — with a possible direction change — ONLY when
+        # the committed target is destroyed (user rule). No target
+        # left: the tank halts where it stands.
+        target = self.move_target
+        if target is not None and self._target_gone(target):
+            target = None
+            self.move_target = None
+        if target is None:
+            target = self._pick_move_target(targets, buildings)
+            if target is not None:
+                self.move_target = target
 
-        # Building stop rule (cannon tanks only — a cannon-less
-        # variant never parks): nearest ALIVE enemy building whose
-        # center is inside gun range AND the gun's facing cone halts
-        # the advance this frame; the tank parks here and shells it
-        # on the cannon's cadence. armor_damage shots work on ALL
-        # enemy buildings (MG nests, artillery, barracks, factories,
-        # air fields, bunkers — destructible since BUILDING_HP). The
-        # stop range sits far outside any footprint, so the tank
-        # NEVER collides with the building it shells (user rule).
-        building = None
-        if self.cannon:
-            building = self._nearest_building(buildings)
-        parked = building is not None
-        if parked:
-            self._fire_building_shot(dt, building, bullets)
-
-        if not parked:
-            # Movement TARGET (user: "target the nearest enemy
-            # infantry, MG, or building; turn toward a closer valid
-            # target; stop only when none remain"): steer at the
-            # nearest opposing infantry or building; enemy tanks are
-            # NOT pursued (the MGs duel armor while advancing). No
-            # target left = straight advance to the enemy edge.
-            cx = self.x + self.width / 2
-            cy = self.y + self.height / 2
-            move_to = self._nearest_move_target(targets, buildings)
-
-            if move_to is not None:
-                dx = move_to[0] - cx
-                dy = move_to[1] - cy
-                length = math.hypot(dx, dy) or 1.0
-                self.x += dx / length * self.speed * dt / 1000
-                self.y += dy / length * self.speed * dt / 1000
-
-                # FACING follows the pursuit, like the player's.
-                if abs(dx) > 1e-6:
-                    self.dir_x = 1 if dx > 0 else -1
+        if target is not None:
+            tx, ty = self._body_center(target)
+            if self._in_stop_range(target, tx, ty):
+                # IN RANGE: halt here and shoot the committed target
+                # until it is destroyed or the tank dies (user
+                # rule). The hull keeps facing the target so the
+                # fixed german cannon stays cone-legal.
+                self._face_towards(tx, ty)
+                if self.cannon:
+                    self._fire_cannon_shot(dt, target, bullets)
             else:
-                self.x += self.dir_x * self.speed * dt / 1000
+                # Out of range (or a french female with the target
+                # column directly ahead of her facing — she keeps
+                # driving to RUN OVER it): drive toward the target
+                # in 2D, steering around buildings (never colliding).
+                self._advance_step(dt, tx, ty, buildings)
+                self._face_towards(tx, ty)
 
-            # In-world clamp on BOTH axes.
-            self.x = max(0, min(self.x, world_w - self.width))
-            self.y = max(0, min(self.y, world_h - self.height))
-
-            # SQUISH (user rule): enemy infantry under the hull die
-            # outright ("killed as if squished"). The list is the
-            # OPPOSING side only, so same-side infantry is never
-            # squished — no extra faction check needed.
-            self._squish_infantry(targets)
-
-        # MG volley: fires while parked AND advancing (simultaneous
-        # cannon + MG fire, user rule).
+        # Infantry are NEVER a reason to stop (user rule): enemy
+        # infantry under the hull die outright ("killed as if
+        # squished") and the MG volley keeps firing on the move,
+        # while halted, and while standing targetless. The list is
+        # the OPPOSING side only, so same-side infantry is never
+        # squished — no extra faction check needed.
+        self._squish_infantry(targets)
         self._fire_mg_volley(dt, targets, bullets)
 
-    def _nearest_move_target(self, targets, buildings):
-        """Nearest enemy body the tank should DRIVE toward.
+    def _target_gone(self, target):
+        """Committed-target death test: units die, buildings fall."""
+        if getattr(target, "dead", False):
+            return True
+        return bool(getattr(target, "is_destroyed", bool)())
 
-        Candidates (user spec): enemy INFANTRY and enemy BUILDINGS
-        (MG nests included — they are buildings). Enemy TANKS are not
-        pursued: armor duels happen through the MGs while advancing.
-        Returns the target's center as (x, y), or None.
+    def _body_center(self, body):
+        """Center point of a unit or building (world px)."""
+        if hasattr(body, "get_hitbox"):
+            return body.get_hitbox().center
+        return (
+            body.x + getattr(body, "width", 0) / 2,
+            body.y + getattr(body, "height", 0) / 2,
+        )
+
+    def _face_towards(self, tx, ty):
+        """Turn east/west toward the committed target.
+
+        The hull's horizontal facing follows the target; up/down
+        movement keeps the heading. A direction change therefore
+        only happens when a fresh commit sits on the other side —
+        which, per the commit rule, only occurs after the previous
+        target was destroyed.
+        """
+        cx = self.x + self.width / 2
+        if tx > cx:
+            self.dir_x = 1
+        elif tx < cx:
+            self.dir_x = -1
+
+    def _in_stop_range(self, target, tx, ty):
+        """True when the committed target should HALT the tank.
+
+        Cannon tanks (german, french male) halt once the target is
+        inside gun range and shoot it until it falls or they die
+        (user rule). The french female halts to gun an infantry
+        column EXCEPT when the column stands directly ahead of her
+        facing — there she never stops: she keeps driving and runs
+        the column over instead (user rule).
+        """
+        cx = self.x + self.width / 2
+        cy = self.y + self.height / 2
+        dist = math.hypot(tx - cx, ty - cy)
+        if dist > self.range:
+            return False
+        if self.pursues_infantry:
+            ahead = (
+                (tx - cx) * self.dir_x > 0
+                and abs(ty - cy) <= self.height
+            )
+            return not ahead
+        return True
+
+    def _pick_move_target(self, targets, buildings):
+        """Nearest valid COMMIT target for the ADVANCE.
+
+        (user rule) Cannon tanks (german, french male) commit to the
+        nearest body that is NOT infantry: enemy tanks, buildings,
+        MG nests and artillery. The french female variant commits
+        to enemy INFANTRY only — the only body her guns can hurt.
+        Returns the OBJECT so the tank can track its death for the
+        turn rule.
         """
         cx = self.x + self.width / 2
         cy = self.y + self.height / 2
 
         best = None
         best_dist = None
+
+        if self.pursues_infantry:
+            # Female variant: infantry targets ONLY.
+            for t in targets:
+                if getattr(t, "dead", False):
+                    continue
+                if getattr(t, "unit_kind", "infantry") != "infantry":
+                    continue
+                tx, ty = self._body_center(t)
+                dist = math.hypot(tx - cx, ty - cy)
+                if best_dist is None or dist < best_dist:
+                    best_dist = dist
+                    best = t
+            return best
+
+        # Cannon tanks: enemy TANKS (user rule) plus BUILDINGS
+        # (MG nests and artillery are buildings too).
         for t in targets:
             if getattr(t, "dead", False):
                 continue
-            if getattr(t, "unit_kind", "infantry") != "infantry":
+            if getattr(t, "unit_kind", "infantry") == "infantry":
                 continue
-            tx = t.x + t.width / 2
-            ty = t.y + t.height / 2
+            tx, ty = self._body_center(t)
             dist = math.hypot(tx - cx, ty - cy)
             if best_dist is None or dist < best_dist:
                 best_dist = dist
-                best = (tx, ty)
+                best = t
 
-        if buildings:
-            for build in buildings:
-                if build.is_destroyed():
-                    continue
-                hb = build.get_hitbox()
-                dist = math.hypot(hb.centerx - cx, hb.centery - cy)
-                if best_dist is None or dist < best_dist:
-                    best_dist = dist
-                    best = (hb.centerx, hb.centery)
-
+        for build in buildings or ():
+            if build.is_destroyed():
+                continue
+            hb = build.get_hitbox()
+            dist = math.hypot(hb.centerx - cx, hb.centery - cy)
+            if best_dist is None or dist < best_dist:
+                best_dist = dist
+                best = build
         return best
+
+    def _advance_step(self, dt, tx, ty, buildings):
+        """One frame of movement toward (tx, ty).
+
+        Movement is FULL 2D (user: back and forward, up and down).
+        Buildings are the only obstacle: the step probes the hull
+        one step ahead and, when a building blocks it, slides along
+        the building's edge on the shortest-detour side — tanks go
+        AROUND buildings, never colliding with them (user rule).
+        """
+        cx = self.x + self.width / 2
+        cy = self.y + self.height / 2
+        dx, dy = tx - cx, ty - cy
+        dist = math.hypot(dx, dy) or 1.0
+        ux, uy = dx / dist, dy / dist
+        step = self.speed * dt / 1000
+
+        # Desired straight step: probe the hull translated one step
+        # along the travel line.
+        probe = pygame.Rect(
+            round(self.x + ux * step), round(self.y + uy * step),
+            self.width, self.height,
+        )
+        blocked = None
+        for build in buildings or ():
+            if build.is_destroyed():
+                continue
+            if probe.colliderect(build.get_hitbox()):
+                blocked = build
+                break
+
+        if blocked is None:
+            self.x += ux * step
+            self.y += uy * step
+        else:
+            # GO AROUND (user rule): steer along the building's edge
+            # toward the side the travel line does NOT pass — the
+            # shorter detour — keeping a little forward progress so
+            # the tank flows around the corner instead of hugging
+            # the wall.
+            hb = blocked.get_hitbox()
+            bx, by = hb.center
+            cross = ux * (by - cy) - uy * (bx - cx)
+            side = -1 if cross > 0 else 1
+            px, py = -uy * side, ux * side
+            plen = math.hypot(px, py) or 1.0
+            self.x += (px / plen * 0.7 + ux * 0.3) * step
+            self.y += (py / plen * 0.7 + uy * 0.3) * step
+
+        # In-world clamp on BOTH axes (full 2D movement).
+        world_w = _world_width()
+        world_h = len(STATIC_MAP) * TILE_SIZE
+        self.x = max(0, min(self.x, world_w - self.width))
+        self.y = max(0, min(self.y, world_h - self.height))
 
     def _squish_infantry(self, targets):
         """Run over opposing infantry: squished, dead outright."""
@@ -308,47 +467,20 @@ class ArmorUnit(RawSubtractDamage):
                 t.hp = 0
                 t.dead = True
 
-    def _nearest_building(self, buildings):
-        """Nearest ALIVE enemy building in gun range AND facing cone.
-
-        buildings=None means the state passed no list (back-compat):
-        no building rule applies. Distance is center-to-center.
-        """
-        if not buildings:
-            return None
-
-        cx = self.x + self.width / 2
-        cy = self.y + self.height / 2
-
-        nearest = None
-        best_dist = None
-        for build in buildings:
-            if build.is_destroyed():
-                continue
-            hb = build.get_hitbox()
-            dx = hb.centerx - cx
-            dy = hb.centery - cy
-            if not self._cannon_can_hit(dx, dy):
-                continue
-            dist = math.hypot(dx, dy)
-            if dist <= self.range and (
-                best_dist is None or dist < best_dist
-            ):
-                best_dist = dist
-                nearest = build
-        return nearest
-
     def _fire_mg_volley(self, dt, targets, bullets):
-        """Fire up to mg_gun_count guns at the nearest valid targets.
+        """Fire the machine guns at the nearest valid infantry.
 
-        One bullet per gun per volley; the volley shares ONE clock
-        (fire_rate). Valid = alive, kind in MG_TARGETS, inside the
-        range circle, inside the MG facing cone. Distance-sorted so
-        the closest bodies get the guns ("targets in rotation" reads
-        as the nearest-first pass). MOUNT RULE: shots originate at
-        the mount covering the target's arc (turret center for
-        rotating turrets; rear/roof/belly mounts for the german
-        hull — see the loop below).
+        The volley shares ONE clock (fire_rate). Valid = alive, kind
+        in MG_TARGETS (infantry only), inside the range circle,
+        inside the MG facing cone. VOLLEY RULE per hull (user spec):
+        a ROTATING turret (french variants) engages the mg_gun_count
+        nearest infantry columns, any direction. The FIXED german
+        hull engages at most ONE column per POSITION — one above,
+        one below, one behind, simultaneously; never two columns in
+        the same position ("can't shoot 3 columns below"). MOUNT
+        RULE: shots originate at the mount covering each column's
+        position (turret center for rotating turrets; rear/roof/
+        belly mounts for the german hull).
         """
         self.mg_cooldown -= dt / 1000
         if self.mg_cooldown > 0:
@@ -375,53 +507,82 @@ class ArmorUnit(RawSubtractDamage):
 
         if not candidates:
             return
-        candidates.sort(key=lambda c: c[0])
 
-        # Tank shells can kill other tanks (Bullet.armor_damage);
-        # regular shots pass through armor harmlessly — the battle
-        # state's bullet loops handle the skip rule. Damage carries
-        # the producing nation's handicap.
-        armor = "tank" in self.MG_TARGETS
-        for _dist, dx, dy, t in candidates[: self.mg_gun_count]:
-            # MOUNT RULE (user): every shot comes from the mount that
-            # covers the target's arc. Rotating-turret MGs (fr female)
-            # fire from the turret at the hull center; the german
-            # hull PAIRS fire from their fixed positions — rear
-            # mounts for bodies BEHIND, roof mounts for bodies ABOVE
-            # (north), belly mounts for bodies BELOW (south).
-            if self.turret_rotates:
-                muzzle_x, muzzle_y = cx, cy
-            elif dx * self.dir_x < 0:
-                muzzle_x = cx - self.dir_x * (self.width / 2)
-                muzzle_y = cy
-            elif dy < 0:
-                muzzle_x, muzzle_y = cx, cy - self.height / 2
-            else:
-                muzzle_x, muzzle_y = cx, cy + self.height / 2
+        # MOUNT RULE + VOLLEY RULE: pick the shot list (muzzle, target)
+        # per hull type.
+        if self.turret_rotates:
+            # Rotating turret: nearest-first, mg_gun_count columns,
+            # every shot from the turret at the hull center.
+            candidates.sort(key=lambda c: c[0])
+            shots = [
+                (cx, cy, c[3]) for c in candidates[: self.mg_gun_count]
+            ]
+        else:
+            # Fixed german hull: ONE column per position — the
+            # nearest BEHIND, the nearest ABOVE, the nearest BELOW —
+            # fired from that position's mount (user rule: up to 3
+            # columns at once, never two from the same position).
+            buckets = {"behind": None, "above": None, "below": None}
+            for dist, dx, dy, t in candidates:
+                if dx * self.dir_x < 0:
+                    key = "behind"
+                elif dy < 0:
+                    key = "above"
+                else:
+                    key = "below"
+                cur = buckets[key]
+                if cur is None or dist < cur[0]:
+                    buckets[key] = (dist, t)
 
+            shots = []
+            if buckets["behind"] is not None:
+                shots.append((
+                    cx - self.dir_x * (self.width / 2), cy,
+                    buckets["behind"][1],
+                ))
+            if buckets["above"] is not None:
+                shots.append((
+                    cx, cy - self.height / 2,
+                    buckets["above"][1],
+                ))
+            if buckets["below"] is not None:
+                shots.append((
+                    cx, cy + self.height / 2,
+                    buckets["below"][1],
+                ))
+
+        for muzzle_x, muzzle_y, t in shots:
             vdx = t.x + t.width / 2 - muzzle_x
             vdy = t.y + t.height / 2 - muzzle_y
             length = math.hypot(vdx, vdy) or 1.0
             bullet = Bullet(
                 muzzle_x, muzzle_y, vdx / length, vdy / length,
-                armor_damage=armor,
             )
+            # MG rounds are ANTI-INFANTRY only (user rule): they pass
+            # through armor harmlessly (cannons kill tanks) and never
+            # scratch buildings (the cannon is the only anti-building
+            # weapon).
+            bullet.armor_damage = False
+            bullet.can_damage_buildings = False
             bullet.damage = scaled_damage(
                 self.nation, self.unit_kind, self.damage,
             )
             bullets.append(bullet)
         self.mg_cooldown = self.fire_rate
 
-    def _fire_building_shot(self, dt, building, bullets):
-        """Shell an enemy building while parked inside shooting range.
+    def _fire_cannon_shot(self, dt, target, bullets):
+        """Shell the COMMITTED target while halted in gun range.
 
-        MOUNT RULE (user): a hull-mounted cannon (tank_ger) fires from
-        the FRONT of the tank — the muzzle sits on the front face, so
+        Cannon targets (user rule): enemy buildings (MG nests and
+        artillery are buildings) AND enemy tanks — for the fixed
+        german hull only when the target sits in front of it. MOUNT
+        RULE (user): a hull-mounted cannon (tank_ger) fires from the
+        FRONT of the tank — the muzzle sits on the front face, so
         the shot physically comes "from the part where the front of
         the tank is"; a rotating-turret cannon (tank_fr_male) fires
         from the turret at the hull center. The facing cone applies
-        either way (tank_ger fires FORWARD only): a building outside
-        the cone never triggers the stop rule, so this shot is always
+        either way (tank_ger fires FORWARD only): the halted tank
+        keeps its hull faced at the target, so the shot is
         cone-legal when it fires.
         """
         self.gun_cooldown -= dt / 1000
@@ -436,12 +597,14 @@ class ArmorUnit(RawSubtractDamage):
             muzzle_x = cx + self.dir_x * (self.width / 2)
             muzzle_y = cy
 
-        hx, hy = building.get_hitbox().center
+        hx, hy = target.get_hitbox().center
         dx, dy = hx - muzzle_x, hy - muzzle_y
         length = math.hypot(dx, dy) or 1.0
         if not self._cannon_can_hit(hx - cx, hy - cy):
             return
 
+        # Cannon shells carry armor damage: they kill enemy tanks
+        # AND scratch every enemy building (armor_damage branch).
         bullet = Bullet(
             muzzle_x, muzzle_y, dx / length, dy / length,
             armor_damage=True,
@@ -465,10 +628,19 @@ class ArmorUnit(RawSubtractDamage):
         py = round(self.y)
 
         if not render_mode.is_sprite() or self.image is None:
+            # FEMALE TANK BLOCK (user rule): her block body is PINK —
+            # the side color moves onto the facing marker (BLUE for
+            # the player's side, RED for the enemy side) so the side
+            # AND the direction stay readable. All other variants
+            # keep the plain side-color block with the dark marker.
+            color = RED if self.is_enemy else BLUE
+            marker_color = None
+            if self.block_accented:
+                color = PINK
+                marker_color = RED if self.is_enemy else BLUE
             draw_unit_block(
                 screen, px, py, self.width, self.height,
-                self.dir_x,
-                RED if self.is_enemy else BLUE,
+                self.dir_x, color, marker_color=marker_color,
             )
             return
 
@@ -476,12 +648,15 @@ class ArmorUnit(RawSubtractDamage):
 
 
 class TankUnit(ArmorUnit):
-    """Factory tank base: 100 hp, slow; MG hurts infantry AND tanks;
-    stops in range of an enemy building and shells it. The VARIANT
-    subclasses below assign the per-variant weapon layouts."""
+    """Factory tank base: 100 hp, slow. The ADVANCE commits to the
+    nearest body that is NOT infantry (enemy tanks, buildings, MG
+    nests, artillery — user rule); infantry are never pursued, only
+    squished when driven over and machine-gunned in range. The
+    VARIANT subclasses below assign the per-variant weapon
+    layouts."""
 
     unit_kind = "tank"
-    MG_TARGETS = ("infantry", "tank")
+    MG_TARGETS = ("infantry",)
 
     def __init__(self, x, y, is_enemy=False, filename=None, nation=None):
         # All tank source files scale to one 128x58 world box
@@ -501,28 +676,47 @@ class TankUnit(ArmorUnit):
 
 class GermanTank(TankUnit):
     """tank_ger (A7V-style hull): 5.7 cm Maxim-Nordenfelt cannon in
-    the FRONT hull only; six 7.9 mm machine guns (two each targeting
-    behind, below, and above) fire as a 6-gun volley — never into the
-    shallow front arc, which the cannon owns."""
+    the FRONT hull only — it fires at enemy tanks/buildings/MG-nests/
+    artillery IN FRONT of the tank; the six 7.9 mm machine guns
+    engage INFANTRY only, from BEHIND, ABOVE or BELOW the tank — at
+    most ONE column per position simultaneously (never two columns
+    in the same position: the hull has no second gun facing any one
+    of them)."""
 
     turret_rotates = False
     mg_gun_count = 6
 
 
 class FrenchMaleTank(TankUnit):
-    """tank_fr_male: 37 mm guns ONLY (no machine guns) — it stops for
-    buildings/MGs and shells them, rotating turret: any direction."""
+    """tank_fr_male: 37 mm gun ONLY (no machine guns) — it targets
+    enemy TANKS/BUILDINGS/MG-nests/artillery (user rule): it halts
+    once near a target (rotating turret: no facing needed) and
+    shells it until it falls. No MG, so infantry are engaged only
+    by being run over (squished)."""
 
     mg_gun_count = 0
 
 
 class FrenchFemaleTank(TankUnit):
-    """tank_fr_female: Hotchkiss/Reibel machine guns ONLY — no
-    cannon, so it NEVER stops for buildings (it keeps advancing and
-    strafing); the rotating turret engages any direction."""
+    """tank_fr_female: Hotchkiss/Reibel machine guns ONLY — she
+    targets ONLY enemy infantry (user rule): her MG rounds carry
+    neither armor damage nor building damage, so tanks and
+    buildings are immune to her fire. She is the SOLE tank that
+    pursues infantry (pursues_infantry), one column at a time; a
+    column directly ahead of her facing is RUN OVER, not shot (she
+    never stops for it); any other column in range is shot from the
+    rotating turret, any direction. No cannon, so she never shells
+    buildings — they are steered around instead."""
 
     cannon = False
-    mg_gun_count = 2
+    mg_gun_count = 1
+    MG_TARGETS = ("infantry",)
+    pursues_infantry = True
+
+    # User rule: in block mode the female tank is the PINK tank —
+    # pink body, side color on the facing marker (blue player side,
+    # red enemy side).
+    block_accented = True
 
 
 # Sprite-variant -> weapon class (user: "assign weapons by sprite

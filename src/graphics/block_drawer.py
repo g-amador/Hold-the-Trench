@@ -13,12 +13,16 @@ import pygame
 _MARKER_COLOR = (20, 20, 20)
 
 
-def draw_unit_block(screen, x, y, width, height, facing, color):
-    """Draw a unit as a flat block with a dark marker on its facing edge.
+def draw_unit_block(screen, x, y, width, height, facing, color,
+                    marker_color=_MARKER_COLOR):
+    """Draw a unit as a flat block with a marker on its facing edge.
 
     The marker sits on the side the unit is moving/aiming toward
     (facing 1 = right edge, -1 = left edge), so direction is readable
-    even without sprites.
+    even without sprites. `marker_color` defaults to the dark contrast
+    color (None keeps that default); a caller may pass a side color
+    instead (the pink female tank re-colors its marker BLUE/RED to
+    keep its side readable).
     """
     px = round(x)
     py = round(y)
@@ -30,4 +34,7 @@ def draw_unit_block(screen, x, y, width, height, facing, color):
     # readable.
     marker = max(6, width // 3)
     marker_x = px + width - marker if facing == 1 else px
-    pygame.draw.rect(screen, _MARKER_COLOR, (marker_x, py, marker, marker))
+    pygame.draw.rect(
+        screen, marker_color or _MARKER_COLOR,
+        (marker_x, py, marker, marker),
+    )

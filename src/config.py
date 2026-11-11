@@ -63,6 +63,7 @@ GOLD = (255, 215, 0)     # gold pickups
 RED = (200, 50, 50)      # enemy side (units, bullets, block fallback)
 BLUE = (0, 200, 255)     # ally side (units, block fallback)
 YELLOW = (255, 255, 0)   # artillery muzzle flash (shell-flight marker)
+PINK = (255, 20, 147)    # french female tank block body (both sides)
 
 # Starting balance, tuned to let the player afford one building
 # or a few partial payments early on.
@@ -86,19 +87,19 @@ GOLD_MAGNET_SPEED_PX_S = 260
 # constructs the building only when the full cost is covered.
 # Enemy variants cost 0 because they are placed free from map markers.
 BUILD_COSTS = {
-    "mg": 30,
+    "mg": 0,
     "bunker": 0,
     "barracks": 60,
-    "artillery": 80,
-    "air_field": 200,
-    "tank_factory": 150,
+    "artillery": 0,
+    "air_field": 0,
+    "tank_factory": 0,
 
-    "enemy_mg": 10, #30
+    "enemy_mg": 0, #30
     "enemy_bunker": 0,
     "enemy_barracks": 0, #60
     "enemy_artillery": 0, #80
     "enemy_air_field": 0, #200
-    "enemy_tank_factory": 0, #150
+    "enemy_tank_factory": 10, #150
 }
 
 # ---------------- Combat ----------------

@@ -84,12 +84,17 @@ def resolve_bullets(bullets, units, buildings, bunkers, planes,
                 hit = True
                 break
 
-        # Fallback to objectives when no unit was hit. Buildings
-        # are destructible: armor_damage bullets (tank shells)
-        # hurt ANY building; plane MG bullets never touch
-        # buildings (bombs only); other shots keep the old
-        # bunker-only rule (shooting bunkers is a core win route).
-        if not hit and bullet.armor_damage:
+        # Fallback to objectives when no unit was hit. BUILDINGS are
+        # destructible only to armor_damage bullets THAT MAY TOUCH
+        # THEM (tank CANNON shells; tank MG rounds carry
+        # can_damage_buildings=False — the cannon is the only
+        # anti-building weapon, user rule). Armor shots without the
+        # flag pass over buildings and keep flying; non-armor shots
+        # keep the old bunker-only rule (shooting bunkers is a core
+        # win route).
+        if not hit and bullet.armor_damage and getattr(
+            bullet, "can_damage_buildings", True,
+        ):
             for building in buildings:
                 if bullet.get_hitbox().colliderect(
                     building.get_hitbox()

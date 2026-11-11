@@ -800,9 +800,10 @@ class AssaultPhase:
                         dt, self.enemy_barracks_units, self.bullets
                     )
 
-        # Factory armor: tanks drive toward the enemy base and hunt
-        # with their hull MG. A tank stops when an enemy building is
-        # inside shooting range (user rule) and shells it.
+        # Factory armor: tanks drive to their committed target (the
+        # nearest enemy tank/building — or infantry for the french
+        # female), halt in gun range and shoot it until it falls;
+        # they steer around buildings and never collide with them.
         for vehicle in list(self.friendlies):
             if isinstance(vehicle, ArmorUnit):
                 vehicle.update(
