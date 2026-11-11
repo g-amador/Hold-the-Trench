@@ -95,7 +95,7 @@ BUILD_COSTS = {
 
     "enemy_mg": 10, #30
     "enemy_bunker": 0,
-    "enemy_barracks": 10, #60
+    "enemy_barracks": 0, #60
     "enemy_artillery": 0, #80
     "enemy_air_field": 0, #200
     "enemy_tank_factory": 0, #150

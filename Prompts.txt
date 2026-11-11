@@ -1,5 +1,5 @@
 -> beta
-Artilery, Buildings, and tanks if destroyed (by tanks or plane bombs) should dissaper from the map.
+Planes sometimes stop over targets moving continuously back and forth before going to the next target. Secondly, the chaase tanks when on top of them for a while once they drop the bomb over the tank they should move on.
 
 Tanks
 - Spawn west of the factory, toward enemy trenches. Use WWI-inspired production rates, with longer production times for German tanks.
@@ -18,19 +18,10 @@ should not squish enemy infantry and vice versa for alied tanks and alied infant
 - German tanks can only shoot infantry above bellow and behind them. Their cannon can also only shoot 
 targets in front of it.
 
-Planes
-- Use approximate WWI cyclic machine-gun rates: France—Vickers, 450–600 rounds/min; Germany—Spandau lMG 08/15, 400–500 rounds/min.
-- Planes move continuously toward the nearest valid enemy target; never stop while attacking. Render them above buildings and units, with transparent backgrounds.
-- Planes may attack enemy planes, buildings, infantry, artillery, tanks, and machine-gun units. Only planes can attack planes.
-- Against ground targets, fly into range and drop a bomb, shown as a yellow dot. On impact, briefly show a red dot. Set bomb damage in `config.py`; apply it to the target’s HP and remove the target when HP reaches 0 or less.
-- In dogfights, firing rate determines how often a plane fires. Only confirmed hits reduce HP; set damage per hit in `config.py`. When one plane is destroyed, the survivor chooses its next target.
-- After each attack, continue toward the next nearest target. If none remain, fly off the map through the nearest edge.
-
-
 Update the relevant `.md` files to reflect the roadmap below. 
 First inspect the existing documentation and preserve its style and structure. 
-Clearly distinguish completed Alpha features from planned Beta and Future Demo features; 
-do not describe planned features as already implemented. 
+Clearly distinguish completed Alpha features, and now the completed Beta, and Future Demo features; 
+Do not describe planned features as already implemented. 
 Make only documentation changes, and summarize which files you updated.
 
 ## Alpha — Completed
@@ -104,6 +95,7 @@ Infantry
 
 Planes
 - Add plane behavior:  
+  - Limited bullets and bombs configurably in config.py. Once, no more ammunition or bombs the planes should return to their air field and land. Once they land they should dissapear.
   - Spawn by taking off from the airfield track, traveling northeast to southwest.
   - Use a suitable texture for bombs.
   - Once hp is zero use going down texture for 3 seconds.
@@ -133,6 +125,11 @@ Controls
 - Add gamepad support using a free library suitable for open-source projects, if pygame-ce is enough use it instead.
 - Add a main-menu settings screen to customize keyboard and gamepad controls.
 - Define customizable default controls in `config.py` and allow players to restore them.
+
+
+When a Artillery, Buildings, and tanks is destroyed (by tank cannons or plane bombs) their dostroyed textures should appear instead.
+For tanks and planes make them slowly dissapear from the maps if a certain configurable threashold is reached.
+In practice, I don't want to slow the game because to many things are being rendered.
 
 
 Review the entire game and identify Python libraries that could reduce code complexity or the amount of custom code. The project uses Pygame-CE.
