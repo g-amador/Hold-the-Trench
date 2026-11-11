@@ -35,8 +35,8 @@ Protect your bunker, manage your supplies, and destroy the enemy bunker to secur
 
 Each battle takes place on a **newly generated WWI battlefield**, forcing players to adapt their defenses, manage supplies, and make difficult tactical decisions.
 
-The animated .gif bellow illustrates running the current game alpha.
-![Game Alpha](https://raw.githubusercontent.com/g-amador/Hold-the-Trench/main/assets/Hold-the-trench-alpha.gif)
+The animated .gif bellow illustrates running the current game beta.
+![Game Beta](https://raw.githubusercontent.com/g-amador/Hold-the-Trench/main/assets/Hold-the-trench-beta.gif)
 
 
 [Back to Table of Contents](#toc)
@@ -332,41 +332,31 @@ Run the game:
 
 ## 🧭 <a name="development-roadmap">Development Roadmap
 
-### ✅ Vertical Slice V1
+### ✅ Alpha — Completed
 
-* [x] Machine-gun nests
-* [x] Bunkers
-* [x] Artillery positions
-* [x] Continuous enemy infantry spawning
-* [x] Enemy bunker destruction objective
-* [x] Post-battle decisions
-* [x] Victory and defeat states
-* [x] Pause and resume
+* [x] Basic game engine mechanics
+* [x] Start and win menu system
+* [x] High-level game prototype
 
-### 🚧 Planned Improvements
+### ✅ Beta — Completed
 
-* [x] Procedural scenarios — every battle rolls a fresh map variant + scene (`systems/factions.py` `roll_scene`; "continue" replays keep it fresh)
-* [ ] Additional enemy types
-* [ ] Better pathfinding
-* [ ] Visual effects
-* [x] Sound effects — menu selection stings and per-nation victory/defeat themes
-* [x] Music — looping main-menu theme
-* [ ] Weather system
-* [ ] Campaign progression
-* [ ] Save/load support
-* [ ] Gameplay balancing
+* [x] Animated sprites for units, including planes, tanks, and infantry
+* [x] Static images for menus, backgrounds, buildings, and other game elements
+* [x] Sound effects
+* [x] Playable Axis and Allied trench warfare
+* [x] Pause functionality
+* [x] Zoom in and out, with full-map and close-up views
 
-### 📌 Future Features
+### 🔮 Future Demo — Planned
 
-* [x] Tanks — factory-produced armor already exists (`entities/tank.py`: tank factories roll tanks per faction pool); a future ENEMY-side tank unit would extend the enemy classes
-* [ ] Difficulty modifiers
-
-### 📝 DONE (was: awaiting assets and design)
-
-* [x] Distinct victory and defeat screens — per-faction images in `systems/factions.py` (`VICTORY_BACKGROUND` / `DEFEAT_BACKGROUND`), used by `states/win_state.py` / `states/game_over.py`
-* [x] Faction selection on the main menu — `A`/`1` Allies, `X`/`2` Axis, `ENTER` starts the battle as chosen
-* [x] Units that follow the chosen faction — armor art/unit options roll per nation pool (`factions.armor_unit_options`), barracks/MG art is nation-keyed
-* [x] Post-battle faction choice — `R` replays the same faction, `S` switches sides (after victory or defeat)
+* [ ] Add AA gun units
+* [ ] Randomized, compatible factions for each side — Austro-Hungarian forces use barracks instead of airfields and tank factories
+* [ ] Expanded unit behavior, including infantry grenades, planes, British tanks, and faction-specific weapons
+* [ ] Unit audio for MG nests, artillery, infantry, planes, and tanks, with volume based on player distance
+* [ ] Gamepad support and a main-menu screen for customizing or restoring keyboard and gamepad controls
+* [ ] Visual effects, including particle explosions, cannon-fire effects, and damaged textures for buildings, tanks, and artillery
+* [ ] A reusable ASCII-map navigation system with route finding and visualization
+* [ ] Review optional Python libraries that could simplify the codebase — recommend suitable options before adding dependencies or changing code
 
 [Back to Table of Contents](#toc)
 

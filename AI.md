@@ -12,18 +12,19 @@ Repo: https://github.com/g-amador/Hold-the-Trench — branch V1.0.
 Run: `.\venv\Scripts\python.exe src\main.py` from the repo root (venv ships with the repo; requirements: pygame-ce >= 2.5).
 There is no automated test suite; verification = running the game and describing manual checks.
 
-# CURRENT GOAL — BETA RELEASE
+# CURRENT GOAL — BETA COMPLETE (Future Demo next)
 
-The bullet list below is the beta gate. Work only on items from this list until the beta ships.
+The beta shipped: every beta gate item below is done.
 
-- [ ] Animated sprites — moving units (infantry first, then planes, tanks, etc.)
-- [x] Static images — menu/result backgrounds + the in-game ground floor texture (map1_a<scene>.jpg, G-bound) done; artillery building art still open
-- [ ] Some special effects
-- [ ] Sound
+## Beta gate — COMPLETED
+
+- [x] Animated sprites — moving units (infantry, planes, tanks)
+- [x] Static images — menu/result backgrounds + the in-game ground floor texture (map1_a<scene>.jpg, G-bound)
+- [x] Sound
 - [x] Playable Axis trench warfare — faction selection + faction-driven art/coins/screens
 - [x] Playable Allies trench warfare — same system, opposite side
 - [x] Game pause
-- [x] Static images — menu/result screens + in-game ground floor texture (map1_a<scene>.jpg) done
+- Special effects are NOT part of the beta — they are a Future Demo item (see the FUTURE DEMO ROADMAP below); never describe them as implemented.
 
 # PROJECT ORGANIZATION
 
@@ -256,9 +257,18 @@ Use reputable museums, archives, institutions, and academic sources; for signifi
 - PACKAGES: added `__init__.py` to every src package (entities, engine, graphics, states, systems, ui, utils, world — one-line package docstrings) so pytest/linters/type-checkers resolve imports; the game layout (run from src/) is unchanged.
 - Verified (round-14 follow-up): Temp\opencode\damage_check.py — 7 groups: MRO wiring for every entity kind; enemy raw (hp goes negative, no re-hit guard); armor raw; plane guarded-raw (-10 after overkill, re-hit no-op); friendly clamp+guard; ALL SIX building kinds clamp+guard+is_destroyed; bunker post-death state identical to the historical no-guard behavior. Regression: battle_sim.py reproduces the EXACT pre-refactor count (8773 player bullets, identical outcome) — the best no-behavior-change witness; damage_check re-run after adding __init__.py; all packages import standalone; compile clean; headless boot smoke clean.
 
-# POST-BETA ROADMAP (do not start until the beta ships)
+# FUTURE DEMO ROADMAP (planned — do not code until the user asks; never describe these as implemented)
 
-Stabilize systems → combat/AI pass → terrain effects → buildings/defenses → waves/progression → economy → UI/feedback → tanks → aircraft → campaign → release prep.
+The beta is complete. The next milestone is the Future Demo:
+
+1. AA gun units.
+2. Randomized, compatible factions for each side — Austro-Hungarian forces use barracks instead of airfields and tank factories.
+3. Expanded unit behavior, including infantry grenades, planes, British tanks, and faction-specific weapons.
+4. Unit audio for MG nests, artillery, infantry, planes, and tanks, with volume based on player distance.
+5. Gamepad support and a main-menu screen for customizing or restoring keyboard and gamepad controls.
+6. Visual effects, including particle explosions, cannon-fire effects, and damaged textures for buildings, tanks, and artillery.
+7. A reusable ASCII-map navigation system with route finding and visualization.
+8. Review optional Python libraries that could simplify the codebase — recommend suitable options before adding dependencies or changing code.
 
 # IMMEDIATE ACTION
 
