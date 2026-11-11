@@ -11,6 +11,7 @@ condition is reached. The engine Game delegates handle_event / update
 
 import pygame
 import math
+import random
 
 from collections import Counter, deque
 
@@ -55,6 +56,7 @@ from config import (
     YELLOW,
     BUILD_FOOTPRINTS,
     footprint_for,
+    ENEMY_BUILD_DELAY_RANGE,
     VIEW_FULL,
     VIEW_CLOSE,
     CLOSE_VIEW_TILES,
@@ -95,6 +97,19 @@ ENEMY_BUILDING_CLASSES = {
 STATIC_BUILDING_CLASSES = {
     "enemy_air_field": AirField,
     "enemy_tank_factory": TankFactory,
+}
+
+# ENEMY DELAYED BUILD KINDS (user rule): the enemy spot kinds whose
+# zero-cost BUILD_COSTS roll is RANDOM ("random.choice"). They are
+# NOT all on the map at battle start — each is built by the enemy at
+# its own random battle moment (enemy_build_queue). The enemy_bunker
+# (always 0, not a random roll) keeps its battle-start placement.
+ENEMY_DELAYED_BUILD_KINDS = {
+    "enemy_mg",
+    "enemy_barracks",
+    "enemy_artillery",
+    "enemy_air_field",
+    "enemy_tank_factory",
 }
 
 # Entity cull margin in world px: entities up to a big sprite's size
@@ -341,6 +356,13 @@ class AssaultPhase:
         self.enemy_planes = []
 
         self.build_prompt_radius = 72
+
+        # ENEMY DELAYED BUILDS (user rule): zero-cost enemy spots
+        # (the random-roll kinds) queue here at battle start; the
+        # enemy constructs each one at its own random battle moment.
+        self.enemy_build_queue = []
+        self.enemy_build_clock = 0.0
+
         self.place_enemy_buildings()
         self.place_static_buildings()
         self.place_zero_cost_buildings()
@@ -401,9 +423,18 @@ class AssaultPhase:
             # DEBUG COST GATE (user rule, applies to BOTH sides): a
             # spot kind with a nonzero BUILD_COSTS entry is never
             # placed free. The enemy has no payment path at all, so
-            # the cost table is the lever: cost 0 = exists at battle
-            # start, cost > 0 = removed from the battle entirely.
+            # the cost table is the lever: cost 0 = exists, cost > 0
+            # = removed from the battle entirely.
             if BUILD_COSTS.get(spot_type, 10**9) != 0:
+                continue
+
+            # ENEMY DELAYED BUILDS (user rule): the random-roll
+            # zero-cost kinds (MG, barracks, artillery) are NOT on
+            # the map at battle start — the enemy builds each at a
+            # random battle moment. The enemy_bunker (always 0, not
+            # a random roll) keeps its battle-start placement.
+            if spot_type in ENEMY_DELAYED_BUILD_KINDS:
+                self.queue_enemy_build(tile_x, tile_y, spot_type)
                 continue
 
             tile = self.tilemap.get_tile(tile_x, tile_y)
@@ -428,16 +459,21 @@ class AssaultPhase:
                 )
 
     def place_static_buildings(self):
-        """Place free statics from the enemy f/k markers.
+        """Queue/place free statics from the enemy f/k markers.
 
-        Same placement as enemy defenses: free at battle start (when
-        BUILD_COSTS allows — see the DEBUG COST GATE below), open
-        tiles only, no payment. The PLAYER-side statics (F/K markers)
-        live in BUILDING_CLASSES since the user made them payable:
-        cost 0 -> place_zero_cost_buildings, cost > 0 -> touch-and-pay.
+        Same rules as enemy defenses: free (when BUILD_COSTS allows —
+        see the DEBUG COST GATE below), open tiles only, no payment.
+        The PLAYER-side statics (F/K markers) live in BUILDING_CLASSES
+        since the user made them payable: cost 0 ->
+        place_zero_cost_buildings, cost > 0 -> touch-and-pay.
         Enemy-side statics get the enemy faction for art behavior
         (german buildings/planes) and spawn into the enemy's lists
         via their own is_enemy flag.
+
+        ENEMY DELAYED BUILDS (user rule): both enemy statics
+        (air field, tank factory) are random-roll zero-cost kinds —
+        they queue for a random build moment instead of existing at
+        battle start.
         """
         for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
             building_class = STATIC_BUILDING_CLASSES.get(spot_type)
@@ -450,6 +486,12 @@ class AssaultPhase:
             # this battle — on the player side (F/K) as well as the
             # enemy side (f/k). Cost 0 keeps the free placement.
             if BUILD_COSTS.get(spot_type, 10**9) != 0:
+                continue
+
+            # ENEMY DELAYED BUILDS (user rule): random-roll zero-cost
+            # kinds build at a random battle moment, not at start.
+            if spot_type in ENEMY_DELAYED_BUILD_KINDS:
+                self.queue_enemy_build(tile_x, tile_y, spot_type)
                 continue
 
             tile = self.tilemap.get_tile(tile_x, tile_y)
@@ -465,6 +507,64 @@ class AssaultPhase:
                 ),
                 is_enemy=is_enemy,
             )
+
+    def queue_enemy_build(self, tile_x, tile_y, spot_type):
+        """Schedule ONE zero-cost enemy building for a random moment.
+
+        ENEMY DELAYED BUILDS (user rule): the random-roll zero-cost
+        enemy spots are not all on the map at battle start — each
+        gets its own random delay inside the config window
+        (ENEMY_BUILD_DELAY_RANGE) and the enemy constructs it when
+        the time is up (run_enemy_build_queue).
+        """
+        delay = random.uniform(*ENEMY_BUILD_DELAY_RANGE)
+        self.enemy_build_queue.append(
+            (delay, tile_x, tile_y, spot_type),
+        )
+
+    def run_enemy_build_queue(self, dt):
+        """Fire due enemy build timers (each spot builds at most once).
+
+        A due timer only builds when its spot is still VALID: the
+        marker still exists in the tilemap and no building stands on
+        the tile. A destroyed building's spot is retired
+        (clear_destroyed_buildings pops the marker), so a timer whose
+        target fell to ruins is dropped — the enemy NEVER rebuilds on
+        ruins (user rule). Pending timers tick on the battle clock,
+        which freezes with the pause.
+        """
+        self.enemy_build_clock += dt / 1000
+
+        still_pending = []
+        for entry in self.enemy_build_queue:
+            delay, tile_x, tile_y, spot_type = entry
+            if self.enemy_build_clock < delay:
+                still_pending.append(entry)
+                continue
+
+            # Validity check at fire time: retired or occupied spots
+            # are dropped, never rebuilt.
+            if self.tilemap.spot_types.get((tile_x, tile_y)) != spot_type:
+                continue
+            tile = self.tilemap.get_tile(tile_x, tile_y)
+            if tile is None or tile.building is not None:
+                continue
+
+            building_class = (
+                ENEMY_BUILDING_CLASSES.get(spot_type)
+                or STATIC_BUILDING_CLASSES.get(spot_type)
+            )
+            if building_class is None:
+                continue
+
+            tile.building = building_class(
+                tile_x,
+                tile_y,
+                is_enemy=True,
+                faction=self.enemy_faction,
+            )
+
+        self.enemy_build_queue = still_pending
 
     def place_zero_cost_buildings(self):
         """Auto-place every purchasable spot whose BUILD_COSTS entry is 0.
@@ -670,6 +770,11 @@ class AssaultPhase:
 
         # Automatically build when close to a valid build spot.
         self.auto_place_if_possible()
+
+        # ENEMY DELAYED BUILDS (user rule): the enemy constructs its
+        # zero-cost buildings at random battle moments. A structure
+        # built this frame joins the building roster next update.
+        self.run_enemy_build_queue(dt)
 
         # Camera: pinned to the map origin. The uniform-zoom view fits
         # the ENTIRE battlefield below the HUD bar, so any pan would

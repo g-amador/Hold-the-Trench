@@ -67,7 +67,7 @@ PINK = (255, 20, 147)    # french female tank block body (both sides)
 
 # Starting balance, tuned to let the player afford one building
 # or a few partial payments early on.
-START_GOLD = 1000
+START_GOLD = 100
 
 # Gold collect radius: the player picks up a coin by walking this
 # close to it (radial distance test, friendlier than a collision box).
@@ -101,6 +101,13 @@ BUILD_COSTS = {
     "enemy_air_field": 0, #200
     "enemy_tank_factory": 0, #150
 }
+
+# ENEMY DELAYED BUILDS (user rule): the zero-cost rolls above do NOT
+# all exist at battle start — the enemy builds them over time, each
+# one at a random moment inside this (min, max) window of battle
+# seconds. Destroyed buildings are never rebuilt: a fired timer whose
+# spot fell to ruins is dropped (no rebuild, no resurrection).
+ENEMY_BUILD_DELAY_RANGE = (0, 90)
 
 # ---------------- Combat ----------------
 # Max bullet travel distance in px. Every engagement range must stay
@@ -317,7 +324,7 @@ MG_NEST_FIRE_RATE = 0.1
 # horizontally and may elevate/depress at most this angle, so targets
 # STEEPLY above or below the muzzle (beyond the cone; e.g. on different
 # trench lines) are outside the arc even inside the circular range.
-MG_NEST_ELEVATION_DEG = 25
+MG_NEST_ELEVATION_DEG = 35
 
 # ---------------- Building footprints (tiles) ----------------
 # How many tiles each building kind covers: the drawn sprite/block, the
