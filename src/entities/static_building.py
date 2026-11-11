@@ -4,10 +4,12 @@ Static, marker-placed buildings: air field and tank factory.
 Placed FREE from map markers (F = air field, K = tank factory for the
 player; f/k for the enemy side) at battle start — nobody pays for
 them and the build prompt never touches them (they are not in
-BUILDING_CLASSES). The tank factory rolls out armored vehicles on the
-shared FACTORY_UNIT_INTERVAL timeline, producing per its rolled
+BUILDING_CLASSES). The tank factory rolls out armored vehicles on a
+per-nation interval (config.FACTORY_UNIT_INTERVALS_BY_NATION —
+German tanks take longer, user rule), producing per its rolled
 COUNTRY; the AIR FIELD produces PLANES into the side's plane list on
-the same cadence (user: "generate planes at the same rate as tanks").
+the generic FACTORY_UNIT_INTERVAL cadence (user: "generate planes at
+the same rate as tanks").
 
 Art follows the battle scene like every other building: the variant
 chain (scene file -> _a file -> base) picks day/night art per the
@@ -21,9 +23,18 @@ Static footprints come from the config table (7x7), and the statics
 are SOLID (player.BLOCKING_BUILDINGS + the enemy_ types).
 """
 
+import random
+
 import pygame
 
-from config import TILE_SIZE, BROWN, BUILD_FOOTPRINTS, BUILDING_HP, FACTORY_UNIT_INTERVAL
+from config import (
+    TILE_SIZE,
+    BROWN,
+    BUILD_FOOTPRINTS,
+    BUILDING_HP,
+    FACTORY_UNIT_INTERVAL,
+    FACTORY_UNIT_INTERVALS_BY_NATION,
+)
 from entities.airplane import AirplaneUnit
 from entities.tank import roll_armor_unit
 from entities.damage import FlooredDamage
@@ -186,29 +197,56 @@ class TankFactory(StaticBuilding):
         # pool would mix per factory again.
         self.nation = armor_factory_nation(faction)
 
-        # Production clock: one vehicle every FACTORY_UNIT_INTERVAL
-        # seconds (user ratio "1 tank per 3 infantry" on the shared
-        # timeline: infantry deploys every 5 s, a vehicle every 15).
+        # Production clock: WWI-INSPIRED RATES (user: "longer
+        # production times for German tanks") — per-nation interval
+        # from config, falling back to the generic table value.
+        self.interval = FACTORY_UNIT_INTERVALS_BY_NATION.get(
+            self.nation, FACTORY_UNIT_INTERVAL,
+        )
         self.spawn_timer = 0.0
 
+        # VARIANT COVERAGE (user: male AND female tanks both appear in
+        # a battle): the first rolls exhaust the nation's variant pool
+        # — every variant at least once, random order — after that
+        # the roll is pure random again.
+        self.rolled_variants = []
+
     def update(self, dt, units):
-        """Roll out a random vehicle of this factory's country into
-        `units` (the side's unit list owned by the battle state)."""
+        """Roll out a vehicle of this factory's country into `units`
+        (the side's unit list owned by the battle state)."""
         if self.dead:
             return
 
         self.spawn_timer += dt / 1000
-        if self.spawn_timer < FACTORY_UNIT_INTERVAL:
+        if self.spawn_timer < self.interval:
             return
 
         # Subtract (rather than zero) so slow frames never lose time.
-        self.spawn_timer -= FACTORY_UNIT_INTERVAL
+        self.spawn_timer -= self.interval
+
+        # Coverage pass: while a variant of this nation has never
+        # rolled here, force an unrolled one (random pick among the
+        # missing files). Once covered, force_filename=None returns
+        # the roll to plain random.
+        from systems.factions import armor_unit_options
+
+        filename = None
+        options = armor_unit_options(self.nation)
+        if options and len(self.rolled_variants) < len(options):
+            missing = [
+                file for _kind, file in options
+                if file not in self.rolled_variants
+            ]
+            filename = random.choice(missing)
 
         unit = roll_armor_unit(
             self.nation,
             self.is_enemy,
             self.tile_x * TILE_SIZE,
             self.tile_y * TILE_SIZE,
+            force_filename=filename,
         )
         if unit is not None:
+            if filename is not None:
+                self.rolled_variants.append(filename)
             units.append(unit)

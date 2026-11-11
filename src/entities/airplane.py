@@ -435,7 +435,13 @@ class AirplaneUnit(GuardedRawDamage):
 
         length = math.hypot(tx - cx, ty - cy) or 1.0
         bullet = Bullet(cx, cy, (tx - cx) / length, (ty - cy) / length)
+        # Plane MG fires at PLANES and infantry: no armor damage (the
+        # state's loops skip armored bodies without this flag), and
+        # no building hits either — only BOMBS touch buildings.
+        # from_plane marks the ORIGIN: only plane-fired bullets may
+        # bring down planes (user rule — ground fire passes under).
         bullet.can_damage_buildings = False
+        bullet.from_plane = True
         bullet.damage = scaled_damage(self.nation, "plane", self.mg_damage)
         bullets.append(bullet)
         self.mg_cooldown = self.mg_fire_rate

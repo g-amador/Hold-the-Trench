@@ -109,11 +109,12 @@ def resolve_bullets(bullets, units, buildings, bunkers, planes,
                     hit = True
                     break
 
-        # PLANES: player-side bullets (and plane MG fire) reach the
-        # opposing planes in the air (bullets with no armor damage
-        # chip planes like infantry; plane bullets are armorless
-        # by design, dogfights stay infantry-like).
-        if not hit:
+        # PLANES: ONLY plane-fired bullets reach the opposing planes
+        # (user rule: "only planes can shoot down other planes").
+        # Ground fire — infantry rifles, MG nests, tank machine guns,
+        # the player's rifle — passes harmlessly beneath the
+        # aircraft; a plane's own MG bullets carry from_plane=True.
+        if not hit and getattr(bullet, "from_plane", False):
             for plane in planes:
                 if plane.dead:
                     continue

@@ -228,15 +228,26 @@ def footprint_for(kind, faction):
 TANK_HP = 100
 
 # Advance speed (px/s) toward the enemy base / enemy bunker; tanks
-# crawl.
+# crawl. MOVEMENT SCALES TO MAP SIZE (user rule): the value is
+# referenced to TANK_SPEED_REF_TILES map tiles — a wider map speeds
+# tanks up proportionally, a narrower one slows them down
+# (effective speed = TANK_SPEED * map_width / reference_width).
 TANK_SPEED = 30
+TANK_SPEED_REF_TILES = 79   # current STATIC_MAP width in tiles
 
 # Production cadence: armored vehicles keep their OWN flat interval —
 # one roll every 15 s per factory, INDEPENDENT of the barracks section
 # batch size (the infantry rate scales with BARRACKS_SPAWN_BATCH; the
 # armor rate deliberately does not, so armor stays a slower drumbeat
 # than a batched infantry deployment).
+# WWI-INSPIRED RATES PER NATION (user: "longer production times for
+# German tanks"): the A7V was a far heavier build than the FT. A
+# nation not in the table keeps the generic interval above.
 FACTORY_UNIT_INTERVAL = 15.0
+FACTORY_UNIT_INTERVALS_BY_NATION = {
+    "fr": 15.0,
+    "ger": 20.0,
+}
 
 # Barracks spawn clock (s between infantry deployments) — the anchor
 # the factory cadence multiplies off (see comment above). Factories
