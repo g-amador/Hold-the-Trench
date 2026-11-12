@@ -822,13 +822,14 @@ def roll_armor_unit(nation, is_enemy, x, y, factory_width=0,
     male AND female both appear in a battle): the file must exist in
     the nation's option pool or the roll yields None.
 
-    SPAWN OUTSIDE THE FACTORY, BATTLE-FACING SIDE (user rule):
-    player-side armor rolls out EAST of the factory (toward the
-    enemy lines); enemy-side armor rolls out WEST of it (toward the
-    player). One hull width + the building STAND-OFF margin of clear
-    air — the hull NEVER starts inside its own factory — clamped
-    in-world. `x` is the factory anchor tile's left edge;
-    `factory_width` is the factory footprint in px.
+    SPAWN NORTH OF THE FACTORY, OUTSIDE IT (user rule): every tank
+    factory — BOTH sides — rolls its armor out of the NORTH edge.
+    The hull aligns to the CENTER of the factory's width and sits
+    one hull height + the building STAND-OFF margin of clear air
+    ABOVE the footprint — it NEVER starts inside its own factory —
+    clamped in-world. `x` is the factory anchor tile's left edge;
+    `y` is the factory anchor tile's top edge; `factory_width` is
+    the factory footprint in px.
     """
     from systems.factions import armor_unit_options
 
@@ -856,13 +857,13 @@ def roll_armor_unit(nation, is_enemy, x, y, factory_width=0,
     # balance handicaps (hp resistance) apply at spawn directly.
     unit = unit_class(x, y, is_enemy, filename, nation)
 
-    # Battle-facing side of the factory (user rule): player units
-    # east of the factory's east edge, enemy units west of its west
-    # edge — always with the stand-off margin of clear air.
+    # NORTH of the factory (user rule): both sides roll out of the
+    # north edge now — one hull height + stand-off margin of clear
+    # air above the footprint's top edge, horizontally centered on
+    # the factory's width, clamped in-world.
     world_w = _world_width()
-    if is_enemy:
-        unit.x = max(0, x - unit.width - TANK_BUILDING_STANDOFF_PX)
-    else:
-        unit.x = x + factory_width + TANK_BUILDING_STANDOFF_PX
+    unit.x = x + (factory_width - unit.width) / 2
+    unit.y = y - unit.height - TANK_BUILDING_STANDOFF_PX
     unit.x = max(0, min(unit.x, world_w - unit.width))
+    unit.y = max(0, unit.y)
     return unit
