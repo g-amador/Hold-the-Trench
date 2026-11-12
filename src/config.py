@@ -107,7 +107,7 @@ BUILD_COSTS = {
 # one at a random moment inside this (min, max) window of battle
 # seconds. Destroyed buildings are never rebuilt: a fired timer whose
 # spot fell to ruins is dropped (no rebuild, no resurrection).
-ENEMY_BUILD_DELAY_RANGE = (0, 90)
+ENEMY_BUILD_DELAY_RANGE = (0, 30)
 
 # ---------------- Combat ----------------
 # Max bullet travel distance in px. Every engagement range must stay
@@ -327,7 +327,7 @@ MG_NEST_FIRE_RATE = 0.1
 # horizontally and may elevate/depress at most this angle, so targets
 # STEEPLY above or below the muzzle (beyond the cone; e.g. on different
 # trench lines) are outside the arc even inside the circular range.
-MG_NEST_ELEVATION_DEG = 35
+MG_NEST_ELEVATION_DEG = 45
 
 # ---------------- Building footprints (tiles) ----------------
 # How many tiles each building kind covers: the drawn sprite/block, the
