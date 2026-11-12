@@ -11,7 +11,7 @@ hold_the_trench/
 │   │   └── game.py
 │   ├── entities/                   # for units, buildings, projectiles, and pickups
 │   │   ├── artillery.py            # artillery building; art keyed by FACTION (allies artillery_fr / axis artillery_ger), GREY block fallback
-│   │   ├── airplane.py             # factory-produced plane (air fields): flies, MGs infantry and planes, bombs tanks/buildings one target at a time; flies off the map when no targets remain
+│   │   ├── airplane.py             # factory-produced plane (air fields): flies, dive-shoots infantry in one straight pass then moves on, MGs planes, bombs tanks/buildings one target at a time; flies off the map when no targets remain
 │   │   ├── barracks.py
 │   │   ├── bullet.py
 │   │   ├── bunker.py
