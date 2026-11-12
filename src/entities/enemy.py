@@ -213,6 +213,10 @@ class EnemyInfantry(EnemyBase):
         compete by PROXIMITY — the bunker is attacked when it is
         nearer than any living friendly (i.e. no friendlies nearby),
         otherwise the nearest friendly is.
+        STOP-AND-SHOOT (user rule, mirror of the friendly side): while
+        a friendly stands in rifle range the soldier STANDS and fires
+        (shoot animation); running resumes only once no friendly is
+        shootable.
         """
         if self.dead: return
 
@@ -256,6 +260,48 @@ class EnemyInfantry(EnemyBase):
             )
             if target_dist is None or bunker_dist < target_dist:
                 target = player_bunker
+
+        # STOP-AND-SHOOT (user rule, mirror of the friendly side):
+        # while a living FRIENDLY stands inside rifle range, this
+        # soldier STANDS and fires on the rifle cadence — both the
+        # hunt and the bunker charge pause; running resumes only once
+        # no friendly infantry is shootable. Shootable = body not in
+        # melee contact (touching bodies stay with the paths below,
+        # so the mutual-destruction clash still resolves) and the aim
+        # fits the 90-degree cone once the soldier faces it. The
+        # standing aim-blip pose is the shoot animation.
+        shoot_target = None
+        shoot_dist = None
+        shoot_aim = (0.0, 0.0)
+        for f in living_friendlies:
+            if self.get_hitbox().colliderect(f.get_hitbox()):
+                continue
+            sx = f.x + f.width / 2 - (self.x + self.width / 2)
+            sy = f.y + f.height / 2 - (self.y + self.height / 2)
+            sdist = math.hypot(sx, sy)
+            if sdist >= INFANTRY_SHOOT_RANGE_PX:
+                continue
+            # Cone check with the facing the soldier would adopt.
+            aim_facing = 1 if sx > 0 else -1
+            if sdist > 0 and (sx / sdist * aim_facing) < 0.707:
+                continue
+            if shoot_dist is None or sdist < shoot_dist:
+                shoot_target = f
+                shoot_dist = sdist
+                shoot_aim = (sx, sy)
+
+        if shoot_target is not None:
+            sx, sy = shoot_aim
+            self.facing = 1 if sx > 0 else -1
+            self.is_moving = False
+            self.run_frame = 0
+            if shoot_dist > 0:
+                self._fire(sx / shoot_dist, sy / shoot_dist, bullets)
+            self.shoot_animation_timer = max(
+                0,
+                self.shoot_animation_timer - dt / 1000,
+            )
+            return
 
         # The player bunker won the proximity race: charge it and
         # OPEN FIRE from one square away (user rule, mirror of the
