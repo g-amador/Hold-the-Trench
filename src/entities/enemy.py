@@ -273,8 +273,11 @@ class EnemyInfantry(EnemyBase):
         shoot_target = None
         shoot_dist = None
         shoot_aim = (0.0, 0.0)
+        # ONE body rect per frame (the scan used to build a fresh
+        # Rect per candidate just for the contact test).
+        self_rect = self.get_hitbox()
         for f in living_friendlies:
-            if self.get_hitbox().colliderect(f.get_hitbox()):
+            if self_rect.colliderect(f.get_hitbox()):
                 continue
             sx = f.x + f.width / 2 - (self.x + self.width / 2)
             sy = f.y + f.height / 2 - (self.y + self.height / 2)

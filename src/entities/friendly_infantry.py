@@ -180,10 +180,13 @@ class FriendlyInfantry(FlooredDamage):
         shoot_target = None
         shoot_dist = None
         shoot_aim = (0.0, 0.0)
+        # ONE body rect per frame (the scan used to build a fresh
+        # Rect per candidate just for the contact test).
+        self_rect = self.get_hitbox()
         for enemy in enemies:
             if enemy.dead or isinstance(enemy, ArmorUnit):
                 continue
-            if self.get_hitbox().colliderect(enemy.get_hitbox()):
+            if self_rect.colliderect(enemy.get_hitbox()):
                 continue
             sx = enemy.x + enemy.width / 2 - (self.x + self.width / 2)
             sy = enemy.y + enemy.height / 2 - (self.y + self.height / 2)

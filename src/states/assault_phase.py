@@ -432,6 +432,20 @@ class AssaultPhase:
         clearing) so the next update rebuilds the roster lists."""
         self._building_roster = None
 
+    def _live_buildings(self):
+        """The flat building list WITHOUT another full grid scan.
+
+        Render-path readers (HUD bunker HP, artillery markers, the
+        CLOSE hires pass, the force panel) used to re-flatten the
+        whole tile grid every frame; they reuse the cached roster's
+        flat list instead. One fallback scan covers the edge case of
+        a roster invalidated this frame (ruins cleared at the end of
+        update) — the next update rebuilds it anyway.
+        """
+        if self._building_roster is not None:
+            return self._building_roster[0]
+        return BuildingQuery.get_all_buildings(self.tilemap)
+
     def place_enemy_buildings(self):
         """Place enemy defenses from lowercase map markers without charging gold."""
         for (tile_x, tile_y), spot_type in self.tilemap.spot_types.items():
@@ -1186,7 +1200,7 @@ class AssaultPhase:
         # Enemy standing buildings, grouped by class; the class naming
         # (MGNest) is translated to the display name in the rows below.
         enemy_placed = Counter()
-        for building in BuildingQuery.get_all_buildings(self.tilemap):
+        for building in self._live_buildings():
             if building.is_enemy:
                 enemy_placed[type(building).__name__] += 1
 
@@ -1388,7 +1402,7 @@ class AssaultPhase:
         # - muzzle: SMALL yellow flash just in front of the gun while
         #   the shell flies (user: "a little yellow", not a square);
         # - blast: red flash where the shell landed.
-        for building in BuildingQuery.get_all_buildings(self.tilemap):
+        for building in self._live_buildings():
             if not isinstance(building, Artillery):
                 continue
             for mx, my, _ttl in building.muzzles:
@@ -1546,7 +1560,7 @@ class AssaultPhase:
             )
 
         # Bunker HP bar: the first bunker found is the one tracked.
-        buildings = BuildingQuery.get_all_buildings(self.tilemap)
+        buildings = self._live_buildings()
         bunkers = [b for b in buildings if isinstance(b, Bunker)]
         bunker_hp = bunkers[0].hp if bunkers else 0
 
@@ -1581,7 +1595,7 @@ class AssaultPhase:
         nothing disappears, quality only stays where it can improve.
         """
         scale = self.close_scale
-        for building in BuildingQuery.get_all_buildings(self.tilemap):
+        for building in self._live_buildings():
             native = getattr(building, "image_native", None)
             if native is None:
                 continue
