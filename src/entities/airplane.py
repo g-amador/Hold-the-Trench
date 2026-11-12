@@ -26,13 +26,14 @@ Behavior:
   or nearest) once the bomb is ready or a dogfight walks into MG
   range. Nothing attackable but enemies alive = straight cruise
   along the last flight vector (bounced at the map edges).
-- STRAFING RUNS vs infantry (user fix): an infantry column in MG
-  range starts ONE locked straight pass — the plane fires its nose
-  MG while the column is in range and ahead of the flight vector,
-  then flies PAST (bombing-run mirror); the old per-frame steering
-  hovered back and forth over a single column. Pass ends when the
-  column leaves range/behind the nose; re-picking brings the plane
-  around for the next run.
+- STRAFING RUNS vs infantry (user rule — dive-shoot-and-move-on):
+  an infantry line in MG range starts ONE locked straight pass; the
+  plane shoots WHATEVER infantry it flies over (nearest in range,
+  ahead of the nose) and keeps going PAST — never steering, never
+  looping back. Bodies the pass fired at are EXCLUDED from the next
+  selection while any other target qualifies, so the plane moves on
+  to shooting or bombing elsewhere; they re-qualify only when
+  nothing else remains (a lone surviving column still gets attacked).
 - machine gun: PLANE_MG bullets fly; the battle state's bullet loops
   hit infantry and enemy planes with them (and never armored bodies
   — plane MG fire skips armor, bombs do the anti-armor work). Only
@@ -142,17 +143,20 @@ class AirplaneUnit(GuardedRawDamage):
         self.flight_vx = -1.0 if is_enemy else 1.0
         self.flight_vy = 0.0
 
-        # STRAFE PASS state (user rule — shoot-and-run vs infantry):
-        # once an infantry column enters MG range the plane locks ONE
-        # straight flight vector and strafes it bombing-style, firing
-        # while the column stays in range, and keeps flying PAST; the
-        # pass ends when the column leaves range and the plane comes
-        # around for the next one. This replaces the old hover that
+        # STRAFE PASS state (user rule — dive-shoot-and-move-on vs
+        # infantry): once an infantry column enters MG range the
+        # plane locks ONE straight flight vector and strafes it
+        # bombing-style, firing at WHATEVER infantry it flies over,
+        # and keeps flying past. Entities the pass fired at are then
+        # EXCLUDED from targeting while any other candidate exists,
+        # so the plane moves to another target instead of looping
+        # back over the same column. This replaces the old hover that
         # steered at the column every frame (reported back-and-forth
         # jitter over a single infantry line).
         self.strafing = False
         self.strafe_vx = 1.0
         self.strafe_vy = 0.0
+        self._strafed = set()
 
         # Initial horizontal heading: EAST for player planes, WEST for
         # enemy planes (the nose will follow this and every change of
@@ -192,8 +196,8 @@ class AirplaneUnit(GuardedRawDamage):
 
     def update(self, dt, ground_targets, air_targets, bullets):
         """Fly toward the nearest enemy; bomb over ground targets,
-        machine-gun enemy planes in range, strafe infantry in locked
-        shooting passes, leave the map otherwise."""
+        machine-gun enemy planes in range, dive-shoot infantry in one
+        straight pass then move on, leave the map otherwise."""
 
         if self.dead:
             return
@@ -274,24 +278,22 @@ class AirplaneUnit(GuardedRawDamage):
             and not hasattr(entity, "is_destroyed")
         )
 
-        # STRAFE PASS (user rule — shoot-and-run vs infantry, the
-        # bombing run's mirror): an infantry body inside MG range
-        # starts ONE locked straight pass. While strafing, the plane
-        # flies that locked vector WITHOUT steering at the column —
-        # the old per-frame steering jittered back and forth on top
-        # of a single infantry line — and fires its nose MG only
-        # while the column is in range and roughly AHEAD (forward-
-        # firing gun, like the bombing run's single overflight).
-        # Leaving range ends the pass; re-picking next frame brings
-        # the plane around for the next run.
+        # STRAFE PASS (user rule — dive-shoot-and-move-on): an
+        # infantry body inside MG range starts ONE locked straight
+        # pass (no per-frame steering — that was the reported
+        # back-and-forth hover over a single column). The pass fires
+        # at WHATEVER infantry it flies over and keeps going; the
+        # bodies it shot are excluded from the next selection (see
+        # _pick_target), so the plane moves ON to another target.
         if mg_body and kind != "air":
             if not self.strafing:
                 if length <= self.mg_range:
                     self.strafing = True
                     self.strafe_vx = dx / length
                     self.strafe_vy = dy / length
+                    self._strafed = set()  # fresh pass, fresh blacklist
             if self.strafing:
-                self._strafe_pass(dt_s, cx, cy, tgx, tgy, bullets)
+                self._strafe_pass(dt_s, ground_targets, bullets)
                 return
 
         # Steer directly at the target (planes ignore the ground).
@@ -320,18 +322,19 @@ class AirplaneUnit(GuardedRawDamage):
             if length <= self.bomb_trigger:
                 self._drop_bomb(entity)
 
-    def _strafe_pass(self, dt_s, cx, cy, tx, ty, bullets):
-        """One LOCKED straight pass over an infantry column (user rule
-        — shoot-and-run, the bombing run's mirror).
+    def _strafe_pass(self, dt_s, ground_targets, bullets):
+        """ONE locked straight pass over the infantry line (user rule
+        — dive-shoot-and-move-on).
 
-        The plane flies its locked strafe vector and NEVER steers at
-        the column (per-frame steering is what hovered back and forth
-        over one infantry line). The nose MG fires only while the
-        column is inside MG range AND roughly ahead of the flight
-        vector (forward-firing gun); once the column falls behind or
-        out of range the pass is over — the plane keeps flying past
-        and the next frame's re-pick brings it around for the next
-        run, like the bomb-once-then-move-on pattern.
+        The plane flies its locked strafe vector and NEVER steers
+        (per-frame steering is what hovered back and forth over one
+        column). Each frame it shoots the nearest infantry that is
+        inside MG range AND ahead of the flight vector — whatever the
+        pass gets, it gets — and every body it fires at joins
+        `_strafed`. When no infantry is in-range-ahead anymore the
+        pass is over: the plane keeps flying and the next selection
+        moves it to ANOTHER target (the strafed bodies only re-qualify
+        when nothing else remains, see _pick_target).
         """
         vx, vy = self.strafe_vx, self.strafe_vy
         self.x += vx * self.speed * dt_s
@@ -361,13 +364,40 @@ class AirplaneUnit(GuardedRawDamage):
             self.y = max_y
             self.strafe_vy = 0.0
 
-        dx, dy = tx - cx, ty - cy
-        length = math.hypot(dx, dy) or 1.0
-        if length <= self.mg_range and (dx * vx + dy * vy) > 0:
-            self._fire_mg(cx, cy, tx, ty, bullets)
-        else:
-            # Column behind the nose or out of range: pass over.
+        # Shoot what the pass gets: nearest infantry in range and
+        # ahead of the nose. Bomb bodies (armor/buildings) are not
+        # strafe targets; dead bodies never are.
+        cx = self.x + self.width / 2
+        cy = self.y + self.height / 2
+        best = None
+        shot = None
+        for t in ground_targets:
+            if getattr(t, "dead", False) or getattr(
+                t, "is_destroyed", bool,
+            )():
+                continue
+            if isinstance(t, ArmorUnit) or hasattr(t, "is_destroyed"):
+                continue
+            scx, scy = _target_center(t)
+            dx, dy = scx - cx, scy - cy
+            length = math.hypot(dx, dy) or 1.0
+            if length > self.mg_range:
+                continue
+            if (dx * vx + dy * vy) <= 0:
+                continue  # behind the nose — the pass moved past it
+            if best is None or length < best:
+                best = length
+                shot = (scx, scy, t)
+
+        if shot is None:
+            # Nothing left in front: pass over, move on (the strafed
+            # blacklist stands until a NEW pass clears it).
             self.strafing = False
+            return
+
+        scx, scy, shot_entity = shot
+        self._fire_mg(cx, cy, scx, scy, bullets)
+        self._strafed.add(shot_entity)
 
     def _pick_target(self, ground_targets, air_targets, bomb_ready=True):
         """Nearest ALIVE attackable enemy across both lists.
@@ -378,12 +408,23 @@ class AirplaneUnit(GuardedRawDamage):
         is_destroyed) qualify only while `bomb_ready`; MG bodies
         (infantry, enemy planes) always qualify. Dead/destroyed
         bodies never qualify either way.
+
+        STRAFED EXCLUSION (user rule — dive-shoot-and-move-on):
+        infantry the last strafe pass already fired at are skipped
+        WHILE any other candidate qualifies — the plane moves to
+        another target instead of looping back over the same column.
+        They re-qualify only when nothing else remains (fallback to
+        the unrestricted nearest), so a lone surviving column still
+        gets attacked instead of ignored.
         """
         cx = self.x + self.width / 2
         cy = self.y + self.height / 2
         best = None
         target = None
         kind = None
+        best_allowed = None
+        target_allowed = None
+        kind_allowed = None
         for t in ground_targets:
             if getattr(t, "dead", False) or getattr(t, "is_destroyed", bool)():
                 continue
@@ -398,6 +439,12 @@ class AirplaneUnit(GuardedRawDamage):
                 best = dist
                 target = (tgx, tgy, t)
                 kind = "ground"
+            if t in self._strafed:
+                continue
+            if best_allowed is None or dist < best_allowed:
+                best_allowed = dist
+                target_allowed = (tgx, tgy, t)
+                kind_allowed = "ground"
         for t in air_targets:
             if getattr(t, "dead", False):
                 continue
@@ -407,6 +454,12 @@ class AirplaneUnit(GuardedRawDamage):
                 best = dist
                 target = (ttx, tty, t)
                 kind = "air"
+            if best_allowed is None or dist < best_allowed:
+                best_allowed = dist
+                target_allowed = (ttx, tty, t)
+                kind_allowed = "air"
+        if target_allowed is not None:
+            return target_allowed, kind_allowed
         return target, kind
 
     def _cruise(self, dt_s):
