@@ -3,7 +3,7 @@
 ```text
 hold_the_trench/
 ├── assets/
-│   ├── images/
+│   ├── images/                     # game art — NOT in the repo: download the free WW1 2D Assets Pack (gnpa, itch.io) and place it here; missing art falls back to block drawing
 │   ├── sounds/
 │   └── music/
 ├── src

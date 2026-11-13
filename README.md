@@ -223,13 +223,22 @@ git clone https://github.com/g-amador/Hold-the-Trench.git
 cd hold-the-trench
 ```
 
-### 2. Install dependencies
+### 2. Download the image assets (free)
+
+The image art is **not included in the repository** — it comes from a free external pack and must be downloaded separately:
+
+1. Get the **[WW1 2D Assets Pack](https://gnpa.itch.io/ww-1-2d-assets-pack)** (free) on itch.io.
+2. Copy the pack's image files into `assets/images/`.
+
+The game loads all unit, building, and ground art from that folder; if images are missing it still runs, drawing simple colored blocks instead — but download the pack for the full experience.
+
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Launch the game
+### 4. Launch the game
 
 ```bash
 python src/main.py
@@ -320,6 +329,10 @@ Install dependencies:
 (venv) pip install -r requirements.txt
 ```
 
+> **Note:** the image assets are not in the repository — download the free
+> [WW1 2D Assets Pack](https://gnpa.itch.io/ww-1-2d-assets-pack) and place it
+> in `assets/images/` (see step 2 of [Installation](#installation)).
+
 Run the game:
 
 ```bash
@@ -369,6 +382,8 @@ While **Hold the Trench** aims to establish its own identity, it draws inspirati
 * Tactical defense games
 * Procedural roguelites
 * Historical WWI trench warfare
+
+The game's image art comes from the free **[WW1 2D Assets Pack](https://gnpa.itch.io/ww-1-2d-assets-pack)** by gnpa on itch.io — it is not bundled with the repository (see [Installation](#installation)).
 
 [Back to Table of Contents](#toc)
 

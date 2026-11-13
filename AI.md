@@ -10,6 +10,7 @@ Work with the existing codebase. Do not assume the game should be rebuilt.
 
 Repo: https://github.com/g-amador/Hold-the-Trench — branch V1.0.
 Run: `.\venv\Scripts\python.exe src\main.py` from the repo root (venv ships with the repo; requirements: pygame-ce >= 2.5).
+IMAGE ASSETS are NOT in the repo: they come from the free WW1 2D Assets Pack on itch.io (https://gnpa.itch.io/ww-1-2d-assets-pack) — download it and place the images under `assets/images/`; a fresh clone without the pack still boots and renders block fallbacks.
 There is no automated test suite; verification = running the game and describing manual checks.
 
 # CURRENT GOAL — BETA COMPLETE (Future Demo next)
