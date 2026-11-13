@@ -36,7 +36,7 @@ Protect your bunker, manage your supplies, and destroy the enemy bunker to secur
 Each battle takes place on a **newly generated WWI battlefield**, forcing players to adapt their defenses, manage supplies, and make difficult tactical decisions.
 
 The animated .gif bellow illustrates running the current game beta.
-![Game Beta](https://raw.githubusercontent.com/g-amador/Hold-the-Trench/main/assets/Hold-the-trench-beta.gif)
+![Game Beta](https://raw.githubusercontent.com/g-amador/Hold-the-Trench/main/screenshots/Hold-the-trench_Beta.gif)
 
 
 [Back to Table of Contents](#toc)
