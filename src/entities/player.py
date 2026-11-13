@@ -1,33 +1,128 @@
 """
-WW1 infantry player with WASD movement, collision, sliding, snapping,
-and wire slow-down.
+WW1 infantry player: WASD movement, tile collision with wall sliding,
+wire slow-down, sprite animation, and cone-limited auto-shooting.
+
+Collision uses tiny stepped moves tested against the tilemap, so walls
+slide instead of sticking. Long-range shots only fire inside a 90
+degree cone in front of the facing direction.
 """
 
 import math
 import pygame
 
-from config import SCREEN_HEIGHT, TILE_SIZE
+from config import (
+    TILE_SIZE,
+    BLUE,
+    INFANTRY_SPEED,
+    PLAYER_SHOOT_RANGE_PX,
+    rifle_shoot_cooldown,
+    INFANTRY_ANIM_FRAME_S,
+    INFANTRY_AIM_POSE_S,
+)
 from entities.bullet import Bullet
+from graphics import render_mode
+from graphics.block_drawer import draw_unit_block
+from graphics.sprite_generator import SpriteGenerator
+from systems.factions import unit_prefix
 
-BLOCKING_TILES = {"#", "H"}
-BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery"}
-BUILDABLE_SPOTS = {"mg", "barracks", "artillery"}
+
+# Tile characters that can never be walked through (trench wall).
+# ('H' was removed: the map's ASCII alphabet never produces it.)
+BLOCKING_TILES = {"#"}
+# Building type strings that are solid obstacles once constructed
+# (the free-placed statics are solid 7x7s too). ENEMY buildings block
+# the player as well (user: "my controlled unit should collide with
+# enemy buildings and artillery"): the check below matches the bare
+# player-side kind OR any "enemy_"-prefixed kind.
+BLOCKING_BUILDINGS = {"mg", "bunker", "barracks", "artillery",
+                      "air_field", "tank_factory"}
+# Build spot types the player collides with while still unbuilt:
+# empty spots are solid so buildings can't be walked into existence.
+# Statics join too (user: touching any tile of an unplaced F/K spot
+# must pay & place it) — the touch-and-pay contact covers the FULL
+# 7x7 footprint either way, but solidity keeps the spot walk-proof
+# exactly like the smaller build spots.
+BUILDABLE_SPOTS = {"mg", "barracks", "artillery",
+                   "air_field", "tank_factory"}
+# Wire characters slow movement to a fraction of base speed.
 SLOW_TILES = {"W"}
 
 
 class Player:
-    def __init__(self, x, y):
+    """The player-controlled ally infantry; free float position, tile collision."""
+
+    def __init__(self, x, y, faction="allies"):
+        # World position as float: sub-pixel movement stays smooth.
         self.x = float(x)
         self.y = float(y)
 
-        self.speed = 120
+        # Speed in px/s (config single source, same soldier pace as
+        # the barracks infantry); footprint matches the sprite frames.
+        self.speed = INFANTRY_SPEED
         self.width = 24
         self.height = 24
 
-        self.shoot_cooldown = 0.25
+        # Side-picked soldier art: nation from the faction pool (fr for
+        # allies, ger for axis — the pools are single-nation right
+        # now, FR vs GER). The faction table
+        # owns the pools (systems/factions.py).
+        prefix, self.nation = unit_prefix(faction)
+
+        # Shooting: a cooldown gates auto-fire, and a short timer keeps
+        # the aim pose on screen after each shot. The player is rifle
+        # infantry too — the cadence is the ROLLED NATION's WWI rifle
+        # from config's per-army table (fr Lebel ~1.4 s, ger Gewehr 98
+        # 4.0 s; round-22 user: the player joins the rifle table).
+        self.shoot_cooldown = rifle_shoot_cooldown(self.nation)
+        self.shoot_timer = 0
         self.shoot_timer = 0
 
-        self.max_world_x = 2000
+        # Standard infantry frames; None means missing assets (block fallback).
+        # size=(width, height): the 1088x976 full-body sources scale to
+        # the player's world box at load, so art and hitbox match 1:1.
+        self.sprite_generator = SpriteGenerator()
+        self.frames = self.sprite_generator.load_unit_frames(
+            prefix, size=(self.width, self.height))
+
+        if self.frames is not None:
+            self.frame_rest = self.frames["rest"]
+            self.frame_rest_alt = self.frames["rest_alt"]
+            self.frames_run = self.frames["run"]
+            self.frame_files = self.frames["files"]
+        else:
+            # Block fallback; non-empty list keeps animation math safe.
+            self.frame_rest = None
+            self.frame_rest_alt = None
+            self.frames_run = [None]
+            self.frame_files = None
+
+        # Animation timing: the run cycle advances on a fixed frame
+        # duration so animation speed is framerate independent.
+        self.run_frame = 0
+        self.run_timer = 0.0
+        self.run_frame_duration = INFANTRY_ANIM_FRAME_S
+
+        # The aim pose stays visible for a fixed beat after each shot.
+        self.shoot_animation_timer = 0.0
+        self.shoot_animation_duration = INFANTRY_AIM_POSE_S
+
+        self.is_moving = False
+        self.facing = 1  # 1 = right, -1 = left
+
+    def current_frame_file(self):
+        """CLOSE-view hires: the art file of the pose being drawn.
+
+        Mirrors draw()'s frame selection one-to-one (run cycle wins
+        over the shot blip while moving); None when the block
+        fallback is active (no art files).
+        """
+        if self.frames is None:
+            return None
+        if self.is_moving:
+            return self.frame_files["run"][self.run_frame]
+        if self.shoot_animation_timer > 0:
+            return self.frame_files["rest_alt"]
+        return self.frame_files["rest"]
 
     def get_hitbox(self):
         """Return the player's hitbox in world coordinates."""
@@ -39,7 +134,13 @@ class Player:
         )
 
     def _is_blocked_at(self, x, y, tilemap, enemies=None):
-        """Check terrain, build spots, buildings, and enemy collisions."""
+        """Check terrain, build spots, buildings, and enemy collisions.
+
+        The single source of truth for "can the player stand here":
+        movement code probes candidate positions with this before or
+        after every move step.
+        """
+        # Candidate hitbox at the hypothetical position.
         rect = pygame.Rect(
             round(x),
             round(y),
@@ -47,6 +148,9 @@ class Player:
             self.height,
         )
 
+        # Tile range covered by the hitbox: dividing by TILE_SIZE maps
+        # pixel rect edges to tile indices (-1 keeps right/bottom edges
+        # inclusive).
         min_tile_x = rect.left // TILE_SIZE
         max_tile_x = (rect.right - 1) // TILE_SIZE
         min_tile_y = rect.top // TILE_SIZE
@@ -56,34 +160,53 @@ class Player:
             for tile_x in range(min_tile_x, max_tile_x + 1):
                 tile = tilemap.get_tile(tile_x, tile_y)
 
+                # Off-world is always blocking (map edge).
                 if tile is None:
                     return True
 
+                # Solid terrain: trench wall.
                 if tile.type_char in BLOCKING_TILES:
                     return True
 
                 spot_type = tilemap.spot_types.get((tile_x, tile_y))
 
-                # An empty build spot is solid until construction occurs.
-                if (
-                    spot_type in BUILDABLE_SPOTS
-                    and tile.building is None
-                ):
+                # An EMPTY build spot is solid across its whole
+                # footprint until construction (buildings can't be
+                # walked into existence; the extra tiles around an MG
+                # spot count even when its marker itself isn't under
+                # the player).
+                spot = tilemap.empty_spot_covering(tile_x, tile_y)
+                if spot is not None and spot[0] in BUILDABLE_SPOTS:
                     return True
 
-                building = tile.building
-                if (
+                # Constructed buildings block every tile their
+                # footprint covers (an MG occupies 4x4, not just its
+                # marker tile). Enemy-pre-fixed kinds are solid too:
+                # the player cannot walk into an enemy MG nest,
+                # artillery, bunker, barracks, or static.
+                building = tilemap.building_covering(tile_x, tile_y)
+
+                covered_type = getattr(building, "type", None) if (
                     building is not None
-                    and getattr(building, "type", None)
-                    in BLOCKING_BUILDINGS
+                ) else None
+
+                if (
+                    covered_type in BLOCKING_BUILDINGS
+                    or (
+                        covered_type is not None
+                        and covered_type.startswith("enemy_")
+                    )
                 ):
                     return True
 
+        # Enemies are solid too: the player cannot walk through units.
         if enemies:
             for enemy in enemies:
                 if enemy.dead:
                     continue
 
+                # Duck-typed target: prefer get_hitbox(), fall back to a
+                # plain rect for anything with raw x/y/size attributes.
                 if hasattr(enemy, "get_hitbox"):
                     enemy_rect = enemy.get_hitbox()
                 else:
@@ -100,7 +223,13 @@ class Player:
         return False
 
     def _move_axis(self, amount, axis, tilemap, enemies=None):
-        """Move along one axis without crossing blocking geometry."""
+        """Move along one axis without crossing blocking geometry.
+
+        Steps in 1px increments instead of one jump: an unobstructed
+        move lands exactly on the requested distance, while any blocked
+        step stops the axis there — which is what preserves wall
+        sliding (the other axis can still move freely).
+        """
         if amount == 0:
             return
 
@@ -112,9 +241,13 @@ class Player:
             step_size = min(remaining, max_step)
             step = direction * step_size
 
+            # Probe the next position on this axis only; the other axis
+            # keeps its current value so sliding along walls works.
             test_x = self.x + step if axis == "x" else self.x
             test_y = self.y + step if axis == "y" else self.y
 
+            # First blocked step ends movement on this axis; whatever
+            # was already committed earlier in the loop stays.
             if self._is_blocked_at(test_x, test_y, tilemap, enemies):
                 break
 
@@ -126,6 +259,9 @@ class Player:
             remaining -= step_size
 
     def handle_input(self, dt, tilemap, enemies=None):
+        """Read held keys and resolve movement through per-axis sliding."""
+        # Global key state (not events): holding a key means continuous
+        # movement for the whole frame.
         keys = pygame.key.get_pressed()
 
         dx = 0
@@ -140,20 +276,30 @@ class Player:
         if keys[pygame.K_s] or keys[pygame.K_DOWN]:
             dy += 1
 
-        # Normalize diagonal movement.
+        # Face the direction of horizontal movement.
+        if dx > 0:
+            self.facing = 1
+        elif dx < 0:
+            self.facing = -1
+
+        # Normalize diagonal movement so diagonals are not sqrt(2)x
+        # faster than cardinal movement.
         if dx and dy:
             length = math.hypot(dx, dy)
             dx /= length
             dy /= length
 
+        # Terrain on the current tile modifies speed; wire halves it.
         tile_x = int(self.x // TILE_SIZE)
         tile_y = int(self.y // TILE_SIZE)
         tile = tilemap.get_tile(tile_x, tile_y)
 
         move_speed = self.speed
+
         if tile and tile.type_char in SLOW_TILES:
             move_speed *= 0.45
 
+        # dt is milliseconds: convert to seconds for px/s speeds.
         move_x = dx * move_speed * dt / 1000
         move_y = dy * move_speed * dt / 1000
 
@@ -161,22 +307,69 @@ class Player:
         self._move_axis(move_x, "x", tilemap, enemies)
         self._move_axis(move_y, "y", tilemap, enemies)
 
-    def _clamp_to_bounds(self):
-        self.x = max(0, min(self.x, self.max_world_x))
-        self.y = max(40, min(self.y, SCREEN_HEIGHT - self.height))
+    def _clamp_to_bounds(self, tilemap):
+        """Keep the player inside the static map's boundaries.
+
+        The map IS the playfield: both axes clamp to the tilemap's real
+        pixel extents (never the window size or any hardcoded margin).
+        The map edge therefore reads exactly like a wall the player can
+        press against, including the very top row.
+        """
+        world_width = tilemap.width * TILE_SIZE
+        world_height = tilemap.height * TILE_SIZE
+
+        self.x = max(0.0, min(self.x, world_width - self.width))
+        self.y = max(0.0, min(self.y, world_height - self.height))
 
     def update(self, dt, tilemap, enemies=None):
-        self.handle_input(dt, tilemap, enemies)
-        self._clamp_to_bounds()
+        """Move input -> collisions -> run animation -> shot timers."""
+        # Previous position for movement detection: the input step is
+        # the truth, this just measures whether it changed anything.
+        old_x = self.x
+        old_y = self.y
 
-        self.shoot_timer -= dt / 1000
-        if self.shoot_timer < 0:
-            self.shoot_timer = 0
+        self.handle_input(dt, tilemap, enemies)
+        self._clamp_to_bounds(tilemap)
+
+        # is_moving drives both the walk animation and idle reset below;
+        # small epsilon avoids flicker from float jitter.
+        self.is_moving = (
+            abs(self.x - old_x) > 0.01
+            or abs(self.y - old_y) > 0.01
+        )
+
+        if self.is_moving:
+            # Advance the run cycle only while actually moving.
+            self.run_timer += dt / 1000
+
+            while self.run_timer >= self.run_frame_duration:
+                self.run_timer -= self.run_frame_duration
+                self.run_frame = (self.run_frame + 1) % len(self.frames_run)
+        else:
+            # Idle pose: reset to the first frame and drain the timer.
+            self.run_frame = 0
+            self.run_timer = 0.0
+
+        # Timers count down in ms regardless of movement.
+        self.shoot_timer = max(0.0, self.shoot_timer - dt / 1000)
+        self.shoot_animation_timer = max(
+            0.0,
+            self.shoot_animation_timer - dt / 1000,
+        )
 
     def shoot_toward(self, target, bullets):
+        """Fire at a target within a 90-grade cone in front of the player.
+
+        Cone check via dot product: the normalized direction to the
+        target dotted with the facing vector equals cos(angle), so
+        requiring >= cos(45 degrees) allows targets within 45 degrees
+        up or down from exactly-ahead (the full cone spans 90 degrees).
+        """
+        # Cooldown gate: shots only when the last one has expired.
         if self.shoot_timer > 0:
             return
 
+        # Muzzle at the player's center; aim at the target's center.
         start_x = self.x + self.width / 2
         start_y = self.y + self.height / 2
 
@@ -185,18 +378,44 @@ class Player:
 
         dx = target_x - start_x
         dy = target_y - start_y
-
         distance = math.hypot(dx, dy)
+
         if distance == 0:
             return
 
-        dx /= distance
-        dy /= distance
+        # Normalize target vector so the bullet flies at constant speed
+        # regardless of distance.
+        nx, ny = dx / distance, dy / distance
 
-        bullets.append(Bullet(start_x, start_y, dx, dy))
+        # Facing vector: (1, 0) if right, (-1, 0) if left; firing is
+        # horizontal-only by design (a trench shooting mechanic).
+        fx, fy = (self.facing, 0)
+
+        # Dot product of normalized vectors = cos(theta)
+        # cos(45 degrees) is approx 0.707
+        dot_product = nx * fx + ny * fy
+
+        # Outside the cone: refuse (this keeps "shooting backwards"
+        # impossible even to nearby targets).
+        if dot_product < 0.707:
+            return
+
+        bullets.append(Bullet(start_x, start_y, nx, ny))
+
+        # Both timers restart: one gates the next shot, one plays the
+        # aim pose art.
         self.shoot_timer = self.shoot_cooldown
+        self.shoot_animation_timer = self.shoot_animation_duration
 
     def auto_fire(self, dt, enemies, bullets):
+        """Shoot the nearest enemy within a 90-degree cone in front, within 300 pixels.
+
+        Selection is distance-first (nearest in range AND cone wins);
+        the actual shot is delegated to shoot_toward, which re-checks
+        the cone and cooldown. dt is unused: firing is not timed by the
+        update loop, only by target presence; kept for call-signature
+        compatibility.
+        """
         if self.shoot_timer > 0:
             return
 
@@ -207,25 +426,72 @@ class Player:
         nearest_distance = float("inf")
 
         for enemy in enemies:
-            if enemy.dead:
+            # Dead units are excluded early: no shots at corpses.
+            if getattr(enemy, "dead", False):
                 continue
 
             enemy_x = enemy.x + enemy.width / 2
             enemy_y = enemy.y + enemy.height / 2
+            dx = enemy_x - player_x
+            dy = enemy_y - player_y
+            distance = math.hypot(dx, dy)
 
-            distance = math.hypot(
-                enemy_x - player_x,
-                enemy_y - player_y,
-            )
+            # Range gate: the player's engagement envelope (config).
+            if distance == 0 or distance > PLAYER_SHOOT_RANGE_PX:
+                continue
+
+            # Normalize target vector
+            nx, ny = dx / distance, dy / distance
+
+            # Dot product with facing vector (self.facing, 0)
+            dot_product = nx * self.facing
+
+            # Only consider enemies within 45 degrees up/down (total 90 deg cone)
+            if dot_product < 0.707:
+                continue
 
             if distance < nearest_distance:
                 nearest_distance = distance
                 nearest_enemy = enemy
 
-        if nearest_enemy and nearest_distance <= 300:
+        if nearest_enemy:
             self.shoot_toward(nearest_enemy, bullets)
 
     def draw(self, screen, camera_x):
-        rect = self.get_hitbox()
-        rect.x -= round(camera_x)
-        pygame.draw.rect(screen, (0, 200, 255), rect)
+        """Draw the animated full-body frame, or blocks when sprites
+        are missing."""
+        if not render_mode.is_sprite() or self.frames is None:
+            self._draw_block(screen, camera_x)
+            return
+
+        screen_x = round(self.x - camera_x)
+        screen_y = round(self.y)
+
+        # Single full-body frame (the layered legs/upper composite is
+        # retired): the run cycle while moving — it wins over the shot
+        # blip so a strafing soldier never freezes mid-stride — the
+        # second rest pose as the per-shot blip while standing, plain
+        # rest otherwise.
+        if self.is_moving:
+            frame = self.frames_run[self.run_frame]
+        elif self.shoot_animation_timer > 0:
+            frame = self.frame_rest_alt
+        else:
+            frame = self.frame_rest
+
+        position = (screen_x, screen_y)
+        self.sprite_generator.draw(
+            screen, frame, position, self.facing
+        )
+
+    def _draw_block(self, screen, camera_x):
+        """Fallback rendering: flat block with a marker on the facing edge."""
+        draw_unit_block(
+            screen,
+            self.x - camera_x,
+            self.y,
+            self.width,
+            self.height,
+            self.facing,
+            BLUE,
+        )

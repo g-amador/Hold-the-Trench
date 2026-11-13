@@ -1,0 +1,104 @@
+-> demo
+When starting the game each side has only buildings units from their randomly atributed faction.
+Example if axis either Ger or Aust but don't mix buildings and units.
+It's FR vs GER or Brit vs Aust or Brit vs Germ, etc.
+In Aust case they don't have tanks or tank_factory. 
+Replace in aust case tank factory placement and airfield placement by barracks placement.
+
+AA guns
+- Add aa guns they ocupy 3x3 tiles.
+- AA guns shoot only nearby planes in the 5x5 tiles above AA guns.
+- AA gun should have the firing and hit rate of planes as each WW I armies respective accuracy.
+- Once destroyed by bomb use destroyed texture aa_*_b.
+- Add audio:
+  - Death: ???
+  - Shooting: `cannon_shoot.wav`
+  - Sound on the sky near planes: choose a suitable sound later.
+
+MG Nest Audio
+- When an MG nest fires, play `ww1-afx-mgfiring.mp3` for 6 seconds, pause for 1 second, then repeat while it continues firing.
+- Stop the firing sound when the nest stops shooting.
+- Adjust volume based on the nest’s distance from the player.
+
+Artileries shoot when it hits the ground and show the red circle
+play randomly:
+-ww1-artillery-explosion1.mp3
+-ww1-artillery-explosion2.mp3
+-ww1-artillery-explosion3.mp3
+-ww1-artillery-explosion4.mp3
+Sound intensity depends on how close player is to the MG nest.
+Artileries sound when it shoots and show yellow circle is
+cannon_shoot.wav
+Sound intensity depends on how close player is to the MG nest.
+
+
+Infantry
+- Behavior: Units near buildings throw grenades. Make grenade damage configurable in `config.py`.
+- Once an infantry unit dies replace it's texture by infantry_unit_COUNTRY_1_i.png
+- Audio: Play `riffle.wav` when allied infantry fire, with volume increasing as the player gets closer. Play `infantry_death.mp3` when an infantry unit dies.
+
+
+Planes
+- Add plane behavior:  
+  - Limited bullets and bombs configurably in config.py. Once, no more ammunition or bombs the planes should return to their air field and land. Once they land they should dissapear.
+  - Spawn by taking off from the airfield track, traveling northeast to southwest.
+  - Use a suitable texture for bombs.
+  - Once hp is zero use going down texture for 3 seconds.
+  - Once it hits the ground use on the ground destroyed texture.
+  - When it hist the ground it should have explosion particle efect.
+- Add audio:
+  - Death: `explosion_airplane.wav`
+  - Machine gun: `machine_gun.wav`
+  - Engine: choose a suitable sound later.
+
+
+Tanks
+- Behavior:
+  - Once destroyed use destroyed texture tank_*_b.
+- Add British tanks:
+  - `tank_brit_male`: two 6-pdr QF guns for buildings and three Hotchkiss MGs for infantry.
+  - `tank_brit_female`: four Vickers MGs and one Hotchkiss MG for infantry.
+  - Assign weapons by sprite variant.
+- Add audio:
+  - Death: `explosion_tank.wav`
+  - Machine gun: `machine_gun.wav`
+  - Cannon: `cannon_shoot.wav`
+  - Engine: ???
+  
+
+Controls
+- Add gamepad support using a free library suitable for open-source projects, if pygame-ce is enough use it instead.
+- Add a main-menu settings screen to customize keyboard and gamepad controls.
+- Define customizable default controls in `config.py` and allow players to restore them.
+
+
+When a Artillery, Buildings, and tanks is destroyed (by tank cannons or plane bombs) their dostroyed textures should appear instead.
+For tanks and planes make them slowly dissapear from the maps if a certain configurable threashold is reached.
+In practice, I don't want to slow the game because to many things are being rendered.
+
+
+Review the entire game and identify Python libraries that could reduce code complexity or the amount of custom code. The project uses Pygame-CE.
+For each useful option, explain what it would simplify, its benefits and drawbacks, and any licensing or compatibility considerations. 
+Check the existing code and dependencies first, and avoid recommending unnecessary libraries.
+Do not install libraries or change the code yet. Present your recommendations and let me choose which, if any, to use.
+
+
+Particle Effects
+- Add explosion particle effects when artillery shells and plane bombs hit.
+- Add cannon-firing particle effects for tanks.
+- Replace the yellow firing circles for artillery and tank cannons with suitable muzzle-flash or projectile-launch effects.
+
+
+Destruction Textures
+- When a building, tank, or artillery unit’s HP falls below a configurable threshold, replace its texture with the damaged version.
+- The damaged image uses the same base filename as the normal texture, with `_damaged.png` appended.
+
+
+Build a reusable Python graph-navigation system on top of an existing ASCII map, using NetworkX and Matplotlib.
+Requirements:
+- Keep the ASCII map as the source of truth; preserve obstacles and free cells. Add/remove nodes directly in valid free cells using `E` for entry/exit and `N` for inner nodes.
+- Create class-based `StaticMap` and `GraphNavigation` components with type hints, validation, and clear exceptions.
+- Store graph connectivity separately from the map. Support adding/removing nodes and edges, and store each edge’s path. Validate paths against obstacles.
+- Use BFS to find the reachable exit requiring the fewest edge hops. Return the exit, full route, and cost; handle no-route cases.
+- Visualize the map, nodes, edges, and selected route with distinct colors, labels, and a legend, preserving map coordinates.
+- Provide complete, executable code and a compact example demonstrating map setup, graph creation, route selection, and route highlighting.

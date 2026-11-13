@@ -1,37 +1,20 @@
 """
-Win state.
-Player can restart or quit.
+Win state: shown when every enemy bunker is destroyed.
+
+Background keys off the played faction (victory shows the winner's
+banner). R replays the same side, S switches faction for the next
+battle, Q quits. All three restart through a fresh TileMap so no
+buildings or wage bookkeeping leak between fights.
 """
 
-import pygame
-
-from config import WHITE, BLACK
-from states.main_menu import MainMenu
+from systems.factions import VICTORY_BACKGROUND
+from states.end_screen import EndScreenState
 
 
-class WinState:
-    def __init__(self, game):
-        self.game = game
-        self.font = pygame.font.SysFont("arial", 40)
-        self.small_font = pygame.font.SysFont("arial", 25)
+class WinState(EndScreenState):
+    """Victory screen. Per-faction art: allies win under the french
+    banner, axis under the german one (single source table). Plays the
+    PLAYER's rolled nation anthem (theme_nation from the transition)."""
 
-    def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_r:
-                self.game.change_state(MainMenu(self.game))
-            if event.key == pygame.K_q:
-                self.game.running = False
-
-    def update(self, dt):
-        pass
-
-    def render(self, screen):
-        screen.fill(BLACK)
-
-        text = self.font.render("YOU WIN!", True, WHITE)
-        restart = self.small_font.render("Press R to Restart", True, WHITE)
-        quit_text = self.small_font.render("Press Q to Quit", True, WHITE)
-
-        screen.blit(text, (200, 150))
-        screen.blit(restart, (200, 250))
-        screen.blit(quit_text, (200, 300))
+    TITLE = "YOU WIN!"
+    BACKGROUND_TABLE = VICTORY_BACKGROUND

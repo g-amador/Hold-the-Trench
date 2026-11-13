@@ -19,7 +19,7 @@ Protect your bunker, manage your supplies, and destroy the enemy bunker to secur
 5. [⚔️ Enemy Types](#enemy-types)
 6. [🎯 Objectives](#objectives)
 7. [🎮 Controls](#controls)
-8. [🗂️ Project Structure](#project-structure)
+8. [🗂️ Project Architecture](#project-architecture)
 9. [🚀 Installation](#installation)
 10. [🪖 How to Play](#how-to-play)
 11. [🔒 Running in an Isolated Environment](#isolated-environment)
@@ -35,8 +35,8 @@ Protect your bunker, manage your supplies, and destroy the enemy bunker to secur
 
 Each battle takes place on a **newly generated WWI battlefield**, forcing players to adapt their defenses, manage supplies, and make difficult tactical decisions.
 
-The animated .gif bellow illustrates running the current game alpha.
-![Game Alpha](https://raw.githubusercontent.com/g-amador//Hold-the-Trench/main/assets/Hold-the-trench-alpha.gif)
+The animated .gif bellow illustrates running the current game beta.
+![Game Beta](https://raw.githubusercontent.com/g-amador/Hold-the-Trench/main/screenshots/Hold-the-trench_Beta.gif)
 
 
 [Back to Table of Contents](#toc)
@@ -46,19 +46,19 @@ The animated .gif bellow illustrates running the current game alpha.
 ## ✨ <a name="features">Features
 
 * 🪖 **Single-player experience**
-* 🌍 **Procedurally generated battlefields**
-* 🕳️ **Procedurally generated trench networks**
+* 🏳️ **Pick your side — Allies (FR) or Axis (GER)**
 * 🔫 **Deploy machine-gun nests**
 * 💥 **Call in artillery support**
-* 🧱 **Construct defensive bunkers**
-* 🪖 **Recruit friendly infantry**
-* 🏭 **Enemy barracks continuously spawn infantry**
+* 🪖 **Recruit friendly infantry** — barracks deploy 12-man rifle sections
+* 🚜 **Build tank factories** that roll out tanks
+* 🛩️ **Build air fields** that launch planes — bombs plus an air machine-gun
+* 🏭 **Enemy barracks continuously spawn infantry** — and the enemy fields tanks and planes of its own
 * ⚔️ **Real-time infantry combat**
-* 🪙 **Collect supplies from defeated enemies**
+* 🪙 **Collect supplies from defeated enemies** — coins magnetize toward you
 * 🎯 **Destroy the enemy bunker to win**
-* 🌧️ **Random weather conditions**
 * ⏸️ **Pause and resume at any time**
-* 🔄 **Generate a new defense scenario after each victory**
+* 🔊 **Sound** — menu music, selection feedback and per-nation victory/defeat themes
+* 🔄 **Load day/night scenario after each victory**
 * 🚪 **Choose to continue fighting or leave after each completed level**
 
 [Back to Table of Contents](#toc)
@@ -96,11 +96,18 @@ Choose:
 
 ## 🛡️ <a name="buildable-defenses">Buildable Defenses
 
-| Structure                  | Purpose                            |
-| -------------------------- | ---------------------------------- |
-| 🏭 Barracks                | Recruit or spawn infantry          |
-| 🔫 MG Nest                 | Anti-infantry fire support         |
-| 💥 Artillery Position      | Long-range bombardment             |
+| Structure                  | Cost              | Purpose                            |
+| -------------------------- | ----------------- | ---------------------------------- |
+| 🧱 Bunker                  | Free (pre-placed) | Protects your HQ — lose it and the battle is over |
+| 🔫 MG Nest                 | 30 gold           | Anti-infantry fire support         |
+| 🏭 Barracks                | 60 gold           | Deploys 12-man rifle sections      |
+| 💥 Artillery Position      | 80 gold           | Bombards the no-man's-land strip between the boundary markers |
+| 🚜 Tank Factory            | 150 gold          | Rolls out tanks for your side      |
+| 🛩️ Air Field               | 200 gold          | Launches planes that strafe and bomb |
+
+Purchasing works in installments: touch a spot and pay toward it — the building goes up once fully paid. Costs live in `src/config.py` (`BUILD_COSTS`).
+
+The enemy fields the same roster for free from its map markers: bunker, MG nests, barracks, artillery, tank factory and air field.
 
 [Back to Table of Contents](#toc)
 
@@ -112,7 +119,9 @@ Choose:
 
 | Enemy | Description |
 |--------|-------------|
-| 🚶 Infantry | Standard assault troops |
+| 🚶 Infantry | Standard assault troops, deployed in 12-man sections |
+| 🚜 Tanks | Armored breakthrough units — rolled out by the tank factory |
+| 🛩️ Planes | Launched by the air field — bombs over ground targets plus an air machine-gun |
 
 ### Planned
 
@@ -121,7 +130,6 @@ Choose:
 | ⚡ Shock Troopers | Fast assault infantry |
 | 🔥 Flamethrowers | Anti-entrenchment troops |
 | 🎯 Mortar Teams | Indirect fire support |
-| 🚜 Tanks | Armored breakthrough units |
 
 [Back to Table of Contents](#toc)
 
@@ -132,7 +140,7 @@ Choose:
 Your primary objective is to destroy the enemy bunker while protecting your own.
 
 * 🏭 Enemy barracks continuously spawn enemy infantry.
-* 🪖 Friendly infantry engage enemy troops in close combat.
+* 🪖 Friendly infantry engage enemy troops with rifle fire at range and in close combat.
 * 🔫 Machine-gun nests and artillery provide defensive fire support.
 * 🪙 Defeated enemies can drop supplies that you can collect.
 * 🧱 Build and maintain defenses to protect your bunker.
@@ -156,68 +164,51 @@ Victory grants you a choice:
 
 ### General
 
-| Key           | Action           |
-| ------------- | ---------------- |
-| `ESC`         | Pause / Resume   |
-| `Left Click`  | Build / Select   |
+| Key           | Action                                  |
+| ------------- | --------------------------------------- |
+| `SPACE`       | Pause / Resume (primary)                |
+| `ESC`         | Pause / Resume (secondary)              |
+| `WASD` / Arrows | Move player                           |
+| `Left Click`  | Build / Select                          |
+| `G`           | Toggle sprite / block graphics mode     |
+| `+` (and `=`) | Zoom IN to the CLOSE view               |
+| `-`           | Zoom OUT to the FULL view               |
+| `A` / `1`     | Main menu: choose the Allies side       |
+| `X` / `2`     | Main menu: choose the Axis side         |
+| `ENTER`       | Start battle as the chosen faction (main menu) |
+| `R`           | Play again with the same faction (after victory or defeat) |
+| `S`           | Switch faction for the next battle (after victory or defeat) |
+| `Q`           | Quit the game                           |
 
 [Back to Table of Contents](#toc)
 
 ---
 
-## 🗂️ <a name="project-structure">Project Structure
+## 🗂️ <a name="project-architecture">Project Architecture
+
+- `systems/` for combat, economy, faction rules, spawning, and wave management.
+- `ui/` for HUD, menus, tooltips, and overlays.
+- `config.py` 
 
 ```text
 hold_the_trench/
-│
 ├── assets/
-│   ├── images/
-│   ├── sounds/
-│   └── music/
-│
 ├── src
-│   │
-│   ├──engine/
-│   │   └── game.py
-│   │
-│   ├── entities/
-│   │   ├── artillery.py
-│   │   ├── barracks.py
-│   │   ├── bullet.py
-│   │   ├── bunker.py
-│   │   ├── enemy.py
-│   │   ├── friendly_infantry.py
-│   │   ├── gold_pickup.py
-│   │   ├── mg_nest.py
-│   │   ├── player.py
-│   │   └── trench.py
-│   │
-│   ├── states/
-│   │   ├── assault_phase.py
-│   │   ├── game_over.py
-│   │   ├── main_menu.py
-│   │   └── win_state.py
-│   │
-│   ├── systems/
-│   │   ├── building_query.py
-│   │   ├── combat_system.py
-│   │   └── economy_system.py
-│   │
-│   ├── ui/
-│   │   └── hud.py
-│   │
-│   ├── world/
-│   │   ├── tilemap.py
-│   │   └── trench_generator.py
-│   │
-│   ├── config.py
-│   └── main.py
-│
-│
-├── LICENSE
-├── README.md
-└── requirements.txt
+│   ├── engine/
+│   ├── entities/               # for units, buildings, projectiles, and pickups.
+│   ├── graphics/               # for sprite generation, animation helpers, and rendering-related utilities where appropriate.
+│   ├── states/                 # for menus, battles, victory, defeat, and other game screens.
+│   ├── systems/                # for combat, economy, faction rules, spawning, and wave management.
+│   ├── ui/                     # for HUD, menus, tooltips, and overlays.
+│   ├── utils/
+│   └── world/                  # for map generation, tiles, terrain, and battlefield configuration.
+├── AI.md                       # Playbook for expanding the game
+├── ARCHITECTURE.md             # Detailed project architecture & directory structure
+├── LICENSE                     # License details
+└── README.md                   # Main project documentation
 ```
+
+For a complete, file-by-file breakdown of the repository, see [ARCHITECTURE.md](https://github.com/g-amador/Hold-the-Trench/blob/main/ARCHITECTURE.md).
 
 [Back to Table of Contents](#toc)
 
@@ -228,20 +219,29 @@ hold_the_trench/
 ### 1. Clone the repository
 
 ```bash
-git clone https://github.com/yourusername/hold-the-trench.git
+git clone https://github.com/g-amador/Hold-the-Trench.git
 cd hold-the-trench
 ```
 
-### 2. Install dependencies
+### 2. Download the image assets (free)
+
+The image art is **not included in the repository** — it comes from a free external pack and must be downloaded separately:
+
+1. Get the **[WW1 2D Assets Pack](https://gnpa.itch.io/ww-1-2d-assets-pack)** (free) on itch.io.
+2. Copy the pack's image files into `assets/images/`.
+
+The game loads all unit, building, and ground art from that folder; if images are missing it still runs, drawing simple colored blocks instead — but download the pack for the full experience.
+
+### 3. Install dependencies
 
 ```bash
 pip install -r requirements.txt
 ```
 
-### 3. Launch the game
+### 4. Launch the game
 
 ```bash
-python main.py
+python src/main.py
 ```
 
 [Back to Table of Contents](#toc)
@@ -252,23 +252,25 @@ python main.py
 
 ### Step 1: Generate a Battlefield
 
-Starting a new game creates a procedurally generated WWI battlefield and trenches with randomized terrain, weather conditions, and enemy strength.
+Starting a new game creates a procedurally generated WWI battlefield and trenches with randomized terrain, scene variants, and enemy strength.
 
 No two battles are exactly alike.
 
 ### Step 2: Prepare Your Defenses
 
-Use your available supplies to construct defensive positions, including:
+Your bunker is already in place — protect it, because if it falls, the battle is over.
 
-* 🔫 Machine-gun nests
-* 🧱 Bunkers
-* 💥 Artillery positions
+Use your available supplies to construct defensive positions by touching a spot and paying toward it (installments count), including:
 
-Friendly barracks can recruit infantry to help defend your position
+* 🔫 Machine-gun nests (30 gold)
+* 🏭 Barracks (60 gold) — they deploy 12-man rifle sections on their own
+* 💥 Artillery positions (80 gold)
+* 🚜 Tank factories (150 gold)
+* 🛩️ Air fields (200 gold)
 
 ### Step 3: Defend your position
 
-Enemy barracks continuously spawn infantry. Enemy troops will engage your friendly infantry and advance toward your bunker when no friendly infantry remain.
+Enemy barracks continuously spawn infantry. Enemy troops will engage your friendly infantry and advance toward your bunker when no friendly infantry remain. The enemy also runs a tank factory and an air field, so expect armor and air raids.
 
 Your machine-gun nests and artillery provide supporting fire against enemy infantry.
 
@@ -304,7 +306,7 @@ Because Hold the Trench is a fully offline single-player game, it can easily be 
 Create an isolated Python environment:
 
 ```bash
-py -3.11 -m venv venv
+py -3.15 -m venv venv
 ```
 
 Activate the environment:
@@ -327,6 +329,10 @@ Install dependencies:
 (venv) pip install -r requirements.txt
 ```
 
+> **Note:** the image assets are not in the repository — download the free
+> [WW1 2D Assets Pack](https://gnpa.itch.io/ww-1-2d-assets-pack) and place it
+> in `assets/images/` (see step 2 of [Installation](#installation)).
+
 Run the game:
 
 ```bash
@@ -339,35 +345,31 @@ Run the game:
 
 ## 🧭 <a name="development-roadmap">Development Roadmap
 
-### ✅ Vertical Slice V1
+### ✅ Alpha — Completed
 
-* [x] Machine-gun nests
-* [x] Bunkers
-* [x] Artillery positions
-* [x] Continuous enemy infantry spawning
-* [x] Enemy bunker destruction objective
-* [x] Post-battle decisions
-* [x] Victory and defeat states
+* [x] Basic game engine mechanics
+* [x] Start and win menu system
+* [x] High-level game prototype
 
-### 🚧 Planned Improvements
+### ✅ Beta — Completed
 
-* [ ] Procedural scenarios
-* [ ] Additional enemy types
-* [ ] Better pathfinding
-* [ ] Visual effects
-* [ ] Sound effects
-* [ ] Music
-* [ ] Weather system
-* [ ] Campaign progression
-* [ ] Save/load support
-* [ ] Pause and resume
-* [ ] Gameplay balancing
+* [x] Animated sprites for units, including planes, tanks, and infantry
+* [x] Static images for menus, backgrounds, buildings, and other game elements
+* [x] Sound effects
+* [x] Playable Axis and Allied trench warfare
+* [x] Pause functionality
+* [x] Zoom in and out, with full-map and close-up views
 
-### 📌 Future Features
+### 🔮 Future Demo — Planned
 
-* [ ] Tanks
-* [ ] Cavalry
-* [ ] Difficulty modifiers
+* [ ] Add AA gun units
+* [ ] Randomized, compatible factions for each side — Austro-Hungarian forces use barracks instead of airfields and tank factories
+* [ ] Expanded unit behavior, including infantry grenades, planes, British tanks, and faction-specific weapons
+* [ ] Unit audio for MG nests, artillery, infantry, planes, and tanks, with volume based on player distance
+* [ ] Gamepad support and a main-menu screen for customizing or restoring keyboard and gamepad controls
+* [ ] Visual effects, including particle explosions, cannon-fire effects, and damaged textures for buildings, tanks, and artillery
+* [ ] A reusable ASCII-map navigation system with route finding and visualization
+* [ ] Review optional Python libraries that could simplify the codebase — recommend suitable options before adding dependencies or changing code
 
 [Back to Table of Contents](#toc)
 
@@ -380,6 +382,8 @@ While **Hold the Trench** aims to establish its own identity, it draws inspirati
 * Tactical defense games
 * Procedural roguelites
 * Historical WWI trench warfare
+
+The game's image art comes from the free **[WW1 2D Assets Pack](https://gnpa.itch.io/ww-1-2d-assets-pack)** by gnpa on itch.io — it is not bundled with the repository (see [Installation](#installation)).
 
 [Back to Table of Contents](#toc)
 

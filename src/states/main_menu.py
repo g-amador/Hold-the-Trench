@@ -1,40 +1,125 @@
 """
 Main menu state.
-Press ENTER to start.
+
+Background is Menu_Start.jpeg (scaled once to the window, cached by
+the image loader). The player picks a side with A/1 (Allies) or X/2
+(Axis) and starts with ENTER (Q quits). The chosen side is stored on
+Game.selected_faction and drives every texture decision downstream
+(single source: systems/factions.py).
 """
 
 import pygame
 
-from config import WHITE, BLACK
+from config import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GREY
+from systems import audio
+from utils.image_loader import load_image
+from systems.factions import (
+    FACTIONS,
+    MENU_BACKGROUND,
+)
 from world.tilemap import TileMap
 
 
 class MainMenu:
     def __init__(self, game):
+        # Keep the Game reference so the menu can switch states and
+        # rebuild the shared world.
         self.game = game
         self.font = pygame.font.SysFont("arial", 40)
         self.small_font = pygame.font.SysFont("arial", 25)
 
-    def handle_event(self, event):
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_RETURN:
-                from states.assault_phase import AssaultPhase
+        # Preload the faction menu background once: window-sized scaled
+        # copy, cached by image_loader.
+        self.background = load_image(
+            MENU_BACKGROUND,
+            alpha=False,
+            size=(SCREEN_WIDTH, SCREEN_HEIGHT),
+        )
 
-                self.game.tilemap = TileMap()
-                self.game.change_state(AssaultPhase(self.game))
-            if event.key == pygame.K_q:
-                self.game.running = False
+        # Translucent wash for text readability over the photo,
+        # built once here (building it per frame would churn).
+        self.text_wash = pygame.Surface(
+            (SCREEN_WIDTH, SCREEN_HEIGHT),
+            pygame.SRCALPHA,
+        )
+        self.text_wash.fill((0, 0, 0, 110))
+
+        # Selection is menu-local; it is promoted to game.selected_faction
+        # only when a battle actually starts (backing out keeps whatever
+        # side was last played).
+        self.selected = "allies"
+
+        # User request: Menu_Loop.wav loops for as long as the start
+        # menu shows. It is cut again when a battle starts (the ENTER
+        # branch below calls audio.stop_menu_audio).
+        audio.play_menu_music()
+
+    def handle_event(self, event):
+        if event.type != pygame.KEYDOWN:
+            return
+
+        # Side selection: W/UP and S/DOWN move between the two sides
+        # (top line = Allies, bottom line = Axis), with number
+        # shortcuts kept. The labels in FACTIONS render these same
+        # keys as hints. Every press also fires the select sting
+        # (user: one menu_select.wav per press).
+        if event.key in (pygame.K_w, pygame.K_UP, pygame.K_1):
+            self.selected = "allies"
+            audio.play_menu_select_sound()
+        elif event.key in (pygame.K_s, pygame.K_DOWN, pygame.K_2):
+            self.selected = "axis"
+            audio.play_menu_select_sound()
+        elif event.key == pygame.K_RETURN:
+            # Imported here (not top-level) to avoid a circular
+            # import: assault_phase imports states it can switch to.
+            from states.assault_phase import AssaultPhase
+
+            # Promote the choice before constructing anything: spawn
+            # clocks, textures, and coin drops all read it.
+            self.game.selected_faction = self.selected
+
+            # Fresh world per battle so existing buildings/pays from a
+            # previous fight never carry over. Leaving the menu also
+            # cuts its music (and any pending select sting) first.
+            audio.stop_menu_audio()
+            self.game.tilemap = TileMap()
+
+            self.game.change_state(AssaultPhase(self.game))
+        elif event.key == pygame.K_q:
+            # Ending the loop from the menu quits the process cleanly.
+            self.game.running = False
 
     def update(self, dt):
+        # Static screen: no simulated elements yet.
         pass
 
     def render(self, screen):
-        screen.fill(BLACK)
+        # Background: static image covers the whole window; the wash
+        # dims it slightly so the white text stays readable.
+        screen.blit(self.background, (0, 0))
+        screen.blit(self.text_wash, (0, 0))
 
         title = self.font.render("HOLD THE TRENCH", True, WHITE)
-        start = self.small_font.render("Press ENTER to Start", True, WHITE)
-        quit_text = self.small_font.render("Press Q to Quit", True, WHITE)
+        prompt = self.small_font.render("Choose your side:", True, WHITE)
 
         screen.blit(title, (180, 150))
-        screen.blit(start, (200, 250))
-        screen.blit(quit_text, (200, 300))
+        screen.blit(prompt, (200, 250))
+
+        # Faction options: the picked line is bright, the other dimmed.
+        for row, (faction_id, data) in enumerate(FACTIONS.items()):
+            selected = faction_id == self.selected
+            color = WHITE if selected else GREY
+            marker = "> " if selected else "  "
+            option = self.small_font.render(
+                f"{marker}{data['label']}",
+                True,
+                color,
+            )
+            screen.blit(option, (220, 300 + row * 35))
+
+        quit_text = self.small_font.render(
+            "ENTER to start | Q to Quit",
+            True,
+            WHITE,
+        )
+        screen.blit(quit_text, (220, 390))
